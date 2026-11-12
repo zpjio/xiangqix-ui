@@ -1,0 +1,431 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
+
+/* ============================================================================
+   象棋X (XiangqiX) 设计简报 §8 标准 Token 体系 (--xq-* & xq-*)
+   支持 html[data-theme="dark"] (紫檀夜案) 与 html[data-theme="light"] (宣纸书斋)
+   ============================================================================ */
+
+:root,
+html[data-theme="dark"] {
+  --xq-bg-canvas: #121316;
+  --xq-bg-surface: #181A1F;
+  --xq-bg-elevated: #21242C;
+  --xq-bg-hover: #2A2E38;
+  --xq-bg-active: #323744;
+  --xq-bg-backdrop: rgba(9, 10, 13, 0.72);
+
+  --xq-text-primary: #F3F4F6;
+  --xq-text-secondary: #A1A7B3;
+  --xq-text-muted: #6E7685;
+  --xq-text-inverse: #121316;
+
+  --xq-border-subtle: rgba(255, 255, 255, 0.09);
+  --xq-border-strong: rgba(255, 255, 255, 0.18);
+
+  --xq-accent-primary: #D49B35;
+  --xq-accent-primary-hover: #E0A842;
+  --xq-accent-gold: #E5A93C;
+  --xq-accent-jade: #10B981;
+
+  /* 统一按钮语义变量 (Dark) */
+  --xq-btn-primary-bg: #D49B35;
+  --xq-btn-primary-hover: #E0A842;
+  --xq-btn-primary-text: #121316;
+  --xq-btn-primary-border: #E5B55A;
+
+  --xq-btn-secondary-bg: #22262F;
+  --xq-btn-secondary-hover: #2C313D;
+  --xq-btn-secondary-text: #E5E7EB;
+  --xq-btn-secondary-border: rgba(255, 255, 255, 0.12);
+
+  --xq-btn-option-bg: #1A1D24;
+  --xq-btn-option-hover: #242832;
+  --xq-btn-option-text: #A1A7B3;
+  --xq-btn-option-border: rgba(255, 255, 255, 0.09);
+
+  --xq-btn-option-active-bg: rgba(212, 155, 53, 0.18);
+  --xq-btn-option-active-text: #F5C45E;
+  --xq-btn-option-active-border: #D49B35;
+
+  --xq-mode-explore: #E5A93C;
+  --xq-mode-play: #10B981;
+  --xq-mode-setup: #F59E0B;
+  --xq-mode-connect: #3B82F6;
+
+  --xq-eval-red: #C8372D;
+  --xq-eval-black: #27272A;
+
+  --xq-badge-best: #10B981;
+  --xq-badge-good: #34D399;
+  --xq-badge-inaccuracy: #F59E0B;
+  --xq-badge-mistake: #F97316;
+  --xq-badge-blunder: #EF4444;
+
+  --xq-font-scale: 1;
+}
+
+html[data-theme="light"] {
+  --xq-bg-canvas: #F2F4F7;
+  --xq-bg-surface: #FFFFFF;
+  --xq-bg-elevated: #F8FAFC;
+  --xq-bg-hover: #EDF1F7;
+  --xq-bg-active: #E2E8F0;
+  --xq-bg-backdrop: rgba(15, 23, 42, 0.42);
+
+  --xq-text-primary: #18181B;
+  --xq-text-secondary: #475569;
+  --xq-text-muted: #64748B;
+  --xq-text-inverse: #FFFFFF;
+
+  --xq-border-subtle: rgba(15, 23, 42, 0.1);
+  --xq-border-strong: rgba(15, 23, 42, 0.2);
+
+  --xq-accent-primary: #B47814;
+  --xq-accent-primary-hover: #9A650E;
+  --xq-accent-gold: #9A6708;
+  --xq-accent-jade: #059669;
+
+  /* 统一按钮语义变量 (Light) */
+  --xq-btn-primary-bg: #B47814;
+  --xq-btn-primary-hover: #9A650E;
+  --xq-btn-primary-text: #FFFFFF;
+  --xq-btn-primary-border: #9A650E;
+
+  --xq-btn-secondary-bg: #FFFFFF;
+  --xq-btn-secondary-hover: #F1F5F9;
+  --xq-btn-secondary-text: #1E293B;
+  --xq-btn-secondary-border: rgba(15, 23, 42, 0.16);
+
+  --xq-btn-option-bg: #F8FAFC;
+  --xq-btn-option-hover: #EEF2F6;
+  --xq-btn-option-text: #475569;
+  --xq-btn-option-border: rgba(15, 23, 42, 0.12);
+
+  --xq-btn-option-active-bg: rgba(180, 120, 20, 0.13);
+  --xq-btn-option-active-text: #855506;
+  --xq-btn-option-active-border: #B47814;
+
+  --xq-mode-explore: #9A6708;
+  --xq-mode-play: #059669;
+  --xq-mode-setup: #D97706;
+  --xq-mode-connect: #2563EB;
+
+  --xq-eval-red: #B82925;
+  --xq-eval-black: #27272A;
+}
+
+html[data-font-scale="standard"] {
+  --xq-font-scale: 1;
+  font-size: 16px;
+}
+
+html[data-font-scale="large"] {
+  --xq-font-scale: 1.0625;
+  font-size: 17px;
+}
+
+html[data-font-scale="xlarge"] {
+  --xq-font-scale: 1.125;
+  font-size: 18px;
+}
+
+@layer base {
+  body {
+    font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background-color: var(--xq-bg-canvas);
+    color: var(--xq-text-primary);
+    overflow-x: hidden;
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* 字体工具类 */
+.font-calligraphy {
+  font-family: "Ma Shan Zheng", "Kaiti SC", "STKaiti", serif;
+}
+
+.font-cursive {
+  font-family: "Zhi Mang Xing", "Ma Shan Zheng", cursive, serif;
+}
+
+.font-serif-sc {
+  font-family: "Noto Serif SC", "Songti SC", "SimSun", serif;
+}
+
+.font-mono-tabular {
+  font-family: "JetBrains Mono", monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 语义化壳层工具类 (xq-*) */
+.xq-canvas {
+  background-color: var(--xq-bg-canvas);
+  color: var(--xq-text-primary);
+}
+
+.xq-surface {
+  background-color: var(--xq-bg-surface);
+  color: var(--xq-text-primary);
+  border-color: var(--xq-border-subtle);
+}
+
+.xq-elevated {
+  background-color: var(--xq-bg-elevated);
+  color: var(--xq-text-primary);
+  border-color: var(--xq-border-subtle);
+}
+
+.xq-border {
+  border-color: var(--xq-border-subtle);
+}
+
+.xq-border-strong {
+  border-color: var(--xq-border-strong);
+}
+
+.xq-text-primary {
+  color: var(--xq-text-primary);
+}
+
+.xq-text-secondary {
+  color: var(--xq-text-secondary);
+}
+
+.xq-text-muted {
+  color: var(--xq-text-muted);
+}
+
+/* ==================== 全局统一按钮规范体系 (适配 Dark / Light 双主题) ==================== */
+.xq-btn-primary {
+  background-color: var(--xq-btn-primary-bg);
+  color: var(--xq-btn-primary-text);
+  border: 1px solid var(--xq-btn-primary-border);
+  font-weight: 600;
+  transition: background-color 150ms ease, border-color 150ms ease, opacity 150ms ease;
+}
+
+.xq-btn-primary:hover:not(:disabled) {
+  background-color: var(--xq-btn-primary-hover);
+}
+
+.xq-btn-secondary {
+  background-color: var(--xq-btn-secondary-bg);
+  color: var(--xq-btn-secondary-text);
+  border: 1px solid var(--xq-btn-secondary-border);
+  font-weight: 500;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.xq-btn-secondary:hover:not(:disabled) {
+  background-color: var(--xq-btn-secondary-hover);
+}
+
+.xq-btn-option {
+  background-color: var(--xq-btn-option-bg);
+  color: var(--xq-btn-option-text);
+  border: 1px solid var(--xq-btn-option-border);
+  font-weight: 500;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.xq-btn-option:hover:not(:disabled) {
+  background-color: var(--xq-btn-option-hover);
+  color: var(--xq-text-primary);
+}
+
+.xq-btn-option-active {
+  background-color: var(--xq-btn-option-active-bg);
+  color: var(--xq-btn-option-active-text);
+  border: 1px solid var(--xq-btn-option-active-border);
+  font-weight: 600;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.xq-btn-engine-on {
+  background-color: #059669;
+  color: #FFFFFF;
+  border: 1px solid #047857;
+  font-weight: 600;
+  transition: background-color 150ms ease;
+}
+
+.xq-btn-engine-on:hover:not(:disabled) {
+  background-color: #047857;
+}
+
+.xq-btn-danger {
+  background-color: rgba(239, 68, 68, 0.12);
+  color: #EF4444;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  font-weight: 500;
+  transition: background-color 150ms ease;
+}
+
+.xq-btn-danger:hover:not(:disabled) {
+  background-color: rgba(239, 68, 68, 0.22);
+}
+
+/* ==================== 《象棋考工》棋子立体木雕旋纹与阴刻内阴影 ==================== */
+.piece-token-red {
+  background: radial-gradient(
+    circle at 32% 28%,
+    #F3DFC1 0%,
+    #DFC196 42%,
+    #C5A06E 78%,
+    #9C784C 100%
+  );
+  box-shadow:
+    0 6px 12px -2px rgba(15, 8, 4, 0.72),
+    0 2px 4px rgba(15, 8, 4, 0.55),
+    inset 0 2px 3px rgba(255, 248, 231, 0.75),
+    inset 0 -3px 6px rgba(92, 60, 28, 0.65);
+}
+
+.piece-token-black {
+  background: radial-gradient(
+    circle at 32% 28%,
+    #3D3530 0%,
+    #26201D 45%,
+    #181412 80%,
+    #0E0B0A 100%
+  );
+  box-shadow:
+    0 6px 12px -2px rgba(10, 6, 3, 0.8),
+    0 2px 4px rgba(10, 6, 3, 0.6),
+    inset 0 2px 3px rgba(255, 255, 255, 0.18),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.85);
+}
+
+.piece-ebony-red {
+  background: radial-gradient(
+    circle at 32% 28%,
+    #4E1E1B 0%,
+    #361210 48%,
+    #240A09 82%,
+    #160504 100%
+  );
+  box-shadow:
+    0 6px 12px -2px rgba(10, 6, 3, 0.8),
+    0 2px 4px rgba(10, 6, 3, 0.6),
+    inset 0 2px 3px rgba(255, 200, 180, 0.22),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.85);
+}
+
+.piece-jade-red,
+.piece-jade-black {
+  background: radial-gradient(
+    circle at 32% 28%,
+    #FAF6EE 0%,
+    #ECE4D4 48%,
+    #D6CBB8 84%,
+    #B8AA93 100%
+  );
+  box-shadow:
+    0 6px 12px -2px rgba(20, 14, 8, 0.65),
+    0 2px 4px rgba(20, 14, 8, 0.45),
+    inset 0 2px 4px rgba(255, 255, 255, 0.9),
+    inset 0 -3px 6px rgba(130, 115, 95, 0.5);
+}
+
+.engraved-red-char {
+  color: #A62222;
+  text-shadow:
+    0 1px 0 rgba(255, 245, 225, 0.7),
+    0 -1px 1px rgba(70, 10, 10, 0.65);
+}
+
+.engraved-gold-char {
+  color: #DFB654;
+  text-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.85),
+    0 0 6px rgba(212, 175, 55, 0.25);
+}
+
+.engraved-crimson-gold-char {
+  color: #E85D4A;
+  text-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.9),
+    0 0 6px rgba(232, 93, 74, 0.3);
+}
+
+.engraved-ink-char {
+  color: #1C1917;
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.75),
+    0 -1px 1px rgba(0, 0, 0, 0.5);
+}
+
+.zitan-board-frame {
+  background: linear-gradient(145deg, #362219 0%, #241610 50%, #1B100C 100%);
+  box-shadow:
+    0 18px 36px -10px rgba(0, 0, 0, 0.68),
+    0 6px 16px -4px rgba(0, 0, 0, 0.5),
+    inset 0 1px 2px rgba(212, 175, 55, 0.28),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.8);
+}
+
+/* ==================== 落子物理碰撞：朱砂粉尘与木屑散落特效 ==================== */
+@keyframes xiangqi-dust-scatter {
+  0% {
+    opacity: 0.95;
+    transform: translate3d(0, 0, 0) scale(0.45) rotate(0deg);
+  }
+  28% {
+    opacity: 0.92;
+    transform: translate3d(calc(var(--tx) * 0.68), calc(var(--ty) * 0.68), 0)
+      scale(var(--scale, 1)) rotate(calc(var(--rot) * 0.6));
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--tx), var(--ty), 0) scale(0.15) rotate(var(--rot));
+  }
+}
+
+@keyframes xiangqi-impact-ring {
+  0% {
+    opacity: 0.82;
+    transform: scale(0.65);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.65);
+  }
+}
+
+@keyframes xiangqi-piece-land {
+  0% {
+    transform: translate3d(0, -7px, 0) scale(1.14);
+  }
+  55% {
+    transform: translate3d(0, 1px, 0) scale(0.97);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+.animate-dust-particle {
+  animation: xiangqi-dust-scatter var(--dur, 560ms) cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.animate-impact-ring {
+  animation: xiangqi-impact-ring 480ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.animate-piece-land {
+  animation: xiangqi-piece-land 190ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-dust-particle,
+  .animate-impact-ring,
+  .animate-piece-land {
+    animation: none !important;
+  }
+}

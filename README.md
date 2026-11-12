@@ -1,11 +1,136 @@
-<div align="center">
+# 象棋X · 前端工作台 (`xiangqix-ui`)
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+> **象棋X (XiangqiX) v2.4** 专业中国象棋分析与对弈桌面端 UI 工作台。  
+> 本仓库为**完整纯前端工程**（React 19 + TypeScript + Tailwind CSS v4 + Vite），内置完整的中国象棋走子规则、无感内联分支推演、棋具考工渲染以及前端模拟引擎/连线/识图交互闭环，可直接独立运行演示，也可无缝对接到 `zpjio/xiangqix` 主客户端工程。
 
-  <h1>Built with AI Studio</h2>
+---
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+## 一、 仓库矩阵与定位说明
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+| 仓库名称 | 权限建议 | 核心定位与职责边界 |
+| :--- | :--- | :--- |
+| **`zpjio/xiangqix`** | 主工程 | **完整桌面端应用**：集成 Tauri / Electron 原生壳、Pikafish UCI 进程通信、外部象棋窗口连线抓图、本地图片识别推理及本仓 UI |
+| **`zpjio/xiangqix-ui`** *(本仓库)* | 私有 | **2.0 完整前端工作台**：包含全部四大核心工作空间、弹窗套件、主题规范与前端交互状态机，供产品迭代与主工程合入 |
+| **`zpjio/xiangqix-craft`** | 公开开源 | **棋具考工与视觉设计展示**：对外公开分享传统棋盘纹理、棋子阴刻工艺与前端视觉探索 |
 
-</div>
+---
+
+## 二、 核心功能与 2.0 交互架构
+
+### 1. 四大工作空间（顶栏中区导航）
+- **复盘分析 (`study`)**
+  - **无感内联分支推演**：在任意历史手直接点击盘面走子或点击右侧候选主变，自动从该手分叉生成内联推演支线，支持一键「升为主线」或「回主谱」，无需切换模式。
+  - **连续双栏数据棋谱 (`MoveList`)**：固定表头（`回合 | 红方着法 / 评估 | 黑方着法 / 评估`），每步完整展示 14px 宋体加粗着法、`妙/优/良/缓/败` 质量角标与右对齐等宽分值。
+  - **整局复盘报告 (`GameReviewPanel`)**：红黑双方整局精准度对比、内嵌 SVG 局势演化曲线（`EvalGraph`）、关键失误诊断卡片及一键「**重练此手**」交互闭环。
+- **残局题库 (`challenge`)**
+  - 内置《七星聚会》《野马操田》《蚯蚓降龙》《千里独行》等经典古谱杀局，支持破局目标校验、正着锦囊提示与一键重摆。
+- **人机对弈 (`play`)**
+  - 支持传统让子规则（`分先` / `让先` / `让左马` / `让双马`）与四档电脑棋力切换（`初级` / `中级` / `高级` / `大师`），随时支持悔棋与引擎支招。
+- **摆子编辑 (`setup`)**
+  - 右侧配备红黑子力库（自动计算剩余可摆子力配额），支持切换红先/黑先、仅留将帅、重置初始棋盘，完成后一键转入复盘分析。
+
+### 2. 常驻引擎分析舱 (`EnginePanel`) 与首次安装引导
+- **未安装/首次启动引导 (`engineStatus: 'missing' | 'installing' | 'ready'`)**：
+  - 当未检测到本地引擎时，自动展示未安装引导卡片（说明需包含 `pikafish` 主程序与 `pikafish.nnue` 神经网络权重文件）。
+  - 提供「**一键下载并安装引擎**」进度条引导及「**手动指定 / 说明**」入口。
+- **实时多主变 (`MultiPV`) 与威胁雷达 (`Threat Radar`)**：
+  - 支持 1~3 条候选变例实时展示，鼠标悬停候选变例可在棋盘上渲染半透明幽灵预览箭头，点击直接落子推演。
+  - 开启「威胁雷达」后，在盘面用红色虚线箭头标出对方下一步最具威胁的攻着。
+
+### 3. 全局工具栏与弹窗套件 (`DialogsModalSuite`)
+- **棋谱库 (`library`)**：支持「全部棋谱 / ★ 我的收藏 / 现代名局 / 古谱名局」分类筛选与关键词搜索，与主界面棋谱顶部的「收藏」按钮实时双向同步。
+- **导入 / 棋谱 (`fen-pgn`)**：
+  - **FEN / PGN 页签**：支持 FEN 局面编码与完整 PGN 棋谱文本的双向导入、复制导出及格式合法性校验。
+  - **图片识别局面页签**：极简一屏设计，支持点击选图、拖入或直接 `Ctrl+V` 粘贴剪贴板截图，选择红先/黑先后一键载入棋盘。
+- **外部平台连线 (`connect`)**：
+  - 选择外部窗口（天天象棋 / JJ象棋 / 模拟器）连接后，**直接复用「复盘分析」工作台**，在棋谱上方显示绿色同步状态条，避免冗余页面切换。
+- **单页设置中心 (`settings`)**：
+  - 集成「本地引擎安装状态管理 + 界面深浅主题 + 棋子简繁字形 + 三款棋盘材质 + 三款棋子工艺 + MultiPV/深度档位 + 界面字号 + 音效开关 + 底部关于与检查更新」。
+
+---
+
+## 三、 目录结构说明
+
+```text
+xiangqix-ui/
+├── index.html                  # 页面入口与 Google Fonts (Noto Serif SC / JetBrains Mono)
+├── package.json                # 依赖与构建脚本
+├── vite.config.ts              # Vite 构建配置
+└── src/
+    ├── main.tsx                # React 挂载入口
+    ├── App.tsx                 # 顶层状态协调器、键盘快捷键 (←/→/Home/End/Space/⌘K) 与主舞台布局
+    ├── index.css               # 全局设计 Token (--xq-*)、深浅双主题变量、5级统一按钮规范与棋盘/棋子考工样式
+    ├── types/
+    │   └── xiangqi.ts          # 全局 TypeScript 类型契约（棋子、着法、MultiPV、引擎状态、连线状态等）
+    ├── data/
+    │   └── catalogRegistry.ts  # 内置古谱残局题库与初始大师名局数据
+    ├── utils/
+    │   └── xiangqiRules.ts     # 中国象棋完整走子规则、将军判定、ICCS/中文纵线记谱转换、FEN/PGN 解析与音效合成
+    └── components/
+        ├── Titlebar.tsx        # 顶栏（左：品牌印记 | 中：四大工作空间 | 右：工具栏与全局设置）
+        ├── PlayerSeatBar.tsx   # 棋盘上下方棋手席位条（阵营、行棋呼吸灯、子力净优势差、将军告警）
+        ├── EvalBar.tsx         # 棋盘左侧纵向红黑胜率评估柱（自适应对比度数字显示）
+        ├── Board.tsx           # 9×10 传统 SVG 棋盘（视口高度自适应缩放、主变/威胁/支招箭头、摆子子力库）
+        ├── XiangqiPiece.tsx    # 棋子组件（红方双弦海棠星 / 黑方外圆内八角阴刻 SVG + 简繁汉字）
+        ├── BoardNav.tsx        # 棋盘下方步进控制与翻转/悔棋/支招操作栏
+        ├── EnginePanel.tsx     # 右侧上半区常驻引擎分析舱（含未安装引导、下载进度与 MultiPV 列表）
+        ├── MoveList.tsx        # 右侧下半区连续斑马纹双栏回合棋谱表格（含连线同步条与内联推演支线盒）
+        ├── GameReviewPanel.tsx # 右侧下半区复盘报告（精准度统计、局势曲线、败着重练卡片）
+        ├── EvalGraph.tsx       # 整局局势演化折线图（支持点击任意手跳步）
+        ├── DialogsModalSuite.tsx # 全局弹窗套件（命令面板、棋谱库、导入导出/识图、连线、对局信息、设置中心）
+        └── StatusBar.tsx       # 底栏状态提示与手数/子力概览
+```
+
+---
+
+## 四、 视觉与主题设计规范（供前端开发参考）
+
+### 1. 现代中性壳层 + 传统棋具焦点
+- **深色模式 (`html[data-theme="dark"]`)**：采用现代中性深灰画布（`#121316`）与面板（`#181A1F`），摒弃全屏棕红底色，突出中央木纹/朱漆/青瓷棋盘。
+- **浅色模式 (`html[data-theme="light"]`)**：采用清爽中性浅灰画布（`#F2F4F7`）与纯白面板（`#FFFFFF`）。
+- **棋盘尺寸自适应**：棋盘容器采用 `w-[clamp(430px,calc((100vh-228px)*0.89),620px)]`，根据屏幕高度动态放大（最高达 `620px` 宽），同时确保一屏完整容纳不出现纵向滚动条。
+
+### 2. 全局 5 级语义按钮类名（定义于 `src/index.css`）
+新增或修改按钮时，请统一使用以下语义类名，自动适配深/浅双主题对比度：
+- `.xq-btn-primary`：主操作按钮（弹窗确认、载入棋盘、保存、一键安装、支招、重练此手）
+- `.xq-btn-secondary`：次级常规按钮（顶栏工具按钮、取消、复制、翻转、悔棋）
+- `.xq-btn-option` / `.xq-btn-option-active`：分段选择器与选项卡按钮（设置项、让子、难度、分类筛选）
+- `.xq-btn-engine-on`：引擎运行中 / 外部连线激活态按钮（翡翠绿）
+- `.xq-btn-danger`：警示 / 断开连线 / 删除按钮（朱砂红）
+
+---
+
+## 五、 合入 `zpjio/xiangqix` 主工程对接指南（交接重点）
+
+将本仓库合入主客户端工程时，`src/components/` 与 `src/index.css` 可 **100% 原样保留**，仅需将 `src/App.tsx` 中的 4 处前端模拟逻辑替换为原项目的真实原生/后端接口：
+
+1. **本地引擎检测与安装 (`engineStatus` & `handleInstallEngine`)**
+   - **位置**：`src/App.tsx` 第 106~136 行
+   - **对接方式**：启动时检查本地 `engines/pikafish` 与 `engines/pikafish.nnue` 是否存在；存在则初始化 `engineStatus = 'ready'`，不存在则保持 `'missing'`。点击「一键下载并安装引擎」或「选择本地引擎」时调用主工程的文件下载/路径绑定接口，并通过进度回调更新 `installProgress`。
+2. **UCI 引擎实时分析流 (`multiPvData` & `threatArrow`)**
+   - **位置**：`src/App.tsx` 第 178~189 行
+   - **对接方式**：将 `generateSimulatedMultiPV(pieces, turn, engineDepth, multiPvCount)` 替换为真实的 Pikafish UCI `position fen ...` + `go depth ...` 输出解析器，将解析出的 `MultiPVLine[]` 传入 `<EnginePanel lines={...} />` 与 `<Board multiPvArrows={...} />`。
+3. **图片识别导入 (`activeModal === 'fen-pgn' -> importMode === 'image'`)**
+   - **位置**：`src/components/DialogsModalSuite.tsx` 第 633~737 行
+   - **对接方式**：将文件上传 (`onChange`) 与剪贴板粘贴 (`onPaste`) 获取到的图片 `File / Blob` 传给原项目的本地棋盘识别模型接口，拿到识别出的 FEN 字符串后调用 `onApplyFen(fen)` 即可载入棋盘。
+4. **外部象棋平台连线同步 (`connectState` & `handleSyncNextExternalMove`)**
+   - **位置**：`src/App.tsx` 第 117~123 行、第 632~639 行
+   - **对接方式**：在 `onUpdateConnectState` 启动外部窗口抓图监听线程，每当检测到外部棋盘落子时调用 `executeMoveOnBoard(from, to)` 即可自动追加到「复盘分析」的棋谱表格中并触发引擎分析。
+
+---
+
+## 六、 本地运行与构建
+
+```bash
+# 1. 安装依赖
+npm install
+
+# 2. 启动开发服务器 (默认端口 http://localhost:3000)
+npm run dev
+
+# 3. TypeScript 类型检查
+npm run lint
+
+# 4. 生产环境打包构建
+npm run build
+```
