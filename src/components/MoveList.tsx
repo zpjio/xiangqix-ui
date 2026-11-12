@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Check, GitBranch, RefreshCw, Star, Unplug, X } from 'lucide-react';
 import { ExternalConnectState, GameMetadata, MoveQuality, MoveRecord } from '../types/xiangqi';
 
@@ -67,6 +67,11 @@ export const MoveList: React.FC<MoveListProps> = ({
 
   const activeMoveList = variationMoves || mainMoves;
   const activeMoveRecord = currentPly > 0 ? activeMoveList[currentPly - 1] : null;
+  const activeRowRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    activeRowRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [currentPly]);
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -204,6 +209,7 @@ export const MoveList: React.FC<MoveListProps> = ({
           return (
             <React.Fragment key={`round-${r.roundNumber}`}>
               <div
+                ref={isRedSelected || isBlackSelected ? activeRowRef : undefined}
                 className={`grid grid-cols-12 items-center px-2 ${
                   idx % 2 === 1 ? 'bg-[var(--xq-bg-canvas)]/45' : ''
                 }`}

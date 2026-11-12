@@ -30,7 +30,8 @@ import {
   AppTheme,
   BoardTheme,
   Camp,
-  EngineInstallStatus,
+  EngineProfile,
+  EngineProtocol,
   EngineSkillTier,
   ExternalConnectState,
   FontScale,
@@ -104,40 +105,130 @@ export default function App() {
   const [impactEffect, setImpactEffect] = useState<ImpactEffect | null>(null);
   const [flipped, setFlipped] = useState<boolean>(false);
 
-  // 引擎安装状态与战术图层状态（首次进入默认展示未安装引导，支持一键下载安装）
-  const [engineStatus, setEngineStatus] = useState<EngineInstallStatus>('missing');
-  const [installProgress, setInstallProgress] = useState<number>(0);
+  // 多引擎注册表与双擎并行对比状态（预置皮卡鱼 UCI、旋风 UCI、天机 UCCI 三大引擎）
+  const [engines, setEngines] = useState<EngineProfile[]>([
+    {
+      id: 'pikafish',
+      name: '皮卡鱼 Pikafish 2026',
+      shortName: '皮卡鱼',
+      version: '2026.11 AVX2',
+      protocol: 'UCI',
+      styleBias: 'balanced',
+      styleLabel: '均衡全能',
+      nnueFile: 'pikafish.nnue',
+      sizeMb: 38,
+      status: 'ready',
+      installProgress: 100,
+    },
+    {
+      id: 'cyclone',
+      name: '旋风 Cyclone v12',
+      shortName: '旋风',
+      version: 'v12.4 Ultimate',
+      protocol: 'UCI',
+      styleBias: 'aggressive',
+      styleLabel: '中路强攻',
+      nnueFile: 'cyclone_v12.nnue',
+      sizeMb: 42,
+      status: 'ready',
+      installProgress: 100,
+    },
+    {
+      id: 'xqms',
+      name: '天机 XQMS Pro 3.26',
+      shortName: '天机',
+      version: 'v3.26 UCCI',
+      protocol: 'UCCI',
+      styleBias: 'positional',
+      styleLabel: '阵地绵密',
+      nnueFile: 'xqms.nnue',
+      sizeMb: 31,
+      status: 'missing',
+      installProgress: 0,
+    },
+  ]);
+  const [primaryEngineId, setPrimaryEngineId] = useState<string>('pikafish');
+  const [secondaryEngineId, setSecondaryEngineId] = useState<string>('cyclone');
+  const [compareMode, setCompareMode] = useState<boolean>(false);
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(true);
   const [multiPvCount, setMultiPvCount] = useState<1 | 2 | 3>(3);
   const [engineDepth, setEngineDepth] = useState<18 | 24 | 30>(24);
+  const [engineThreads, setEngineThreads] = useState<4 | 8 | 16>(8);
+  const [engineHashMb, setEngineHashMb] = useState<256 | 512 | 1024>(512);
   const [threatRadarEnabled, setThreatRadarEnabled] = useState<boolean>(false);
   const [hoveredArrow, setHoveredArrow] = useState<MultiPVArrow | null>(null);
   const [hintArrow, setHintArrow] = useState<MultiPVArrow | null>(null);
   const [isReplaying, setIsReplaying] = useState<boolean>(false);
 
-  const handleInstallEngine = useCallback(() => {
-    if (engineStatus === 'installing') return;
-    setEngineStatus('installing');
-    setInstallProgress(12);
+  const handleInstallEngine = useCallback((targetId: string) => {
+    setEngines((prev) =>
+      prev.map((eng) =>
+        eng.id === targetId && eng.status !== 'installing'
+          ? { ...eng, status: 'installing', installProgress: 14 }
+          : eng
+      )
+    );
     const timer = window.setInterval(() => {
-      setInstallProgress((prev) => {
-        if (prev >= 96) {
+      setEngines((prev) => {
+        const target = prev.find((e) => e.id === targetId);
+        if (!target || target.status !== 'installing') {
           window.clearInterval(timer);
-          setEngineStatus('ready');
-          setIsAnalyzing(true);
-          return 100;
+          return prev;
         }
-        return prev + 18;
+        if (target.installProgress >= 92) {
+          window.clearInterval(timer);
+          setIsAnalyzing(true);
+          return prev.map((e) =>
+            e.id === targetId ? { ...e, status: 'ready', installProgress: 100 } : e
+          );
+        }
+        return prev.map((e) =>
+          e.id === targetId
+            ? { ...e, installProgress: Math.min(99, e.installProgress + 22) }
+            : e
+        );
       });
-    }, 200);
-  }, [engineStatus]);
-
-  const handleResetEngineMissing = useCallback(() => {
-    setEngineStatus('missing');
-    setInstallProgress(0);
-    setIsAnalyzing(false);
-    setThreatRadarEnabled(false);
+    }, 180);
   }, []);
+
+  const handleResetEngineMissing = useCallback((targetId: string) => {
+    setEngines((prev) =>
+      prev.map((e) =>
+        e.id === targetId ? { ...e, status: 'missing', installProgress: 0 } : e
+      )
+    );
+  }, []);
+
+  const handleAddCustomEngine = useCallback((fileName: string, protocol: EngineProtocol) => {
+    const cleanName = fileName.replace(/\.(exe|bin|uci|ucci)$/i, '');
+    const newId = `custom-${Date.now()}`;
+    const newEngine: EngineProfile = {
+      id: newId,
+      name: `${cleanName} (本地导入)`,
+      shortName: cleanName.slice(0, 6) || '自定义',
+      version: 'Local Custom',
+      protocol,
+      styleBias: protocol === 'UCCI' ? 'positional' : 'aggressive',
+      styleLabel: protocol === 'UCCI' ? '阵地均衡' : '算力进取',
+      nnueFile: `${cleanName.toLowerCase()}.nnue`,
+      sizeMb: 36,
+      status: 'ready',
+      installProgress: 100,
+    };
+    setEngines((prev) => [...prev, newEngine]);
+    setSecondaryEngineId(newId);
+  }, []);
+
+  const handleChangePrimaryEngine = useCallback(
+    (nextPrimaryId: string) => {
+      setPrimaryEngineId(nextPrimaryId);
+      if (nextPrimaryId === secondaryEngineId) {
+        const fallback = engines.find((e) => e.id !== nextPrimaryId);
+        if (fallback) setSecondaryEngineId(fallback.id);
+      }
+    },
+    [secondaryEngineId, engines]
+  );
 
   // 外部平台连线状态（复用复盘分析）
   const [connectState, setConnectState] = useState<ExternalConnectState>({
@@ -205,17 +296,146 @@ export default function App() {
     return getLegalMovesForPiece(selectedPiece, pieces);
   }, [selectedPiece, pieces, workspace, isBotThinking]);
 
+  const primaryEngine = useMemo(
+    () => engines.find((e) => e.id === primaryEngineId) || engines[0],
+    [engines, primaryEngineId]
+  );
+  const secondaryEngine = useMemo(
+    () =>
+      engines.find((e) => e.id === secondaryEngineId) ||
+      engines.find((e) => e.id !== primaryEngine.id) ||
+      engines[0],
+    [engines, secondaryEngineId, primaryEngine.id]
+  );
+
   const multiPvData = useMemo(() => {
-    if (engineStatus !== 'ready' || !isAnalyzing || workspace === 'setup') {
+    if (primaryEngine.status !== 'ready' || !isAnalyzing || workspace === 'setup') {
       return { lines: [], arrows: [] };
     }
-    return generateSimulatedMultiPV(pieces, turn, engineDepth, multiPvCount);
-  }, [engineStatus, isAnalyzing, workspace, pieces, turn, engineDepth, multiPvCount]);
+    return generateSimulatedMultiPV(
+      pieces,
+      turn,
+      engineDepth,
+      multiPvCount,
+      primaryEngine.styleBias,
+      engineThreads,
+      engineHashMb
+    );
+  }, [
+    primaryEngine.status,
+    primaryEngine.styleBias,
+    isAnalyzing,
+    workspace,
+    pieces,
+    turn,
+    engineDepth,
+    multiPvCount,
+    engineThreads,
+    engineHashMb,
+  ]);
+
+  const secondaryMultiPvData = useMemo(() => {
+    if (
+      !compareMode ||
+      secondaryEngine.status !== 'ready' ||
+      !isAnalyzing ||
+      workspace === 'setup'
+    ) {
+      return { lines: [], arrows: [] };
+    }
+    return generateSimulatedMultiPV(
+      pieces,
+      turn,
+      engineDepth,
+      2,
+      secondaryEngine.styleBias,
+      engineThreads,
+      engineHashMb
+    );
+  }, [
+    compareMode,
+    secondaryEngine.status,
+    secondaryEngine.styleBias,
+    isAnalyzing,
+    workspace,
+    pieces,
+    turn,
+    engineDepth,
+    engineThreads,
+    engineHashMb,
+  ]);
+
+  // 棋盘箭头合成：单引擎显示主/次变；双擎对比下显示主擎首推(绿) + 副擎首推(蓝)，若一致则自动合并为 [双擎共识]
+  const boardArrows = useMemo(() => {
+    if (!compareMode) {
+      return {
+        primaryArrows: multiPvData.arrows,
+        secondaryArrow: null as MultiPVArrow | null,
+      };
+    }
+    const priTop = multiPvData.lines[0];
+    const secTop = secondaryMultiPvData.lines[0];
+    if (!priTop) {
+      return { primaryArrows: [], secondaryArrow: null };
+    }
+    const fmt = (cp: number) => `${cp >= 0 ? '+' : ''}${cp.toFixed(2)}`;
+    if (
+      secTop &&
+      priTop.firstMove.from.row === secTop.firstMove.from.row &&
+      priTop.firstMove.from.col === secTop.firstMove.from.col &&
+      priTop.firstMove.to.row === secTop.firstMove.to.row &&
+      priTop.firstMove.to.col === secTop.firstMove.to.col
+    ) {
+      const avgCp = Number(((priTop.scoreCp + secTop.scoreCp) / 2).toFixed(2));
+      return {
+        primaryArrows: [
+          {
+            rank: 1,
+            from: priTop.firstMove.from,
+            to: priTop.firstMove.to,
+            scoreText: `[双擎共识] ${fmt(avgCp)}`,
+            notation: priTop.firstMove.notation,
+            isConsensus: true,
+          },
+        ],
+        secondaryArrow: null,
+      };
+    }
+
+    return {
+      primaryArrows: [
+        {
+          rank: 1,
+          from: priTop.firstMove.from,
+          to: priTop.firstMove.to,
+          scoreText: `[${primaryEngine.shortName}] ${fmt(priTop.scoreCp)}`,
+          notation: priTop.firstMove.notation,
+        },
+      ],
+      secondaryArrow: secTop
+        ? {
+            rank: 1,
+            from: secTop.firstMove.from,
+            to: secTop.firstMove.to,
+            scoreText: `[${secondaryEngine.shortName}] ${fmt(secTop.scoreCp)}`,
+            notation: secTop.firstMove.notation,
+            isSecondaryEngine: true,
+          }
+        : null,
+    };
+  }, [
+    compareMode,
+    multiPvData,
+    secondaryMultiPvData,
+    primaryEngine.shortName,
+    secondaryEngine.shortName,
+  ]);
 
   const threatArrow = useMemo(() => {
-    if (engineStatus !== 'ready' || !threatRadarEnabled || workspace === 'setup') return null;
+    if (primaryEngine.status !== 'ready' || !threatRadarEnabled || workspace === 'setup')
+      return null;
     return generateOpponentThreatArrow(pieces, turn);
-  }, [engineStatus, threatRadarEnabled, workspace, pieces, turn]);
+  }, [primaryEngine.status, threatRadarEnabled, workspace, pieces, turn]);
 
   const currentEvalScore = useMemo(() => {
     if (multiPvData.lines[0]) return multiPvData.lines[0].scoreCp;
@@ -588,6 +808,18 @@ export default function App() {
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
         handleJumpPly(currentPly + 1);
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        handleJumpPly(0);
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        handleJumpPly(activeMovesList.length);
+      } else if (!e.metaKey && !e.ctrlKey && e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        setCompareMode((prev) => !prev);
+      } else if (!e.metaKey && !e.ctrlKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        setFlipped((prev) => !prev);
       } else if (e.key === ' ' && workspace === 'study') {
         e.preventDefault();
         const best = multiPvData.lines[0]?.firstMove;
@@ -598,7 +830,15 @@ export default function App() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [activeModal, handleJumpPly, currentPly, workspace, multiPvData, executeMoveOnBoard]);
+  }, [
+    activeModal,
+    handleJumpPly,
+    currentPly,
+    activeMovesList.length,
+    workspace,
+    multiPvData,
+    executeMoveOnBoard,
+  ]);
 
   // 收藏当前棋局并与棋谱库「我的收藏」实时联动
   const handleToggleCurrentFavorite = useCallback(() => {
@@ -707,6 +947,8 @@ export default function App() {
                 <div className="py-0.5 flex items-stretch">
                   <EvalBar
                     scoreCp={currentEvalScore}
+                    secondaryScoreCp={secondaryMultiPvData.lines[0]?.scoreCp ?? null}
+                    compareMode={compareMode && isAnalyzing && secondaryEngine.status === 'ready'}
                     flipped={flipped}
                     heightClass="h-full"
                   />
@@ -718,7 +960,8 @@ export default function App() {
                 selectedPieceId={selectedPieceId}
                 legalMoves={legalMoves}
                 lastMove={lastMove}
-                multiPvArrows={multiPvData.arrows}
+                multiPvArrows={boardArrows.primaryArrows}
+                secondaryPvArrow={boardArrows.secondaryArrow}
                 threatArrow={threatArrow}
                 hoveredArrow={hoveredArrow}
                 hintArrow={hintArrow}
@@ -813,13 +1056,19 @@ export default function App() {
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
 
-            {/* 上半区：常驻精炼引擎分析舱 (EnginePod) */}
+            {/* 上半区：常驻多引擎分析与双擎对比舱 (EnginePanel) */}
             <EnginePanel
-              engineStatus={engineStatus}
-              installProgress={installProgress}
+              engines={engines}
+              primaryEngineId={primaryEngine.id}
+              secondaryEngineId={secondaryEngine.id}
+              compareMode={compareMode}
               isAnalyzing={isAnalyzing}
               threatRadarEnabled={threatRadarEnabled}
-              lines={multiPvData.lines}
+              primaryLines={multiPvData.lines}
+              secondaryLines={secondaryMultiPvData.lines}
+              onChangePrimaryEngine={handleChangePrimaryEngine}
+              onChangeSecondaryEngine={setSecondaryEngineId}
+              onToggleCompareMode={() => setCompareMode((prev) => !prev)}
               onInstallEngine={handleInstallEngine}
               onOpenEngineSettings={() => setActiveModal('settings')}
               onToggleAnalysis={() => setIsAnalyzing((prev) => !prev)}
@@ -1099,7 +1348,12 @@ export default function App() {
       {/* ==================== 4. 底栏 Status ==================== */}
       <StatusBar
         workspace={workspace}
-        isAnalyzing={engineStatus === 'ready' && isAnalyzing}
+        isAnalyzing={primaryEngine.status === 'ready' && isAnalyzing}
+        compareMode={compareMode && secondaryEngine.status === 'ready'}
+        primaryEngineName={primaryEngine.shortName}
+        secondaryEngineName={secondaryEngine.shortName}
+        engineThreads={engineThreads}
+        engineHashMb={engineHashMb}
         turn={turn}
         currentPly={currentPly}
         totalPlies={activeMovesList.length}
@@ -1119,8 +1373,12 @@ export default function App() {
         useTraditionalChar={useTraditionalChar}
         multiPvCount={multiPvCount}
         engineDepth={engineDepth}
-        engineStatus={engineStatus}
-        installProgress={installProgress}
+        engineThreads={engineThreads}
+        engineHashMb={engineHashMb}
+        engines={engines}
+        primaryEngineId={primaryEngine.id}
+        secondaryEngineId={secondaryEngine.id}
+        compareMode={compareMode}
         connectState={connectState}
         currentFen={piecesToFen(pieces, turn)}
         currentPgn={formatGameToPgn(metadata, activeMovesList, piecesToFen(pieces, turn))}
@@ -1184,8 +1442,14 @@ export default function App() {
         onChangeUseTraditionalChar={setUseTraditionalChar}
         onChangeMultiPvCount={setMultiPvCount}
         onChangeEngineDepth={setEngineDepth}
+        onChangeEngineThreads={setEngineThreads}
+        onChangeEngineHashMb={setEngineHashMb}
+        onChangePrimaryEngine={handleChangePrimaryEngine}
+        onChangeSecondaryEngine={setSecondaryEngineId}
+        onToggleCompareMode={() => setCompareMode((prev) => !prev)}
         onInstallEngine={handleInstallEngine}
         onResetEngineMissing={handleResetEngineMissing}
+        onAddCustomEngine={handleAddCustomEngine}
         onUpdateConnectState={(next) => {
           setConnectState(next);
           if (next.connected && next.autoAnalyze) {

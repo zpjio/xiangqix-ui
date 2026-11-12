@@ -63,6 +63,8 @@ export interface MultiPVArrow {
   notation: string;
   isThreat?: boolean; // 对手威胁雷达虚线箭头
   isGhostPreview?: boolean; // 鼠标悬停幽灵预览箭头
+  isSecondaryEngine?: boolean; // 双擎对比模式下副引擎天青蓝箭头
+  isConsensus?: boolean; // 双擎首推一致时的共识合并箭头
 }
 
 export interface MultiPVLine {
@@ -91,6 +93,22 @@ export type WorkspaceMode =
 export type HandicapType = 'even' | 'move-first' | 'left-horse' | 'two-horses';
 export type EngineSkillTier = 'scholar' | 'strategist' | 'grandmaster' | 'deity';
 export type EngineInstallStatus = 'missing' | 'installing' | 'ready';
+export type EngineProtocol = 'UCI' | 'UCCI';
+export type EngineStyleBias = 'balanced' | 'aggressive' | 'positional';
+
+export interface EngineProfile {
+  id: string;
+  name: string;
+  shortName: string;
+  version: string;
+  protocol: EngineProtocol;
+  styleBias: EngineStyleBias;
+  styleLabel: string;
+  nnueFile: string;
+  sizeMb: number;
+  status: EngineInstallStatus;
+  installProgress: number;
+}
 
 export type ActiveModalId =
   | null

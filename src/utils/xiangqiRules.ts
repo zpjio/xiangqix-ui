@@ -552,7 +552,10 @@ export function generateSimulatedMultiPV(
   pieces: Piece[],
   turn: Camp,
   depth = 24,
-  maxLines = 3
+  maxLines = 3,
+  styleBias: 'balanced' | 'aggressive' | 'positional' = 'balanced',
+  threads = 8,
+  hashMb = 512
 ): { lines: MultiPVLine[]; arrows: MultiPVArrow[] } {
   const baseEval = evaluateBoardScore(pieces);
   const candidates: { piece: Piece; from: Position; to: Position; notation: string; delta: number }[] =
@@ -571,12 +574,23 @@ export function generateSimulatedMultiPV(
             ? 5
             : 2.5;
         priority += capVal;
+        if (styleBias === 'aggressive') priority += 1.4;
       }
-      if (p.type === 'cannon' && to.col === 4) priority += 2.2;
-      if (p.type === 'horse' && (to.col === 2 || to.col === 6)) priority += 1.9;
-      if (p.type === 'chariot' && (to.col === 1 || to.col === 7 || to.row === 4 || to.row === 5))
-        priority += 1.7;
-      if (p.type === 'soldier' && (to.col === 2 || to.col === 6)) priority += 1.1;
+      if (p.type === 'cannon' && to.col === 4) {
+        priority += styleBias === 'aggressive' ? 2.8 : 2.2;
+      }
+      if (p.type === 'horse' && (to.col === 2 || to.col === 6)) {
+        priority += styleBias === 'positional' ? 2.7 : 1.9;
+      }
+      if (p.type === 'chariot' && (to.col === 1 || to.col === 7 || to.row === 4 || to.row === 5)) {
+        priority += styleBias === 'aggressive' ? 2.4 : 1.7;
+      }
+      if (p.type === 'soldier' && (to.col === 2 || to.col === 6)) {
+        priority += styleBias === 'positional' ? 2.1 : 1.1;
+      }
+      if (styleBias === 'positional' && (p.type === 'advisor' || p.type === 'elephant')) {
+        priority += 1.45;
+      }
 
       candidates.push({
         piece: p,
@@ -597,9 +611,23 @@ export function generateSimulatedMultiPV(
     ['炮8平5', '马八进七', '车1平2', '炮八平六'],
   ];
 
+  const styleEvalShift =
+    styleBias === 'aggressive' ? 0.14 : styleBias === 'positional' ? -0.09 : 0;
+  const threadMultiplier = threads === 16 ? 1.75 : threads === 4 ? 0.62 : 1.0;
+  const rawBaseNps =
+    styleBias === 'aggressive' ? 5680 : styleBias === 'positional' ? 4460 : 5120;
+  const baseNps = Math.round(rawBaseNps * threadMultiplier);
+  const simulatedHashfull = Math.min(
+    960,
+    Math.round((depth / 24) * (512 / hashMb) * (styleBias === 'aggressive' ? 412 : 368))
+  );
+
   const lines: MultiPVLine[] = topCandidates.map((cand, idx) => {
     const scoreOffset = idx === 0 ? 0.35 : idx === 1 ? 0.1 : -0.18;
-    const rawScore = turn === 'red' ? baseEval + scoreOffset : baseEval - scoreOffset;
+    const rawScore =
+      turn === 'red'
+        ? baseEval + scoreOffset + styleEvalShift
+        : baseEval - scoreOffset - styleEvalShift;
     const scoreCp = Number(rawScore.toFixed(2));
     const summaryText =
       scoreCp > 1.2
@@ -612,8 +640,8 @@ export function generateSimulatedMultiPV(
       multipv: idx + 1,
       depth: depth - idx,
       scoreCp,
-      nps: 5120 - idx * 240,
-      hashfull: 386,
+      nps: baseNps - idx * 240,
+      hashfull: simulatedHashfull,
       pvMoves: [cand.notation, ...followUps[idx % followUps.length]],
       firstMove: {
         from: cand.from,

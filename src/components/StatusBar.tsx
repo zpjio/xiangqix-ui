@@ -4,6 +4,11 @@ import { Camp, WorkspaceMode } from '../types/xiangqi';
 interface StatusBarProps {
   workspace: WorkspaceMode;
   isAnalyzing: boolean;
+  compareMode?: boolean;
+  primaryEngineName?: string;
+  secondaryEngineName?: string;
+  engineThreads?: number;
+  engineHashMb?: number;
   turn: Camp;
   currentPly: number;
   totalPlies: number;
@@ -15,6 +20,11 @@ interface StatusBarProps {
 export const StatusBar: React.FC<StatusBarProps> = ({
   workspace,
   isAnalyzing,
+  compareMode = false,
+  primaryEngineName = '皮卡鱼',
+  secondaryEngineName = '旋风',
+  engineThreads = 8,
+  engineHashMb = 512,
   turn,
   currentPly,
   totalPlies,
@@ -35,9 +45,13 @@ export const StatusBar: React.FC<StatusBarProps> = ({
     if (isVariationActive) {
       return '分支推演中 · 可在右侧棋谱「升为主线」或返回主谱';
     }
-    return isAnalyzing
-      ? '引擎分析中 · 悬停右侧变例可在棋盘预览走法'
-      : '复盘分析 · 点击任意历史手直接落子即可生成分支';
+    if (isAnalyzing) {
+      if (compareMode) {
+        return `双擎并行对比中 (${primaryEngineName} vs ${secondaryEngineName} · ${engineThreads}核/${engineHashMb}M) · 快捷键 C 切换`;
+      }
+      return `${primaryEngineName} 实时分析中 (${engineThreads}核/${engineHashMb}M) · 悬停变例可预览走法`;
+    }
+    return '复盘分析 · 点击任意历史手直接落子即可生成分支';
   };
 
   return (

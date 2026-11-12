@@ -22,7 +22,8 @@ import {
   AppTheme,
   BoardTheme,
   Camp,
-  EngineInstallStatus,
+  EngineProfile,
+  EngineProtocol,
   ExternalConnectState,
   ExternalPlatformId,
   FontScale,
@@ -43,8 +44,12 @@ interface DialogsModalSuiteProps {
   useTraditionalChar: boolean;
   multiPvCount: 1 | 2 | 3;
   engineDepth: 18 | 24 | 30;
-  engineStatus: EngineInstallStatus;
-  installProgress: number;
+  engineThreads: 4 | 8 | 16;
+  engineHashMb: 256 | 512 | 1024;
+  engines: EngineProfile[];
+  primaryEngineId: string;
+  secondaryEngineId: string;
+  compareMode: boolean;
   connectState: ExternalConnectState;
   currentFen: string;
   currentPgn: string;
@@ -65,8 +70,14 @@ interface DialogsModalSuiteProps {
   onChangeUseTraditionalChar: (useTrad: boolean) => void;
   onChangeMultiPvCount: (count: 1 | 2 | 3) => void;
   onChangeEngineDepth: (depth: 18 | 24 | 30) => void;
-  onInstallEngine: () => void;
-  onResetEngineMissing: () => void;
+  onChangeEngineThreads: (threads: 4 | 8 | 16) => void;
+  onChangeEngineHashMb: (hashMb: 256 | 512 | 1024) => void;
+  onChangePrimaryEngine: (id: string) => void;
+  onChangeSecondaryEngine: (id: string) => void;
+  onToggleCompareMode: () => void;
+  onInstallEngine: (id: string) => void;
+  onResetEngineMissing: (id: string) => void;
+  onAddCustomEngine: (fileName: string, protocol: EngineProtocol) => void;
   onUpdateConnectState: (next: ExternalConnectState) => void;
   onTriggerHint: () => void;
 }
@@ -111,8 +122,12 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
   useTraditionalChar,
   multiPvCount,
   engineDepth,
-  engineStatus,
-  installProgress,
+  engineThreads,
+  engineHashMb,
+  engines,
+  primaryEngineId,
+  secondaryEngineId,
+  compareMode,
   connectState,
   currentFen,
   currentPgn,
@@ -133,8 +148,14 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
   onChangeUseTraditionalChar,
   onChangeMultiPvCount,
   onChangeEngineDepth,
+  onChangeEngineThreads,
+  onChangeEngineHashMb,
+  onChangePrimaryEngine,
+  onChangeSecondaryEngine,
+  onToggleCompareMode,
   onInstallEngine,
   onResetEngineMissing,
+  onAddCustomEngine,
   onUpdateConnectState,
   onTriggerHint,
 }) => {
@@ -233,6 +254,18 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
           platformLabel: '天天象棋桌面版',
           autoAnalyze: true,
         });
+        onSwitchWorkspace('study');
+        onClose();
+      },
+    },
+    {
+      id: 'cmd-compare',
+      label: compareMode
+        ? '关闭「双擎并行对比」恢复单引擎视图'
+        : '开启「双擎并行对比」（皮卡鱼 vs 旋风/天机同盘交叉印证）',
+      shortcut: 'C',
+      action: () => {
+        onToggleCompareMode();
         onSwitchWorkspace('study');
         onClose();
       },
@@ -962,76 +995,120 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
               </button>
             </div>
 
-            {/* 顶部专享：本地 UCI 引擎状态、一键下载安装与手动配置说明 */}
+            {/* 顶部专享：多引擎库管理 (UCI / UCCI) 与双擎对比分配 */}
             <div className="p-3 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  {engineStatus === 'ready' ? (
-                    <CheckCircle2 className="w-4 h-4 text-[#10B981] shrink-0" />
-                  ) : (
-                    <AlertTriangle className="w-4 h-4 text-[var(--xq-accent-gold)] shrink-0" />
-                  )}
-                  <span className="font-semibold text-xs">
-                    本地引擎状态：
-                    {engineStatus === 'ready'
-                      ? 'Pikafish 2026.11 (AVX2 + pikafish.nnue) 已安装就绪'
-                      : engineStatus === 'installing'
-                      ? `正在下载安装官方引擎组件 (${installProgress}%)…`
-                      : '未检测到本地象棋引擎（首次使用请安装）'}
+                  <span className="font-semibold text-xs xq-text-primary">
+                    多引擎库管理（支持 UCI / UCCI 协议与双擎并行对比）
                   </span>
-                </div>
-
-                {engineStatus === 'ready' ? (
                   <button
                     type="button"
-                    onClick={onResetEngineMissing}
-                    className="px-2.5 py-1 rounded text-xs xq-btn-secondary cursor-pointer whitespace-nowrap"
+                    onClick={onToggleCompareMode}
+                    className={`px-2 py-0.5 rounded text-[11px] cursor-pointer ${
+                      compareMode ? 'xq-btn-option-active' : 'xq-btn-option'
+                    }`}
                   >
-                    卸载 / 模拟未安装状态
+                    {compareMode ? '✓ 双擎对比已开启' : '开启双擎对比'}
                   </button>
-                ) : (
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      disabled={engineStatus === 'installing'}
-                      onClick={onInstallEngine}
-                      className="px-3 py-1 rounded text-xs xq-btn-primary flex items-center gap-1 cursor-pointer whitespace-nowrap"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>
-                        {engineStatus === 'installing'
-                          ? `安装中 ${installProgress}%`
-                          : '一键下载安装 (38MB)'}
-                      </span>
-                    </button>
+                </div>
 
-                    <label className="px-2.5 py-1 rounded text-xs xq-btn-secondary flex items-center gap-1 cursor-pointer whitespace-nowrap">
-                      <FolderOpen className="w-3.5 h-3.5" />
-                      <span>选择本地引擎</span>
-                      <input
-                        type="file"
-                        className="hidden"
-                        onChange={(e) => {
-                          if (e.target.files && e.target.files.length > 0) {
-                            onInstallEngine();
-                          }
-                        }}
-                      />
-                    </label>
-                  </div>
-                )}
+                <label className="px-2.5 py-1 rounded text-xs xq-btn-secondary flex items-center gap-1 cursor-pointer whitespace-nowrap">
+                  <FolderOpen className="w-3.5 h-3.5" />
+                  <span>+ 添加本地引擎</span>
+                  <input
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const isUcci = file.name.toLowerCase().includes('ucci') || file.name.toLowerCase().includes('xqms');
+                        onAddCustomEngine(file.name, isUcci ? 'UCCI' : 'UCI');
+                      }
+                    }}
+                  />
+                </label>
               </div>
 
-              <div className="text-xs xq-text-muted leading-relaxed">
-                说明：本软件支持标准 UCI 协议象棋引擎。自动安装将自动配置{' '}
-                <code className="px-1 py-0.2 rounded bg-[var(--xq-bg-elevated)] border xq-border font-mono-tabular text-[11px]">
-                  engines/pikafish
-                </code>{' '}
-                与{' '}
-                <code className="px-1 py-0.2 rounded bg-[var(--xq-bg-elevated)] border xq-border font-mono-tabular text-[11px]">
-                  engines/pikafish.nnue
-                </code>
-                ；若手动指定，请确保权重文件与引擎处于同一文件夹下。
+              <div className="space-y-1.5 max-h-36 overflow-y-auto pr-0.5">
+                {engines.map((eng) => {
+                  const isPrimary = eng.id === primaryEngineId;
+                  const isSecondary = eng.id === secondaryEngineId;
+                  return (
+                    <div
+                      key={eng.id}
+                      className="px-2.5 py-1.5 rounded-md border xq-border bg-[var(--xq-bg-surface)] flex items-center justify-between gap-2 text-xs"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        {eng.status === 'ready' ? (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-[#10B981] shrink-0" />
+                        ) : (
+                          <AlertTriangle className="w-3.5 h-3.5 text-[var(--xq-accent-gold)] shrink-0" />
+                        )}
+                        <span className="font-semibold truncate">{eng.name}</span>
+                        <span className="px-1.5 py-0.2 rounded text-[10px] font-mono-tabular border xq-border xq-text-secondary shrink-0">
+                          {eng.protocol} · {eng.styleLabel}
+                        </span>
+                        {isPrimary && (
+                          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-[#10B981] text-white shrink-0">
+                            主擎
+                          </span>
+                        )}
+                        {isSecondary && (
+                          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-[#3B82F6] text-white shrink-0">
+                            副擎
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {eng.status === 'ready' ? (
+                          <>
+                            {!isPrimary && (
+                              <button
+                                type="button"
+                                onClick={() => onChangePrimaryEngine(eng.id)}
+                                className="px-2 py-0.5 rounded text-[11px] xq-btn-secondary cursor-pointer"
+                              >
+                                设为主擎
+                              </button>
+                            )}
+                            {!isSecondary && !isPrimary && (
+                              <button
+                                type="button"
+                                onClick={() => onChangeSecondaryEngine(eng.id)}
+                                className="px-2 py-0.5 rounded text-[11px] xq-btn-secondary cursor-pointer"
+                              >
+                                设为副擎
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => onResetEngineMissing(eng.id)}
+                              className="px-2 py-0.5 rounded text-[11px] xq-btn-ghost cursor-pointer"
+                            >
+                              卸载
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={eng.status === 'installing'}
+                            onClick={() => onInstallEngine(eng.id)}
+                            className="px-2.5 py-0.5 rounded text-[11px] xq-btn-primary flex items-center gap-1 cursor-pointer"
+                          >
+                            <Download className="w-3 h-3" />
+                            <span>
+                              {eng.status === 'installing'
+                                ? `安装中 ${eng.installProgress}%`
+                                : `一键下载 (${eng.sizeMb}MB)`}
+                            </span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -1134,47 +1211,73 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
               </div>
             </div>
 
-            {/* 第二部分：引擎核心算力配置 */}
+            {/* 第二部分：引擎核心算力配置（MultiPV + 深度 + CPU 线程 + Hash 内存） */}
             <div className="grid grid-cols-2 gap-3">
               <div className="p-2.5 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] space-y-1.5">
-                <div className="font-semibold text-xs xq-text-secondary">引擎候选变例条数 (MultiPV)</div>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {([1, 2, 3] as const).map((cnt) => (
-                    <button
-                      key={`mpv-${cnt}`}
-                      type="button"
-                      onClick={() => onChangeMultiPvCount(cnt)}
-                      className={`py-1.5 rounded-md text-xs font-mono-tabular cursor-pointer ${
-                        multiPvCount === cnt ? 'xq-btn-option-active' : 'xq-btn-option'
-                      }`}
-                    >
-                      {cnt} 条主变
-                    </button>
-                  ))}
+                <div className="font-semibold text-xs xq-text-secondary">候选变例 (MultiPV) 与计算深度</div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <div className="grid grid-cols-3 gap-1">
+                    {([1, 2, 3] as const).map((cnt) => (
+                      <button
+                        key={`mpv-${cnt}`}
+                        type="button"
+                        onClick={() => onChangeMultiPvCount(cnt)}
+                        className={`py-1 rounded-md text-xs font-mono-tabular cursor-pointer ${
+                          multiPvCount === cnt ? 'xq-btn-option-active' : 'xq-btn-option'
+                        }`}
+                      >
+                        {cnt}变
+                      </button>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-3 gap-1">
+                    {([18, 24, 30] as const).map((d) => (
+                      <button
+                        key={`depth-${d}`}
+                        type="button"
+                        onClick={() => onChangeEngineDepth(d)}
+                        className={`py-1 rounded-md text-xs font-mono-tabular cursor-pointer ${
+                          engineDepth === d ? 'xq-btn-option-active' : 'xq-btn-option'
+                        }`}
+                      >
+                        {d}层
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
               <div className="p-2.5 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] space-y-1.5">
-                <div className="font-semibold text-xs xq-text-secondary">引擎计算深度档位</div>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {(
-                    [
-                      { depth: 18, label: '快速 18层' },
-                      { depth: 24, label: '标准 24层' },
-                      { depth: 30, label: '深度 30层' },
-                    ] as const
-                  ).map((d) => (
-                    <button
-                      key={`depth-${d.depth}`}
-                      type="button"
-                      onClick={() => onChangeEngineDepth(d.depth)}
-                      className={`py-1.5 rounded-md text-xs cursor-pointer ${
-                        engineDepth === d.depth ? 'xq-btn-option-active' : 'xq-btn-option'
-                      }`}
-                    >
-                      {d.label}
-                    </button>
-                  ))}
+                <div className="font-semibold text-xs xq-text-secondary">引擎算力分配（CPU 线程 / Hash 内存）</div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <div className="grid grid-cols-3 gap-1">
+                    {([4, 8, 16] as const).map((th) => (
+                      <button
+                        key={`th-${th}`}
+                        type="button"
+                        onClick={() => onChangeEngineThreads(th)}
+                        className={`py-1 rounded-md text-xs font-mono-tabular cursor-pointer ${
+                          engineThreads === th ? 'xq-btn-option-active' : 'xq-btn-option'
+                        }`}
+                      >
+                        {th}核
+                      </button>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-3 gap-1">
+                    {([256, 512, 1024] as const).map((hm) => (
+                      <button
+                        key={`hm-${hm}`}
+                        type="button"
+                        onClick={() => onChangeEngineHashMb(hm)}
+                        className={`py-1 rounded-md text-xs font-mono-tabular cursor-pointer ${
+                          engineHashMb === hm ? 'xq-btn-option-active' : 'xq-btn-option'
+                        }`}
+                      >
+                        {hm === 1024 ? '1G' : `${hm}M`}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>

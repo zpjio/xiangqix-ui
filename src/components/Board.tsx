@@ -27,6 +27,7 @@ interface BoardProps {
   legalMoves: Position[];
   lastMove: MoveRecord | null;
   multiPvArrows?: MultiPVArrow[];
+  secondaryPvArrow?: MultiPVArrow | null;
   threatArrow?: MultiPVArrow | null;
   hoveredArrow?: MultiPVArrow | null;
   hintArrow?: MultiPVArrow | null;
@@ -129,6 +130,7 @@ export const Board: React.FC<BoardProps> = ({
   legalMoves,
   lastMove,
   multiPvArrows = [],
+  secondaryPvArrow = null,
   threatArrow = null,
   hoveredArrow = null,
   hintArrow = null,
@@ -278,7 +280,8 @@ export const Board: React.FC<BoardProps> = ({
     color: string,
     markerId: string,
     isDashed = false,
-    strokeW = '12'
+    strokeW = '12',
+    labelRatio = 0.5
   ) => {
     const vf = toVisualCoord(arrow.from.row, arrow.from.col);
     const vt = toVisualCoord(arrow.to.row, arrow.to.col);
@@ -286,8 +289,9 @@ export const Board: React.FC<BoardProps> = ({
     const y1 = OFFSET_Y + vf.vRow * STEP;
     const x2 = OFFSET_X + vt.vCol * STEP;
     const y2 = OFFSET_Y + vt.vRow * STEP;
-    const midX = (x1 + x2) / 2;
-    const midY = (y1 + y2) / 2;
+    const midX = x1 + (x2 - x1) * labelRatio;
+    const midY = y1 + (y2 - y1) * labelRatio;
+    const boxWidth = Math.max(76, arrow.scoreText.length * 10 + 18);
 
     return (
       <g key={key} className="pointer-events-none">
@@ -305,9 +309,9 @@ export const Board: React.FC<BoardProps> = ({
         />
         <g transform={`translate(${midX}, ${midY})`}>
           <rect
-            x="-38"
+            x={-boxWidth / 2}
             y="-13"
-            width="76"
+            width={boxWidth}
             height="26"
             rx="6"
             fill="#1A1412"
@@ -320,7 +324,7 @@ export const Board: React.FC<BoardProps> = ({
             y="5"
             textAnchor="middle"
             fill="#FAF5EB"
-            className="font-mono-tabular text-[14px] font-semibold"
+            className="font-mono-tabular text-[13px] font-semibold"
           >
             {arrow.scoreText}
           </text>
@@ -395,7 +399,7 @@ export const Board: React.FC<BoardProps> = ({
                   markerHeight="5.5"
                   orient="auto-start-reverse"
                 >
-                  <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#2E7D5B" fillOpacity="0.95" />
+                  <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#10B981" fillOpacity="0.95" />
                 </marker>
                 <marker
                   id="arrow-secondary"
@@ -429,6 +433,17 @@ export const Board: React.FC<BoardProps> = ({
                   orient="auto-start-reverse"
                 >
                   <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#D4AF37" fillOpacity="0.95" />
+                </marker>
+                <marker
+                  id="arrow-compare-secondary"
+                  viewBox="0 0 10 10"
+                  refX="7"
+                  refY="5"
+                  markerWidth="5.5"
+                  markerHeight="5.5"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#3B82F6" fillOpacity="0.95" />
                 </marker>
               </defs>
 
@@ -675,17 +690,30 @@ export const Board: React.FC<BoardProps> = ({
                   );
                 })()}
 
-              {/* MultiPV 引擎主变/次变箭头层 */}
+              {/* MultiPV 引擎主变/次变箭头层 (错位排布标签比例以防同起点走法遮挡) */}
               {multiPvArrows.map((arrow) =>
                 renderSvgArrow(
                   arrow,
                   `pv-arrow-${arrow.rank}`,
-                  arrow.rank === 1 ? '#2E7D5B' : '#B87D1E',
+                  arrow.rank === 1 ? '#10B981' : '#B87D1E',
                   arrow.rank === 1 ? 'arrow-primary' : 'arrow-secondary',
                   arrow.rank !== 1,
-                  arrow.rank === 1 ? '13' : '7.5'
+                  arrow.isConsensus ? '14' : arrow.rank === 1 ? '13' : '7.5',
+                  arrow.rank === 1 ? 0.46 : arrow.rank === 2 ? 0.64 : 0.34
                 )
               )}
+
+              {/* 双擎对比模式：副引擎首推着法天青蓝箭头 (当与主引擎分歧时独立显示，标签置于 0.64 处避免与主擎交叉重叠) */}
+              {secondaryPvArrow &&
+                renderSvgArrow(
+                  secondaryPvArrow,
+                  'secondary-engine-arrow',
+                  '#3B82F6',
+                  'arrow-compare-secondary',
+                  false,
+                  '11.5',
+                  0.64
+                )}
 
               {/* 对手威胁雷达箭头 (Threat Radar) */}
               {threatArrow &&
