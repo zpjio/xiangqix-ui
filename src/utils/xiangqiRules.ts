@@ -1,4 +1,11 @@
 import {
+  BLACK_ROAD_NUMERALS,
+  INITIAL_FEN,
+  MATERIAL_QUOTA_WEIGHTS,
+  PIECE_LABELS,
+  RED_ROAD_NUMERALS,
+} from '../constants/xiangqiConstants';
+import {
   Camp,
   CompactLibraryMove,
   HandicapType,
@@ -10,36 +17,23 @@ import {
   PieceType,
   Position,
 } from '../types/xiangqi';
+import {
+  playCheckChimeSound,
+  playCheckmateGongSound,
+  playInvalidWarningSound,
+  playWoodClackSound,
+} from './soundEffects';
 
-export const PIECE_LABELS: Record<
-  Camp,
-  Record<PieceType, { traditional: string; simplified: string; roleDesc: string }>
-> = {
-  red: {
-    general: { traditional: '帥', simplified: '帅', roleDesc: '九宫主帅 · 直行一格' },
-    advisor: { traditional: '仕', simplified: '仕', roleDesc: '九宫斜行' },
-    elephant: { traditional: '相', simplified: '相', roleDesc: '田字飞相 · 不过河' },
-    horse: { traditional: '傌', simplified: '马', roleDesc: '日字跳马 · 蹩马腿' },
-    chariot: { traditional: '俥', simplified: '车', roleDesc: '纵横直线行走' },
-    cannon: { traditional: '炮', simplified: '炮', roleDesc: '隔子打子' },
-    soldier: { traditional: '兵', simplified: '兵', roleDesc: '过河可横行' },
-  },
-  black: {
-    general: { traditional: '將', simplified: '将', roleDesc: '九宫主将 · 直行一格' },
-    advisor: { traditional: '士', simplified: '士', roleDesc: '九宫斜行' },
-    elephant: { traditional: '象', simplified: '象', roleDesc: '田字飞象 · 不过河' },
-    horse: { traditional: '馬', simplified: '马', roleDesc: '日字跳马 · 蹩马腿' },
-    chariot: { traditional: '車', simplified: '车', roleDesc: '纵横直线行走' },
-    cannon: { traditional: '砲', simplified: '炮', roleDesc: '隔子打子' },
-    soldier: { traditional: '卒', simplified: '卒', roleDesc: '过河可横行' },
-  },
+export {
+  BLACK_ROAD_NUMERALS,
+  INITIAL_FEN,
+  PIECE_LABELS,
+  playCheckChimeSound,
+  playCheckmateGongSound,
+  playInvalidWarningSound,
+  playWoodClackSound,
+  RED_ROAD_NUMERALS,
 };
-
-export const RED_ROAD_NUMERALS = ['九', '八', '七', '六', '五', '四', '三', '二', '一'];
-export const BLACK_ROAD_NUMERALS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
-
-export const INITIAL_FEN =
-  'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1';
 
 export function createInitialPieces(handicap: HandicapType = 'even'): Piece[] {
   const full: Piece[] = [
@@ -126,15 +120,6 @@ export function calculateMaterialAndCaptures(pieces: Piece[]): {
   netAdvantageRed: number;
   advantageSummary: string;
 } {
-  const initialQuota: { type: PieceType; count: number; weight: number }[] = [
-    { type: 'chariot', count: 2, weight: 9 },
-    { type: 'cannon', count: 2, weight: 4.5 },
-    { type: 'horse', count: 2, weight: 4 },
-    { type: 'advisor', count: 2, weight: 2 },
-    { type: 'elephant', count: 2, weight: 2 },
-    { type: 'soldier', count: 5, weight: 1 },
-  ];
-
   const redCounts: Record<PieceType, number> = {
     general: 0,
     advisor: 0,
@@ -165,7 +150,7 @@ export function calculateMaterialAndCaptures(pieces: Piece[]): {
   let redTotal = 0;
   let blackTotal = 0;
 
-  for (const item of initialQuota) {
+  for (const item of MATERIAL_QUOTA_WEIGHTS) {
     const redAlive = redCounts[item.type];
     const blackAlive = blackCounts[item.type];
 
@@ -205,30 +190,6 @@ function isInsidePalace(camp: Camp, row: number, col: number): boolean {
   return row >= 7 && row <= 9;
 }
 
-function countObstaclesBetweenGrid(
-  grid: (Piece | null)[],
-  r1: number,
-  c1: number,
-  r2: number,
-  c2: number
-): number {
-  let count = 0;
-  if (r1 === r2) {
-    const minC = Math.min(c1, c2);
-    const maxC = Math.max(c1, c2);
-    for (let c = minC + 1; c < maxC; c++) {
-      if (grid[r1 * 9 + c]) count++;
-    }
-  } else if (c1 === c2) {
-    const minR = Math.min(r1, r2);
-    const maxR = Math.max(r1, r2);
-    for (let r = minR + 1; r < maxR; r++) {
-      if (grid[r * 9 + c1]) count++;
-    }
-  }
-  return count;
-}
-
 export function getLegalMovesForPiece(
   piece: Piece,
   pieces: Piece[],
@@ -261,10 +222,15 @@ export function getLegalMovesForPiece(
           tryAdd(nr, nc);
         }
       }
-      const enemyGeneral = pieces.find((p) => p.type === 'general' && p.camp !== camp);
-      if (enemyGeneral && enemyGeneral.col === col) {
-        if (countObstaclesBetweenGrid(grid, row, col, enemyGeneral.row, enemyGeneral.col) === 0) {
-          moves.push({ row: enemyGeneral.row, col: enemyGeneral.col });
+      // 飞将照面判定：沿同列向敌方宫城方向扫描首个棋子，无需遍历 pieces
+      const flyDir = camp === 'red' ? -1 : 1;
+      for (let nr = row + flyDir; nr >= 0 && nr <= 9; nr += flyDir) {
+        const hit = grid[nr * 9 + col];
+        if (hit) {
+          if (hit.camp !== camp && hit.type === 'general') {
+            moves.push({ row: nr, col });
+          }
+          break;
         }
       }
       break;
@@ -399,26 +365,36 @@ export function getLegalMovesForPiece(
   return moves;
 }
 
-// 向心射线将军检测：从将/帅位置向四向、马位与兵卒位反查，复杂度降为常数级 O(1)
-export function isCampInCheck(
-  pieces: Piece[],
+const ORTHO_DIRS: readonly [number, number][] = [
+  [-1, 0],
+  [1, 0],
+  [0, -1],
+  [0, 1],
+];
+
+const HORSE_CHECK_OFFSETS: readonly { hr: number; hc: number; legR: number; legC: number }[] = [
+  { hr: -2, hc: -1, legR: -1, legC: -1 },
+  { hr: -2, hc: 1, legR: -1, legC: 1 },
+  { hr: 2, hc: -1, legR: 1, legC: -1 },
+  { hr: 2, hc: 1, legR: 1, legC: 1 },
+  { hr: -1, hc: -2, legR: -1, legC: -1 },
+  { hr: 1, hc: -2, legR: 1, legC: -1 },
+  { hr: -1, hc: 2, legR: -1, legC: 1 },
+  { hr: 1, hc: 2, legR: 1, legC: 1 },
+];
+
+// 核心原位网格将军检测：给定 90 格网格与将/帅坐标 (gr, gc)，零内存分配完成常数级 O(1) 向心反查
+function isGeneralInCheckOnGrid(
+  grid: (Piece | null)[],
   camp: Camp,
-  prebuiltGrid?: (Piece | null)[]
-): Position | null {
-  const general = pieces.find((p) => p.type === 'general' && p.camp === camp);
-  if (!general) return null;
-  const grid = prebuiltGrid || buildBoardGrid(pieces);
-  const { row: gr, col: gc } = general;
+  gr: number,
+  gc: number
+): boolean {
   const enemyCamp: Camp = camp === 'red' ? 'black' : 'red';
 
   // 1. 车、炮与将帅照面（四向正交射线）
-  const orthoDirs = [
-    [-1, 0],
-    [1, 0],
-    [0, -1],
-    [0, 1],
-  ];
-  for (const [dr, dc] of orthoDirs) {
+  for (let d = 0; d < 4; d++) {
+    const [dr, dc] = ORTHO_DIRS[d];
     let nr = gr + dr;
     let nc = gc + dc;
     let screenFound = false;
@@ -427,12 +403,12 @@ export function isCampInCheck(
       if (p) {
         if (!screenFound) {
           if (p.camp === enemyCamp && (p.type === 'chariot' || p.type === 'general')) {
-            return { row: gr, col: gc };
+            return true;
           }
           screenFound = true;
         } else {
           if (p.camp === enemyCamp && p.type === 'cannon') {
-            return { row: gr, col: gc };
+            return true;
           }
           break;
         }
@@ -442,18 +418,9 @@ export function isCampInCheck(
     }
   }
 
-  // 2. 敌方马位反查（含蹩马腿检验：马腿紧邻敌马所在轴向）
-  const horseChecks = [
-    { hr: -2, hc: -1, legR: -1, legC: -1 },
-    { hr: -2, hc: 1, legR: -1, legC: 1 },
-    { hr: 2, hc: -1, legR: 1, legC: -1 },
-    { hr: 2, hc: 1, legR: 1, legC: 1 },
-    { hr: -1, hc: -2, legR: -1, legC: -1 },
-    { hr: 1, hc: -2, legR: 1, legC: -1 },
-    { hr: -1, hc: 2, legR: -1, legC: 1 },
-    { hr: 1, hc: 2, legR: 1, legC: 1 },
-  ];
-  for (const hc of horseChecks) {
+  // 2. 敌方马位反查（含蹩马腿检验）
+  for (let i = 0; i < 8; i++) {
+    const hc = HORSE_CHECK_OFFSETS[i];
     const r = gr + hc.hr;
     const c = gc + hc.hc;
     if (r < 0 || r > 9 || c < 0 || c > 8) continue;
@@ -462,30 +429,44 @@ export function isCampInCheck(
       const lr = gr + hc.legR;
       const lc = gc + hc.legC;
       if (lr >= 0 && lr <= 9 && lc >= 0 && lc <= 8 && !grid[lr * 9 + lc]) {
-        return { row: gr, col: gc };
+        return true;
       }
     }
   }
 
   // 3. 敌方兵/卒反查（前方与左右临位）
   const soldierFromRow = camp === 'red' ? gr - 1 : gr + 1;
-  const soldierSpots: [number, number][] = [
-    [soldierFromRow, gc],
-    [gr, gc - 1],
-    [gr, gc + 1],
-  ];
-  for (const [sr, sc] of soldierSpots) {
-    if (sr < 0 || sr > 9 || sc < 0 || sc > 8) continue;
-    const p = grid[sr * 9 + sc];
-    if (p && p.camp === enemyCamp && p.type === 'soldier') {
-      return { row: gr, col: gc };
-    }
+  if (soldierFromRow >= 0 && soldierFromRow <= 9) {
+    const frontP = grid[soldierFromRow * 9 + gc];
+    if (frontP && frontP.camp === enemyCamp && frontP.type === 'soldier') return true;
+  }
+  if (gc - 1 >= 0) {
+    const leftP = grid[gr * 9 + (gc - 1)];
+    if (leftP && leftP.camp === enemyCamp && leftP.type === 'soldier') return true;
+  }
+  if (gc + 1 <= 8) {
+    const rightP = grid[gr * 9 + (gc + 1)];
+    if (rightP && rightP.camp === enemyCamp && rightP.type === 'soldier') return true;
   }
 
-  return null;
+  return false;
 }
 
-// 过滤送将、将帅照面及未应将着法，返回严格遵守中国象棋规则的合法目标点
+// 向心射线将军检测：从将/帅位置向四向、马位与兵卒位反查，复杂度降为常数级 O(1)
+export function isCampInCheck(
+  pieces: Piece[],
+  camp: Camp,
+  prebuiltGrid?: (Piece | null)[]
+): Position | null {
+  const general = pieces.find((p) => p.type === 'general' && p.camp === camp);
+  if (!general) return null;
+  const grid = prebuiltGrid || buildBoardGrid(pieces);
+  return isGeneralInCheckOnGrid(grid, camp, general.row, general.col)
+    ? { row: general.row, col: general.col }
+    : null;
+}
+
+// 过滤送将、将帅照面及未应将着法：采用原位 90 格网格试走与回溯，消除候选走法枚举中的数组克隆与重复建网
 export function getSafeLegalMovesForPiece(
   piece: Piece,
   pieces: Piece[],
@@ -493,13 +474,36 @@ export function getSafeLegalMovesForPiece(
 ): Position[] {
   const grid = prebuiltGrid || buildBoardGrid(pieces);
   const candidates = getLegalMovesForPiece(piece, pieces, grid);
+  if (candidates.length === 0) return [];
+
+  const myGeneral =
+    piece.type === 'general'
+      ? piece
+      : pieces.find((p) => p.type === 'general' && p.camp === piece.camp);
+  if (!myGeneral) return candidates;
+
   const safeMoves: Position[] = [];
+  const fromIdx = piece.row * 9 + piece.col;
+  const isMovingGeneral = piece.type === 'general';
+
   for (let i = 0; i < candidates.length; i++) {
     const to = candidates[i];
-    const nextPieces = pieces
-      .filter((other) => !(other.row === to.row && other.col === to.col))
-      .map((other) => (other.id === piece.id ? { ...other, row: to.row, col: to.col } : other));
-    if (!isCampInCheck(nextPieces, piece.camp)) {
+    const toIdx = to.row * 9 + to.col;
+    const displaced = grid[toIdx];
+
+    // 原位试走
+    grid[fromIdx] = null;
+    grid[toIdx] = piece;
+
+    const gr = isMovingGeneral ? to.row : myGeneral.row;
+    const gc = isMovingGeneral ? to.col : myGeneral.col;
+    const stillInCheck = isGeneralInCheckOnGrid(grid, piece.camp, gr, gc);
+
+    // 立即原位回溯恢复
+    grid[fromIdx] = piece;
+    grid[toIdx] = displaced;
+
+    if (!stillInCheck) {
       safeMoves.push(to);
     }
   }
@@ -521,13 +525,8 @@ export function getCheckingAttackers(
   const gc = general.col;
 
   // 1. 车、炮与将帅照面
-  const orthoDirs = [
-    [-1, 0],
-    [1, 0],
-    [0, -1],
-    [0, 1],
-  ];
-  for (const [dr, dc] of orthoDirs) {
+  for (let d = 0; d < 4; d++) {
+    const [dr, dc] = ORTHO_DIRS[d];
     let nr = gr + dr;
     let nc = gc + dc;
     let screenFound = false;
@@ -552,17 +551,8 @@ export function getCheckingAttackers(
   }
 
   // 2. 敌方马照将
-  const horseChecks = [
-    { hr: -2, hc: -1, legR: -1, legC: -1 },
-    { hr: -2, hc: 1, legR: -1, legC: 1 },
-    { hr: 2, hc: -1, legR: 1, legC: -1 },
-    { hr: 2, hc: 1, legR: 1, legC: 1 },
-    { hr: -1, hc: -2, legR: -1, legC: -1 },
-    { hr: 1, hc: -2, legR: 1, legC: -1 },
-    { hr: -1, hc: 2, legR: -1, legC: 1 },
-    { hr: 1, hc: 2, legR: 1, legC: 1 },
-  ];
-  for (const hc of horseChecks) {
+  for (let i = 0; i < 8; i++) {
+    const hc = HORSE_CHECK_OFFSETS[i];
     const r = gr + hc.hr;
     const c = gc + hc.hc;
     if (r < 0 || r > 9 || c < 0 || c > 8) continue;
@@ -594,18 +584,40 @@ export function getCheckingAttackers(
   return attackers;
 }
 
-// 校验指定行棋方是否仍存在至少一步不致己方被将的合法着法（用于判断绝杀/困毙终局）
+// 校验指定行棋方是否仍存在至少一步不致己方被将的合法着法（找到第一步安全着法即刻短路返回）
 export function hasAnyLegalMoves(
   pieces: Piece[],
   camp: Camp,
   prebuiltGrid?: (Piece | null)[]
 ): boolean {
   const grid = prebuiltGrid || buildBoardGrid(pieces);
+  const myGeneral = pieces.find((p) => p.type === 'general' && p.camp === camp);
+  if (!myGeneral) return false;
+
   for (let i = 0; i < pieces.length; i++) {
     const p = pieces[i];
     if (p.camp !== camp) continue;
-    if (getSafeLegalMovesForPiece(p, pieces, grid).length > 0) {
-      return true;
+    const candidates = getLegalMovesForPiece(p, pieces, grid);
+    if (candidates.length === 0) continue;
+
+    const fromIdx = p.row * 9 + p.col;
+    const isMovingGeneral = p.type === 'general';
+    for (let j = 0; j < candidates.length; j++) {
+      const to = candidates[j];
+      const toIdx = to.row * 9 + to.col;
+      const displaced = grid[toIdx];
+
+      grid[fromIdx] = null;
+      grid[toIdx] = p;
+      const gr = isMovingGeneral ? to.row : myGeneral.row;
+      const gc = isMovingGeneral ? to.col : myGeneral.col;
+      const stillInCheck = isGeneralInCheckOnGrid(grid, camp, gr, gc);
+      grid[fromIdx] = p;
+      grid[toIdx] = displaced;
+
+      if (!stillInCheck) {
+        return true;
+      }
     }
   }
   return false;
@@ -1396,203 +1408,4 @@ export function createSampleSessionMoves(): {
   });
 
   return { initialPieces, moves: records };
-}
-
-let sharedAudioCtx: AudioContext | null = null;
-
-function getAudioContext(): AudioContext | null {
-  if (typeof window === 'undefined') return null;
-  if (!sharedAudioCtx) {
-    const AudioCtx =
-      window.AudioContext ||
-      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (AudioCtx) {
-      sharedAudioCtx = new AudioCtx();
-    }
-  }
-  if (sharedAudioCtx && sharedAudioCtx.state === 'suspended') {
-    sharedAudioCtx.resume().catch(() => {});
-  }
-  return sharedAudioCtx;
-}
-
-export function playWoodClackSound(
-  isCapture = false,
-  row = 4.5,
-  col = 4,
-  soundEnabled = true
-) {
-  if (!soundEnabled) return;
-  const ctx = getAudioContext();
-  if (!ctx) return;
-
-  try {
-    const now = ctx.currentTime;
-    const distFromCenter = Math.hypot(row - 4.5, col - 4);
-    const normDist = Math.min(1, distFromCenter / 6.02);
-    const baseFreq = Math.round(135 + normDist * 75);
-    const decaySec = Number((0.105 - normDist * 0.042).toFixed(3));
-
-    const triggerWoodStrike = (
-      startTime: number,
-      freq: number,
-      duration: number,
-      gainPeak: number
-    ) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(freq, startTime);
-      osc.frequency.exponentialRampToValueAtTime(Math.max(38, freq * 0.36), startTime + duration);
-
-      gain.gain.setValueAtTime(0.001, startTime);
-      gain.gain.linearRampToValueAtTime(gainPeak, startTime + 0.004);
-      gain.gain.exponentialRampToValueAtTime(0.0008, startTime + duration);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(startTime);
-      osc.stop(startTime + duration + 0.01);
-    };
-
-    if (isCapture) {
-      triggerWoodStrike(now, baseFreq * 1.48, 0.048, 0.24);
-      triggerWoodStrike(now + 0.018, baseFreq, decaySec, 0.34);
-    } else {
-      triggerWoodStrike(now, baseFreq, decaySec, 0.26);
-    }
-  } catch {
-    // Ignore audio context errors
-  }
-}
-
-// 警示哑木音效（未应将或尝试送将时的克制提示）
-export function playInvalidWarningSound(soundEnabled = true) {
-  if (!soundEnabled) return;
-  const ctx = getAudioContext();
-  if (!ctx) return;
-  try {
-    const now = ctx.currentTime;
-    [0, 0.075].forEach((offset, idx) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(idx === 0 ? 108 : 88, now + offset);
-      osc.frequency.exponentialRampToValueAtTime(52, now + offset + 0.055);
-      gain.gain.setValueAtTime(0.001, now + offset);
-      gain.gain.linearRampToValueAtTime(0.14, now + offset + 0.005);
-      gain.gain.exponentialRampToValueAtTime(0.0008, now + offset + 0.06);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now + offset);
-      osc.stop(now + offset + 0.07);
-    });
-  } catch {
-    // Ignore audio context errors
-  }
-}
-
-// 中式清越编钟/铜磬「将军」提示音
-export function playCheckChimeSound(soundEnabled = true) {
-  if (!soundEnabled) return;
-  const ctx = getAudioContext();
-  if (!ctx) return;
-
-  try {
-    const start = ctx.currentTime + 0.025;
-    // 双声叠韵铜磬（D5 + A5 五声音阶清鸣 + 高次泛音瞬态）
-    const strikeChime = (t: number, baseHz: number, dur: number, peak: number) => {
-      const partials = [
-        { ratio: 1, amp: peak, type: 'sine' as OscillatorType, dec: dur },
-        { ratio: 2.0, amp: peak * 0.34, type: 'triangle' as OscillatorType, dec: dur * 0.72 },
-        { ratio: 2.98, amp: peak * 0.16, type: 'sine' as OscillatorType, dec: dur * 0.42 },
-      ];
-      for (const p of partials) {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = p.type;
-        osc.frequency.setValueAtTime(baseHz * p.ratio, t);
-        gain.gain.setValueAtTime(0.0008, t);
-        gain.gain.linearRampToValueAtTime(p.amp, t + 0.006);
-        gain.gain.exponentialRampToValueAtTime(0.0006, t + p.dec);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(t);
-        osc.stop(t + p.dec + 0.02);
-      }
-    };
-
-    strikeChime(start, 587.33, 0.36, 0.16);
-    strikeChime(start + 0.09, 880.0, 0.46, 0.14);
-  } catch {
-    // Ignore audio context errors
-  }
-}
-
-// 中式大锣余韵 + 金磬收煞「绝杀 / 困毙」终局音效
-export function playCheckmateGongSound(soundEnabled = true) {
-  if (!soundEnabled) return;
-  const ctx = getAudioContext();
-  if (!ctx) return;
-
-  try {
-    const start = ctx.currentTime + 0.035;
-    // 1. 低沉铜锣主体泛音群（微非谐波打造传统响铜颤音）
-    const gongPartials = [
-      { freq: 116, endFreq: 109, dur: 1.35, gain: 0.24, type: 'triangle' as OscillatorType },
-      { freq: 174, endFreq: 171, dur: 1.12, gain: 0.14, type: 'sine' as OscillatorType },
-      { freq: 242, endFreq: 238, dur: 0.92, gain: 0.11, type: 'sine' as OscillatorType },
-      { freq: 356, endFreq: 350, dur: 0.65, gain: 0.07, type: 'triangle' as OscillatorType },
-    ];
-    for (const gp of gongPartials) {
-      const osc = ctx.createOscillator();
-      const g = ctx.createGain();
-      osc.type = gp.type;
-      osc.frequency.setValueAtTime(gp.freq, start);
-      osc.frequency.exponentialRampToValueAtTime(gp.endFreq, start + gp.dur);
-      g.gain.setValueAtTime(0.001, start);
-      g.gain.linearRampToValueAtTime(gp.gain, start + 0.018);
-      g.gain.exponentialRampToValueAtTime(0.0006, start + gp.dur);
-      osc.connect(g);
-      g.connect(ctx.destination);
-      osc.start(start);
-      osc.stop(start + gp.dur + 0.03);
-    }
-
-    // 2. 轻微响铜击锤沙响（滤波白噪）
-    const noiseLen = Math.floor(ctx.sampleRate * 0.22);
-    const noiseBuf = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
-    const data = noiseBuf.getChannelData(0);
-    for (let i = 0; i < noiseLen; i++) {
-      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.06));
-    }
-    const noiseSrc = ctx.createBufferSource();
-    noiseSrc.buffer = noiseBuf;
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(720, start);
-    filter.Q.setValueAtTime(1.8, start);
-    const noiseGain = ctx.createGain();
-    noiseGain.gain.setValueAtTime(0.11, start);
-    noiseGain.gain.exponentialRampToValueAtTime(0.001, start + 0.22);
-    noiseSrc.connect(filter);
-    filter.connect(noiseGain);
-    noiseGain.connect(ctx.destination);
-    noiseSrc.start(start);
-
-    // 3. 高音金磬收煞清响（D5 -> A5 微延后定音）
-    const chimeOsc = ctx.createOscillator();
-    const chimeGain = ctx.createGain();
-    chimeOsc.type = 'sine';
-    chimeOsc.frequency.setValueAtTime(587.33, start + 0.06);
-    chimeGain.gain.setValueAtTime(0.0008, start + 0.06);
-    chimeGain.gain.linearRampToValueAtTime(0.12, start + 0.075);
-    chimeGain.gain.exponentialRampToValueAtTime(0.0006, start + 0.95);
-    chimeOsc.connect(chimeGain);
-    chimeGain.connect(ctx.destination);
-    chimeOsc.start(start + 0.06);
-    chimeOsc.stop(start + 0.98);
-  } catch {
-    // Ignore audio context errors
-  }
 }

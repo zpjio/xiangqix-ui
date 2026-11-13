@@ -9,8 +9,9 @@ import {
   RotateCcw,
   Trash2,
 } from 'lucide-react';
+import { PIECE_LABELS, PIECE_QUOTA_LIST } from '../constants/xiangqiConstants';
 import { Camp, Piece, PieceType } from '../types/xiangqi';
-import { PIECE_LABELS, piecesToFen } from '../utils/xiangqiRules';
+import { piecesToFen } from '../utils/xiangqiRules';
 
 interface SetupWorkbenchProps {
   pieces: Piece[];
@@ -23,16 +24,6 @@ interface SetupWorkbenchProps {
   onResetSetupInitial: () => void;
   onFinishSetup: () => void;
 }
-
-const PIECE_QUOTA: { type: PieceType; max: number }[] = [
-  { type: 'chariot', max: 2 },
-  { type: 'horse', max: 2 },
-  { type: 'cannon', max: 2 },
-  { type: 'advisor', max: 2 },
-  { type: 'elephant', max: 2 },
-  { type: 'soldier', max: 5 },
-  { type: 'general', max: 1 },
-];
 
 export const SetupWorkbench: React.FC<SetupWorkbenchProps> = React.memo(({
   pieces,
@@ -109,7 +100,7 @@ export const SetupWorkbench: React.FC<SetupWorkbenchProps> = React.memo(({
               红方子力库
             </div>
             <div className="space-y-1">
-              {PIECE_QUOTA.map(({ type, max }) => {
+              {PIECE_QUOTA_LIST.map(({ type, max }) => {
                 const remain = getRemainingCount('red', type, max);
                 const isSelected =
                   setupSelectedTemplate?.camp === 'red' &&
@@ -160,7 +151,7 @@ export const SetupWorkbench: React.FC<SetupWorkbenchProps> = React.memo(({
               黑方子力库
             </div>
             <div className="space-y-1">
-              {PIECE_QUOTA.map(({ type, max }) => {
+              {PIECE_QUOTA_LIST.map(({ type, max }) => {
                 const remain = getRemainingCount('black', type, max);
                 const isSelected =
                   setupSelectedTemplate?.camp === 'black' &&

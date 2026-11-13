@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { FileCode2, RotateCcw, Sparkles, Target } from 'lucide-react';
-import { MoveQuality, MoveRecord, Position } from '../types/xiangqi';
+import { getMoveQualityAccuracyScore } from '../constants/xiangqiConstants';
+import { MoveRecord, Position } from '../types/xiangqi';
 import { EvalGraph } from './EvalGraph';
 
 interface GameReviewPanelProps {
@@ -15,18 +16,10 @@ interface GameReviewPanelProps {
   onOpenImportModal: () => void;
 }
 
-const QUALITY_SCORE_MAP: Record<MoveQuality, number> = {
-  妙: 99,
-  优: 95,
-  良: 88,
-  缓: 74,
-  败: 48,
-};
-
 function calcCampAccuracy(list: MoveRecord[]): string {
   if (list.length === 0) return '—';
   const total = list.reduce(
-    (sum, m) => sum + (m.quality ? QUALITY_SCORE_MAP[m.quality] : 90),
+    (sum, m) => sum + getMoveQualityAccuracyScore(m.quality),
     0
   );
   return `${(total / list.length).toFixed(1)}%`;

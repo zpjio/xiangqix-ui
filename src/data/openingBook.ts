@@ -699,10 +699,25 @@ export function getOpeningBookMap(): Map<string, OpeningBookNode> {
   return map;
 }
 
+const openingLookupWeakCache = new WeakMap<
+  Piece[],
+  { red?: OpeningBookNode | null; black?: OpeningBookNode | null }
+>();
+
 export function lookupOpeningBookNode(pieces: Piece[], turn: Camp): OpeningBookNode | null {
+  let cachedEntry = openingLookupWeakCache.get(pieces);
+  if (cachedEntry && turn in cachedEntry) {
+    return cachedEntry[turn] ?? null;
+  }
   const map = getOpeningBookMap();
   const key = getPositionKeyFromPieces(pieces, turn);
-  return map.get(key) || null;
+  const matched = map.get(key) || null;
+  if (!cachedEntry) {
+    cachedEntry = {};
+    openingLookupWeakCache.set(pieces, cachedEntry);
+  }
+  cachedEntry[turn] = matched;
+  return matched;
 }
 
 export function countMatchingLibraryGames(games: LibraryGameItem[], keyword: string): number {

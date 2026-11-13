@@ -190,47 +190,49 @@ const FIDUCIAL_POSITIONS: [number, number][] = [
   [6, 8],
 ];
 
-const ImpactDustBurst: React.FC<{ camp: Camp; isCapture: boolean; effectId: number }> = ({
+const ImpactDustBurst: React.FC<{ camp: Camp; isCapture: boolean; effectId: number }> = React.memo(({
   camp,
   isCapture,
   effectId,
 }) => {
-  const count = isCapture ? 16 : 10;
-  const particles = Array.from({ length: count }).map((_, idx) => {
-    const seed = ((effectId * 31 + idx * 17) % 97) / 97;
-    const baseAngle = (idx / count) * Math.PI * 2 + (seed - 0.5) * 0.42;
-    const minRadius = isCapture ? 22 : 18;
-    const maxRadius = isCapture ? 48 : 34;
-    const dist = minRadius + seed * (maxRadius - minRadius);
+  const particles = useMemo(() => {
+    const count = isCapture ? 16 : 10;
+    return Array.from({ length: count }).map((_, idx) => {
+      const seed = ((effectId * 31 + idx * 17) % 97) / 97;
+      const baseAngle = (idx / count) * Math.PI * 2 + (seed - 0.5) * 0.42;
+      const minRadius = isCapture ? 22 : 18;
+      const maxRadius = isCapture ? 48 : 34;
+      const dist = minRadius + seed * (maxRadius - minRadius);
 
-    const tx = `${Math.round(Math.cos(baseAngle) * dist)}px`;
-    const ty = `${Math.round(Math.sin(baseAngle) * dist)}px`;
-    const rot = `${Math.round((seed - 0.5) * 260)}deg`;
-    const dur = `${Math.round((isCapture ? 500 : 420) + seed * 160)}ms`;
-    const scale = (0.75 + seed * 0.6).toFixed(2);
+      const tx = `${Math.round(Math.cos(baseAngle) * dist)}px`;
+      const ty = `${Math.round(Math.sin(baseAngle) * dist)}px`;
+      const rot = `${Math.round((seed - 0.5) * 260)}deg`;
+      const dur = `${Math.round((isCapture ? 500 : 420) + seed * 160)}ms`;
+      const scale = (0.75 + seed * 0.6).toFixed(2);
 
-    const isWoodSplinter = idx % 3 === 0;
-    let colorClass = 'bg-[#C8372D]';
-    if (isWoodSplinter) {
-      colorClass = idx % 2 === 0 ? 'bg-[#DFC196]' : 'bg-[#8C5A36]';
-    } else if (camp === 'black' && idx % 2 === 1) {
-      colorClass = 'bg-[#D4AF37]';
-    }
+      const isWoodSplinter = idx % 3 === 0;
+      let colorClass = 'bg-[#C8372D]';
+      if (isWoodSplinter) {
+        colorClass = idx % 2 === 0 ? 'bg-[#DFC196]' : 'bg-[#8C5A36]';
+      } else if (camp === 'black' && idx % 2 === 1) {
+        colorClass = 'bg-[#D4AF37]';
+      }
 
-    return {
-      key: `dust-${effectId}-${idx}`,
-      isWoodSplinter,
-      colorClass,
-      style: {
-        '--tx': tx,
-        '--ty': ty,
-        '--rot': rot,
-        '--dur': dur,
-        '--scale': scale,
-        animationDelay: `${(idx % 4) * 12}ms`,
-      } as React.CSSProperties,
-    };
-  });
+      return {
+        key: `dust-${effectId}-${idx}`,
+        isWoodSplinter,
+        colorClass,
+        style: {
+          '--tx': tx,
+          '--ty': ty,
+          '--rot': rot,
+          '--dur': dur,
+          '--scale': scale,
+          animationDelay: `${(idx % 4) * 12}ms`,
+        } as React.CSSProperties,
+      };
+    });
+  }, [effectId, isCapture, camp]);
 
   return (
     <div
@@ -258,7 +260,7 @@ const ImpactDustBurst: React.FC<{ camp: Camp; isCapture: boolean; effectId: numb
       ))}
     </div>
   );
-};
+});
 
 /* ==================== 第 1 层：静态盘面纹理与网格 SVG（独立缓存，隔离 feTurbulence 重栅格化） ==================== */
 const StaticBoardSurface: React.FC<{

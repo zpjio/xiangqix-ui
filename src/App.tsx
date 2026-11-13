@@ -26,8 +26,16 @@ import { PlayerSeatBar } from './components/PlayerSeatBar';
 import { SetupWorkbench } from './components/SetupWorkbench';
 import { StatusBar } from './components/StatusBar';
 import { Titlebar } from './components/Titlebar';
-import { CLASSICAL_CHALLENGES, INITIAL_LIBRARY_GAMES } from './data/catalogRegistry';
+import { CLASSICAL_CHALLENGES } from './data/catalogRegistry';
 import { countMatchingLibraryGames, lookupOpeningBookNode, OPENING_PRESETS } from './data/openingBook';
+import {
+  DEFAULT_ENGINE_PROFILES,
+  DEFAULT_STUDY_METADATA,
+  getMoveQualityAccuracyScore,
+  INITIAL_FEN,
+  PIECE_QUOTA_BY_TYPE,
+  SAMPLE_MASTER_METADATA,
+} from './constants/xiangqiConstants';
 import {
   ActiveModalId,
   AppTheme,
@@ -46,9 +54,9 @@ import {
   HandicapType,
   ImpactEffect,
   LibraryGameItem,
-  MoveQuality,
   MoveRecord,
   MultiPVArrow,
+  OpeningBookCategory,
   OpeningDrillProgress,
   OpeningDrillRuntime,
   OpeningPanelSubMode,
@@ -59,6 +67,25 @@ import {
   Position,
   WorkspaceMode,
 } from './types/xiangqi';
+import {
+  playCheckChimeSound,
+  playCheckmateGongSound,
+  playInvalidWarningSound,
+  playWoodClackSound,
+} from './utils/soundEffects';
+import {
+  readStoredLibraryGames,
+  readStoredOpeningDrillProgress,
+  readStoredPrefs,
+  readStoredSolvedChallenges,
+  readStoredStudySession,
+  StoredStudySession,
+  writeStoredLibraryGames,
+  writeStoredOpeningDrillProgress,
+  writeStoredPrefs,
+  writeStoredSolvedChallenges,
+  writeStoredStudySession,
+} from './utils/storage';
 import {
   buildBoardGrid,
   calculateMaterialAndCaptures,
@@ -77,149 +104,13 @@ import {
   getPieceAtGrid,
   getSafeLegalMovesForPiece,
   hasAnyLegalMoves,
-  INITIAL_FEN,
   isCampInCheck,
   parseFenToPieces,
   parsePgnTextToSession,
   piecesToFen,
-  playCheckChimeSound,
-  playCheckmateGongSound,
-  playInvalidWarningSound,
-  playWoodClackSound,
   replayCompactMoves,
   sanitizeExportFilename,
 } from './utils/xiangqiRules';
-
-const STUDY_SESSION_STORAGE_KEY = 'xiangqix_study_session_v1';
-const PREFS_STORAGE_KEY = 'xiangqix_prefs_v1';
-const LIBRARY_STORAGE_KEY = 'xiangqix_library_v1';
-const SOLVED_CHALLENGES_STORAGE_KEY = 'xiangqix_challenges_solved_v1';
-const OPENING_DRILLS_STORAGE_KEY = 'xiangqix_opening_drills_v1';
-
-const DEFAULT_STUDY_METADATA: GameMetadata = {
-  redPlayer: '红方（先手）',
-  blackPlayer: '黑方（后手）',
-  event: '自由拆棋 · 复盘分析',
-  date: '2026-11-12',
-  result: '进行中',
-  site: '象棋X 分析工作台',
-  opening: '标准开局（待定式）',
-  isFavorite: false,
-};
-
-const SAMPLE_MASTER_METADATA: GameMetadata = {
-  redPlayer: '王天一',
-  blackPlayer: '郑惟桐',
-  event: '全国象棋个人锦标赛冠亚军决战',
-  date: '2026-11-11',
-  result: '红胜',
-  site: '杭州棋院',
-  opening: '中炮过河车对屏风马',
-  isFavorite: true,
-};
-
-interface StoredStudySession {
-  pieces: Piece[];
-  basePieces?: Piece[];
-  baseTurn?: Camp;
-  mainMoves: MoveRecord[];
-  variationMoves: MoveRecord[] | null;
-  branchOriginPly: number | null;
-  currentPly: number;
-  turn: Camp;
-  metadata: GameMetadata;
-  flipped?: boolean;
-  activeLibraryGameId?: string | null;
-}
-
-interface StoredPrefs {
-  appTheme?: AppTheme;
-  fontScale?: FontScale;
-  soundEnabled?: boolean;
-  boardTheme?: BoardTheme;
-  craftStyle?: PieceCraftStyle;
-  useTraditionalChar?: boolean;
-  primaryEngineId?: string;
-  secondaryEngineId?: string;
-  compareMode?: boolean;
-  multiPvCount?: 1 | 2 | 3;
-  engineDepth?: 18 | 24 | 30;
-  engineThreads?: 4 | 8 | 16;
-  engineHashMb?: 256 | 512 | 1024;
-}
-
-function readStoredStudySession(): StoredStudySession | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = window.localStorage.getItem(STUDY_SESSION_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<StoredStudySession>;
-    if (!Array.isArray(parsed.pieces) || parsed.pieces.length === 0) return null;
-    if (!Array.isArray(parsed.mainMoves)) return null;
-    return {
-      pieces: parsed.pieces,
-      basePieces: Array.isArray(parsed.basePieces) && parsed.basePieces.length > 0 ? parsed.basePieces : undefined,
-      baseTurn: parsed.baseTurn === 'black' ? 'black' : 'red',
-      mainMoves: parsed.mainMoves,
-      variationMoves: Array.isArray(parsed.variationMoves) ? parsed.variationMoves : null,
-      branchOriginPly: typeof parsed.branchOriginPly === 'number' ? parsed.branchOriginPly : null,
-      currentPly: typeof parsed.currentPly === 'number' ? parsed.currentPly : 0,
-      turn: parsed.turn === 'black' ? 'black' : 'red',
-      metadata: parsed.metadata?.redPlayer ? parsed.metadata : DEFAULT_STUDY_METADATA,
-      flipped: !!parsed.flipped,
-    };
-  } catch {
-    return null;
-  }
-}
-
-function readStoredPrefs(): StoredPrefs {
-  if (typeof window === 'undefined') return {};
-  try {
-    const raw = window.localStorage.getItem(PREFS_STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as StoredPrefs) : {};
-  } catch {
-    return {};
-  }
-}
-
-function readStoredLibraryGames(): LibraryGameItem[] {
-  if (typeof window === 'undefined') return INITIAL_LIBRARY_GAMES;
-  try {
-    const raw = window.localStorage.getItem(LIBRARY_STORAGE_KEY);
-    if (!raw) return INITIAL_LIBRARY_GAMES;
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? (parsed as LibraryGameItem[]) : INITIAL_LIBRARY_GAMES;
-  } catch {
-    return INITIAL_LIBRARY_GAMES;
-  }
-}
-
-function readStoredSolvedChallenges(): string[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = window.localStorage.getItem(SOLVED_CHALLENGES_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
-  } catch {
-    return [];
-  }
-}
-
-function readStoredOpeningDrillProgress(): Record<string, OpeningDrillProgress> {
-  if (typeof window === 'undefined') return {};
-  try {
-    const raw = window.localStorage.getItem(OPENING_DRILLS_STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object'
-      ? (parsed as Record<string, OpeningDrillProgress>)
-      : {};
-  } catch {
-    return {};
-  }
-}
 
 export default function App() {
   const initialPrefs = useMemo(() => readStoredPrefs(), []);
@@ -302,47 +193,9 @@ export default function App() {
   const [flipped, setFlipped] = useState<boolean>(() => initialStudy?.flipped ?? false);
 
   // 多引擎注册表与双擎并行对比状态（预置皮卡鱼 UCI、旋风 UCI、天机 UCCI 三大引擎）
-  const [engines, setEngines] = useState<EngineProfile[]>([
-    {
-      id: 'pikafish',
-      name: '皮卡鱼 Pikafish 2026',
-      shortName: '皮卡鱼',
-      version: '2026.11 AVX2',
-      protocol: 'UCI',
-      styleBias: 'balanced',
-      styleLabel: '均衡全能',
-      nnueFile: 'pikafish.nnue',
-      sizeMb: 38,
-      status: 'ready',
-      installProgress: 100,
-    },
-    {
-      id: 'cyclone',
-      name: '旋风 Cyclone v12',
-      shortName: '旋风',
-      version: 'v12.4 Ultimate',
-      protocol: 'UCI',
-      styleBias: 'aggressive',
-      styleLabel: '中路强攻',
-      nnueFile: 'cyclone_v12.nnue',
-      sizeMb: 42,
-      status: 'ready',
-      installProgress: 100,
-    },
-    {
-      id: 'xqms',
-      name: '天机 XQMS Pro 3.26',
-      shortName: '天机',
-      version: 'v3.26 UCCI',
-      protocol: 'UCCI',
-      styleBias: 'positional',
-      styleLabel: '阵地绵密',
-      nnueFile: 'xqms.nnue',
-      sizeMb: 31,
-      status: 'missing',
-      installProgress: 0,
-    },
-  ]);
+  const [engines, setEngines] = useState<EngineProfile[]>(() =>
+    DEFAULT_ENGINE_PROFILES.map((eng) => ({ ...eng }))
+  );
   const [primaryEngineId, setPrimaryEngineId] = useState<string>(
     initialPrefs.primaryEngineId || 'pikafish'
   );
@@ -370,7 +223,22 @@ export default function App() {
   const [hintArrow, setHintArrow] = useState<MultiPVArrow | null>(null);
   const [isReplaying, setIsReplaying] = useState<boolean>(false);
 
+  const installIntervalsRef = useRef<Map<string, number>>(new Map());
+
+  useEffect(() => {
+    const intervals = installIntervalsRef.current;
+    return () => {
+      intervals.forEach((timerId) => window.clearInterval(timerId));
+      intervals.clear();
+    };
+  }, []);
+
   const handleInstallEngine = useCallback((targetId: string) => {
+    const existingTimer = installIntervalsRef.current.get(targetId);
+    if (existingTimer !== undefined) {
+      window.clearInterval(existingTimer);
+      installIntervalsRef.current.delete(targetId);
+    }
     setEngines((prev) =>
       prev.map((eng) =>
         eng.id === targetId && eng.status !== 'installing'
@@ -383,10 +251,12 @@ export default function App() {
         const target = prev.find((e) => e.id === targetId);
         if (!target || target.status !== 'installing') {
           window.clearInterval(timer);
+          installIntervalsRef.current.delete(targetId);
           return prev;
         }
         if (target.installProgress >= 92) {
           window.clearInterval(timer);
+          installIntervalsRef.current.delete(targetId);
           setIsAnalyzing(true);
           return prev.map((e) =>
             e.id === targetId ? { ...e, status: 'ready', installProgress: 100 } : e
@@ -399,9 +269,15 @@ export default function App() {
         );
       });
     }, 180);
+    installIntervalsRef.current.set(targetId, timer);
   }, []);
 
   const handleResetEngineMissing = useCallback((targetId: string) => {
+    const existingTimer = installIntervalsRef.current.get(targetId);
+    if (existingTimer !== undefined) {
+      window.clearInterval(existingTimer);
+      installIntervalsRef.current.delete(targetId);
+    }
     setEngines((prev) =>
       prev.map((e) =>
         e.id === targetId ? { ...e, status: 'missing', installProgress: 0 } : e
@@ -522,6 +398,7 @@ export default function App() {
     expectedMove: null,
   });
   const drillReplyTimerRef = useRef<number | null>(null);
+  const botReplyTimerRef = useRef<number | null>(null);
 
   const clearDrillTimer = useCallback(() => {
     if (drillReplyTimerRef.current !== null) {
@@ -530,7 +407,20 @@ export default function App() {
     }
   }, []);
 
-  useEffect(() => clearDrillTimer, [clearDrillTimer]);
+  const clearBotReplyTimer = useCallback(() => {
+    if (botReplyTimerRef.current !== null) {
+      window.clearTimeout(botReplyTimerRef.current);
+      botReplyTimerRef.current = null;
+    }
+    setIsBotThinking(false);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      clearDrillTimer();
+      clearBotReplyTimer();
+    };
+  }, [clearDrillTimer, clearBotReplyTimer]);
 
   // 自动防抖持久化「复盘分析」当前会话，并在页面隐藏/卸载前立即落盘
   const latestStudyPayloadRef = useRef<StoredStudySession | null>(null);
@@ -542,14 +432,7 @@ export default function App() {
       studyPersistTimerRef.current = null;
     }
     if (!latestStudyPayloadRef.current) return;
-    try {
-      window.localStorage.setItem(
-        STUDY_SESSION_STORAGE_KEY,
-        JSON.stringify(latestStudyPayloadRef.current)
-      );
-    } catch {
-      // Ignore storage quota errors
-    }
+    writeStoredStudySession(latestStudyPayloadRef.current);
   }, []);
 
   useEffect(() => {
@@ -573,14 +456,7 @@ export default function App() {
     studyPersistTimerRef.current = window.setTimeout(() => {
       studyPersistTimerRef.current = null;
       if (!latestStudyPayloadRef.current) return;
-      try {
-        window.localStorage.setItem(
-          STUDY_SESSION_STORAGE_KEY,
-          JSON.stringify(latestStudyPayloadRef.current)
-        );
-      } catch {
-        // Ignore storage quota errors
-      }
+      writeStoredStudySession(latestStudyPayloadRef.current);
     }, 350);
   }, [
     workspace,
@@ -608,26 +484,21 @@ export default function App() {
   }, [flushStudyPersistence]);
 
   useEffect(() => {
-    try {
-      const prefs: StoredPrefs = {
-        appTheme,
-        fontScale,
-        soundEnabled,
-        boardTheme,
-        craftStyle,
-        useTraditionalChar,
-        primaryEngineId,
-        secondaryEngineId,
-        compareMode,
-        multiPvCount,
-        engineDepth,
-        engineThreads,
-        engineHashMb,
-      };
-      window.localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(prefs));
-    } catch {
-      // Ignore storage quota errors
-    }
+    writeStoredPrefs({
+      appTheme,
+      fontScale,
+      soundEnabled,
+      boardTheme,
+      craftStyle,
+      useTraditionalChar,
+      primaryEngineId,
+      secondaryEngineId,
+      compareMode,
+      multiPvCount,
+      engineDepth,
+      engineThreads,
+      engineHashMb,
+    });
   }, [
     appTheme,
     fontScale,
@@ -646,35 +517,17 @@ export default function App() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      try {
-        window.localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(libraryGames));
-      } catch {
-        // Ignore storage quota errors
-      }
+      writeStoredLibraryGames(libraryGames);
     }, 300);
     return () => window.clearTimeout(timer);
   }, [libraryGames]);
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(
-        SOLVED_CHALLENGES_STORAGE_KEY,
-        JSON.stringify(solvedChallengeIds)
-      );
-    } catch {
-      // Ignore storage quota errors
-    }
+    writeStoredSolvedChallenges(solvedChallengeIds);
   }, [solvedChallengeIds]);
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(
-        OPENING_DRILLS_STORAGE_KEY,
-        JSON.stringify(drillProgressMap)
-      );
-    } catch {
-      // Ignore storage quota errors
-    }
+    writeStoredOpeningDrillProgress(drillProgressMap);
   }, [drillProgressMap]);
 
   // ==================== 3. 派生计算：O(1) 棋盘索引、防抖异步引擎分析与单次将军校验 ====================
@@ -950,30 +803,58 @@ export default function App() {
     [selectedChallengeId]
   );
 
-  // 开局库盘面指纹 O(1) 实时匹配与回溯最近定式节点（同时服务于「复盘分析」与「开局研习」）
+  // 开局库盘面指纹 O(1) 实时匹配与增量时间线缓存（切换手数时零 FEN 重序列化）
   const isOpeningContext = workspace === 'study' || workspace === 'opening';
+  const openingStandardInitialRef = useRef<Piece[] | null>(null);
+  if (!openingStandardInitialRef.current) {
+    openingStandardInitialRef.current = createInitialPieces('even');
+  }
+
   const matchedOpeningNode = useMemo(
     () => (isOpeningContext ? lookupOpeningBookNode(pieces, turn) : null),
     [isOpeningContext, pieces, turn]
   );
 
-  const lastMatchedOpeningInfo = useMemo(() => {
-    if (!isOpeningContext || matchedOpeningNode || currentPly <= 0) return null;
-    const baseSnap = workspace === 'opening' ? createInitialPieces('even') : studyBasePieces;
+  // 预构建各手最近命中的开局定式索引表，依赖与 currentPly 解耦，跳步翻谱直接 O(1) 下标读取
+  const openingMatchTimeline = useMemo(() => {
+    if (!isOpeningContext) return [];
+    const baseSnap =
+      workspace === 'opening' ? openingStandardInitialRef.current! : studyBasePieces;
     const baseTurnVal: Camp = workspace === 'opening' ? 'red' : studyBaseTurn;
-    for (let ply = currentPly - 1; ply >= 0; ply--) {
-      const snapPieces =
-        ply === 0 ? baseSnap : activeMovesList[ply - 1]?.piecesSnapshot;
-      if (!snapPieces) continue;
-      const snapTurn: Camp =
-        ply === 0
-          ? baseTurnVal
-          : activeMovesList[ply - 1].piece.camp === 'red'
-          ? 'black'
-          : 'red';
-      const node = lookupOpeningBookNode(snapPieces, snapTurn);
+    const maxPly = activeMovesList.length;
+    const timeline: ({
+      ply: number;
+      openingName: string;
+      category: OpeningBookCategory;
+      matchKeyword: string;
+    } | null)[] = new Array(maxPly + 1).fill(null);
+
+    let latestMatch: {
+      ply: number;
+      openingName: string;
+      category: OpeningBookCategory;
+      matchKeyword: string;
+    } | null = null;
+
+    const rootNode = lookupOpeningBookNode(baseSnap, baseTurnVal);
+    if (rootNode) {
+      latestMatch = {
+        ply: 0,
+        openingName: rootNode.openingName,
+        category: rootNode.category,
+        matchKeyword: rootNode.matchKeyword,
+      };
+    }
+    timeline[0] = latestMatch;
+
+    for (let ply = 1; ply <= maxPly; ply++) {
+      timeline[ply] = latestMatch;
+      const move = activeMovesList[ply - 1];
+      if (!move?.piecesSnapshot) continue;
+      const snapTurn: Camp = move.piece.camp === 'red' ? 'black' : 'red';
+      const node = lookupOpeningBookNode(move.piecesSnapshot, snapTurn);
       if (node) {
-        return {
+        latestMatch = {
           ply,
           openingName: node.openingName,
           category: node.category,
@@ -981,16 +862,14 @@ export default function App() {
         };
       }
     }
-    return null;
-  }, [
-    isOpeningContext,
-    workspace,
-    matchedOpeningNode,
-    currentPly,
-    studyBasePieces,
-    studyBaseTurn,
-    activeMovesList,
-  ]);
+    return timeline;
+  }, [isOpeningContext, workspace, studyBasePieces, studyBaseTurn, activeMovesList]);
+
+  const lastMatchedOpeningInfo = useMemo(() => {
+    if (!isOpeningContext || matchedOpeningNode || currentPly <= 0) return null;
+    const clampedPly = Math.min(currentPly, openingMatchTimeline.length - 1);
+    return clampedPly >= 0 ? openingMatchTimeline[clampedPly] : null;
+  }, [isOpeningContext, matchedOpeningNode, currentPly, openingMatchTimeline]);
 
   const activeMatchKeyword =
     matchedOpeningNode?.matchKeyword ?? lastMatchedOpeningInfo?.matchKeyword ?? '';
@@ -1006,6 +885,7 @@ export default function App() {
   // ==================== 4. 切换工作空间、新局重置与载入古谱/示范名局 ====================
   const handleNewStudyGame = useCallback(() => {
     clearDrillTimer();
+    clearBotReplyTimer();
     setDrillState((prev) => ({ ...prev, status: 'idle', feedback: null, expectedMove: null }));
     const freshPieces = createInitialPieces('even');
     setWorkspace('study');
@@ -1029,10 +909,11 @@ export default function App() {
     setTurn('red');
     setMetadata(DEFAULT_STUDY_METADATA);
     setIsAnalyzing(true);
-  }, [clearDrillTimer]);
+  }, [clearDrillTimer, clearBotReplyTimer]);
 
   const handleLoadSampleMasterGame = useCallback(() => {
     clearDrillTimer();
+    clearBotReplyTimer();
     setDrillState((prev) => ({ ...prev, status: 'idle', feedback: null, expectedMove: null }));
     const sampleSession = getSampleSession();
     setWorkspace('study');
@@ -1056,7 +937,7 @@ export default function App() {
     setTurn('red');
     setMetadata(SAMPLE_MASTER_METADATA);
     setIsAnalyzing(true);
-  }, [clearDrillTimer, getSampleSession]);
+  }, [clearDrillTimer, clearBotReplyTimer, getSampleSession]);
 
   const handleTransferToStudy = useCallback(
     (payload: {
@@ -1071,6 +952,7 @@ export default function App() {
       libraryGameId?: string | null;
     }) => {
       clearDrillTimer();
+      clearBotReplyTimer();
       setDrillState((prev) => ({ ...prev, status: 'idle', feedback: null, expectedMove: null }));
       setWorkspace('study');
       setActiveLibraryGameId(payload.libraryGameId ?? null);
@@ -1103,12 +985,13 @@ export default function App() {
       }));
       setIsAnalyzing(true);
     },
-    [clearDrillTimer]
+    [clearDrillTimer, clearBotReplyTimer]
   );
 
   const handleSwitchWorkspace = useCallback(
     (nextWs: WorkspaceMode) => {
       clearDrillTimer();
+      clearBotReplyTimer();
       setDrillState((prev) => ({ ...prev, status: 'idle', feedback: null, expectedMove: null }));
       if (workspace === 'study' && nextWs !== 'study') {
         flushStudyPersistence();
@@ -1185,27 +1068,32 @@ export default function App() {
         setIsAnalyzing(false);
       }
     },
-    [clearDrillTimer, workspace, flushStudyPersistence, handicap, turn]
+    [clearDrillTimer, clearBotReplyTimer, workspace, flushStudyPersistence, handicap, turn]
   );
 
-  const handleSelectChallenge = useCallback((chId: string) => {
-    const ch = CLASSICAL_CHALLENGES.find((c) => c.id === chId);
-    if (!ch) return;
-    setSelectedChallengeId(ch.id);
-    setPieces(ch.pieces());
-    setMainMoves([]);
-    setVariationMoves(null);
-    setCurrentPly(0);
-    setTurn(ch.initialTurn);
-    setHintArrow(null);
-    setCheckSealEffect(null);
-    setIllegalMoveWarning(null);
-    setTerminalDismissed(false);
-    setChallengeStatusBanner(`破局目标：${ch.objective}`);
-  }, []);
+  const handleSelectChallenge = useCallback(
+    (chId: string) => {
+      clearBotReplyTimer();
+      const ch = CLASSICAL_CHALLENGES.find((c) => c.id === chId);
+      if (!ch) return;
+      setSelectedChallengeId(ch.id);
+      setPieces(ch.pieces());
+      setMainMoves([]);
+      setVariationMoves(null);
+      setCurrentPly(0);
+      setTurn(ch.initialTurn);
+      setHintArrow(null);
+      setCheckSealEffect(null);
+      setIllegalMoveWarning(null);
+      setTerminalDismissed(false);
+      setChallengeStatusBanner(`破局目标：${ch.objective}`);
+    },
+    [clearBotReplyTimer]
+  );
 
   const handleStartHandicapGame = useCallback(
     (newHandicap: HandicapType, newTier: EngineSkillTier) => {
+      clearBotReplyTimer();
       setHandicap(newHandicap);
       setSkillTier(newTier);
       const initP = createInitialPieces(newHandicap);
@@ -1219,7 +1107,7 @@ export default function App() {
       setIllegalMoveWarning(null);
       setTerminalDismissed(false);
     },
-    []
+    [clearBotReplyTimer]
   );
 
   const recordDrillCompletion = useCallback(
@@ -1364,6 +1252,7 @@ export default function App() {
   // ==================== 5. 跳手、无感内联分支走子与人机/古谱自动应手 ====================
   const handleJumpPly = useCallback(
     (targetPly: number, useVariation = false) => {
+      clearBotReplyTimer();
       if (isOpeningDrillSpoilerFree) {
         clearDrillTimer();
         setDrillState((prev) => ({ ...prev, status: 'idle', feedback: null, expectedMove: null }));
@@ -1410,6 +1299,7 @@ export default function App() {
       }
     },
     [
+      clearBotReplyTimer,
       isOpeningDrillSpoilerFree,
       clearDrillTimer,
       variationMoves,
@@ -1424,6 +1314,7 @@ export default function App() {
 
   const executeMoveOnBoard = useCallback(
     (from: Position, to: Position) => {
+      clearBotReplyTimer();
       const moving = getPieceAtGrid(boardGrid, from.row, from.col);
       if (!moving) return;
       const captured = getPieceAtGrid(boardGrid, to.row, to.col);
@@ -1632,7 +1523,8 @@ export default function App() {
         }
 
         setIsBotThinking(true);
-        setTimeout(() => {
+        botReplyTimerRef.current = window.setTimeout(() => {
+          botReplyTimerRef.current = null;
           const sim = generateSimulatedMultiPV(nextPieces, 'black', 18);
           const reply = sim.lines[0]?.firstMove;
           if (reply) {
@@ -1680,6 +1572,7 @@ export default function App() {
       }
     },
     [
+      clearBotReplyTimer,
       boardGrid,
       pieces,
       currentPly,
@@ -1715,21 +1608,12 @@ export default function App() {
           if (existing.type === 'general') return;
           setPieces((prev) => prev.filter((p) => p.id !== existing.id));
         } else if (setupSelectedTemplate) {
-          const maxCountByType: Record<PieceType, number> = {
-            chariot: 2,
-            horse: 2,
-            cannon: 2,
-            advisor: 2,
-            elephant: 2,
-            soldier: 5,
-            general: 1,
-          };
           const currentCount = pieces.filter(
             (p) =>
               p.camp === setupSelectedTemplate.camp &&
               p.type === setupSelectedTemplate.type
           ).length;
-          if (currentCount >= maxCountByType[setupSelectedTemplate.type]) {
+          if (currentCount >= PIECE_QUOTA_BY_TYPE[setupSelectedTemplate.type]) {
             return;
           }
           const newPiece: Piece = {
@@ -1908,9 +1792,10 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [isReplaying, currentPly, variationMoves, mainMoves, handleJumpPly, triggerMoveSoundAndCheckEffects]);
 
-  // 全局快捷键支持 (⌘K 呼出命令面板，←/→ 前后跳手，Space 走出引擎最佳推荐着进入推演)
+  // 全局快捷键支持：使用最新处理器 Ref，仅在应用挂载时绑定一次 keydown 监听器
+  const keydownHandlerRef = useRef<(e: KeyboardEvent) => void>(() => {});
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
+    keydownHandlerRef.current = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setActiveModal((prev) => (prev === 'command-palette' ? null : 'command-palette'));
@@ -1956,25 +1841,13 @@ export default function App() {
         }
       }
     };
+  });
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => keydownHandlerRef.current(e);
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [
-    activeModal,
-    handleJumpPly,
-    currentPly,
-    activeMovesList.length,
-    workspace,
-    isOpeningDrillSpoilerFree,
-    analysisMatchesCurrent,
-    multiPvData,
-    pieces,
-    turn,
-    engineDepth,
-    primaryEngine.styleBias,
-    engineThreads,
-    engineHashMb,
-    executeMoveOnBoard,
-  ]);
+  }, []);
 
   const canSaveCurrentGame = useMemo(
     () =>
@@ -1998,20 +1871,24 @@ export default function App() {
         evalScore: m.evalScore,
         quality: m.quality,
       }));
-      const qualityScore = (q?: MoveQuality) =>
-        q === '妙' ? 99 : q === '优' ? 95 : q === '良' ? 88 : q === '缓' ? 74 : q === '败' ? 48 : 90;
       const redMoves = activeMovesList.filter((m) => m.piece.camp === 'red');
       const blackMoves = activeMovesList.filter((m) => m.piece.camp === 'black');
       const accuracyRed =
         redMoves.length > 0
           ? Number(
-              (redMoves.reduce((s, m) => s + qualityScore(m.quality), 0) / redMoves.length).toFixed(1)
+              (
+                redMoves.reduce((s, m) => s + getMoveQualityAccuracyScore(m.quality), 0) /
+                redMoves.length
+              ).toFixed(1)
             )
           : 92.0;
       const accuracyBlack =
         blackMoves.length > 0
           ? Number(
-              (blackMoves.reduce((s, m) => s + qualityScore(m.quality), 0) / blackMoves.length).toFixed(1)
+              (
+                blackMoves.reduce((s, m) => s + getMoveQualityAccuracyScore(m.quality), 0) /
+                blackMoves.length
+              ).toFixed(1)
             )
           : 90.0;
 
@@ -2666,6 +2543,168 @@ export default function App() {
     primaryEngine.status,
   ]);
 
+  const handleStartRetryMistake = useCallback(
+    (mistakeMove: MoveRecord) => {
+      const prevPly = Math.max(0, mistakeMove.ply - 1);
+      setVariationMoves(null);
+      setBranchOriginPly(null);
+      handleJumpPly(prevPly, false);
+      setRetryMistakePly(mistakeMove.ply);
+      if (mistakeMove.bestFrom && mistakeMove.bestTo && mistakeMove.bestAlternative) {
+        setRetryTargetMove({
+          from: mistakeMove.bestFrom,
+          to: mistakeMove.bestTo,
+          notation: mistakeMove.bestAlternative,
+        });
+        setRetryFeedback(
+          `已回到第 ${mistakeMove.ply} 手失误前！请在左侧棋盘尝试走出正着（提示：${mistakeMove.bestAlternative}）`
+        );
+      }
+    },
+    [handleJumpPly]
+  );
+
+  const handleApplyFenModal = useCallback(
+    (fenStr: string) => {
+      const parsed = parseFenToPieces(fenStr);
+      if (!parsed) return false;
+      handleTransferToStudy({
+        basePieces: parsed.pieces,
+        baseTurn: parsed.turn,
+        currentPieces: parsed.pieces,
+        currentTurn: parsed.turn,
+        moves: [],
+        ply: 0,
+        nextMetadata: {
+          opening: '导入 FEN 局面',
+          isFavorite: false,
+        },
+      });
+      return true;
+    },
+    [handleTransferToStudy]
+  );
+
+  const handleApplyPgnSessionModal = useCallback(
+    (pgnText: string, fenFallback: string) => {
+      const session = parsePgnTextToSession(pgnText, fenFallback);
+      if (!session) return false;
+      handleTransferToStudy({
+        basePieces: session.basePieces,
+        baseTurn: session.baseTurn,
+        currentPieces: session.finalPieces,
+        currentTurn: session.finalTurn,
+        moves: session.moves,
+        ply: session.moves.length,
+        nextMetadata: {
+          opening: session.moves.length > 0 ? '导入 PGN 棋谱' : '导入 FEN 局面',
+          ...session.metadata,
+          isFavorite: false,
+        },
+      });
+      return true;
+    },
+    [handleTransferToStudy]
+  );
+
+  const handleLoadLibraryGameModal = useCallback(
+    (game: LibraryGameItem) => {
+      const baseMeta: Partial<GameMetadata> = {
+        redPlayer: game.redPlayer,
+        blackPlayer: game.blackPlayer,
+        event: game.event,
+        date: game.date,
+        result: game.result,
+        opening: game.opening,
+        isFavorite: game.isFavorite,
+      };
+      if (game.movesData && game.movesData.length > 0) {
+        const parsedBase = parseFenToPieces(game.baseFen || INITIAL_FEN);
+        const basePieces = parsedBase ? parsedBase.pieces : createInitialPieces('even');
+        const baseTurn = parsedBase ? parsedBase.turn : 'red';
+        const replayed = replayCompactMoves(basePieces, game.movesData, baseTurn);
+        handleTransferToStudy({
+          basePieces,
+          baseTurn,
+          currentPieces: replayed.finalPieces,
+          currentTurn: replayed.finalTurn,
+          moves: replayed.moves,
+          ply: replayed.moves.length,
+          nextMetadata: baseMeta,
+          libraryGameId: game.id,
+        });
+        return;
+      }
+      if (game.fen) {
+        const parsed = parseFenToPieces(game.fen);
+        if (parsed) {
+          handleTransferToStudy({
+            basePieces: parsed.pieces,
+            baseTurn: parsed.turn,
+            currentPieces: parsed.pieces,
+            currentTurn: parsed.turn,
+            moves: [],
+            ply: 0,
+            nextMetadata: baseMeta,
+            libraryGameId: game.id,
+          });
+          return;
+        }
+      }
+      const sampleSession = getSampleSession();
+      handleTransferToStudy({
+        basePieces: sampleSession.initialPieces,
+        baseTurn: 'red',
+        currentPieces: sampleSession.moves[11]?.piecesSnapshot || createInitialPieces(),
+        currentTurn: 'red',
+        moves: sampleSession.moves,
+        ply: 12,
+        nextMetadata: baseMeta,
+        libraryGameId: game.id,
+      });
+    },
+    [handleTransferToStudy, getSampleSession]
+  );
+
+  const handleToggleLibraryFavoriteModal = useCallback(
+    (id: string) => {
+      let nextFavState: boolean | null = null;
+      setLibraryGames((prev) =>
+        prev.map((g) => {
+          if (g.id !== id) return g;
+          nextFavState = !g.isFavorite;
+          return { ...g, isFavorite: nextFavState };
+        })
+      );
+      if (id === activeLibraryGameId && nextFavState !== null) {
+        const syncedFav = nextFavState;
+        setMetadata((prev) => ({ ...prev, isFavorite: syncedFav }));
+      }
+    },
+    [activeLibraryGameId]
+  );
+
+  const handleDeleteLibraryGameModal = useCallback(
+    (id: string) => {
+      setLibraryGames((prev) => prev.filter((g) => g.id !== id));
+      if (id === activeLibraryGameId) {
+        setActiveLibraryGameId(null);
+        setMetadata((prev) => ({ ...prev, isFavorite: false }));
+      }
+    },
+    [activeLibraryGameId]
+  );
+
+  const handleUpdateConnectStateModal = useCallback((next: ExternalConnectState) => {
+    setConnectState(next);
+    if (next.connected) {
+      setWorkspace('study');
+      if (next.autoAnalyze) {
+        setIsAnalyzing(true);
+      }
+    }
+  }, []);
+
   const topCamp: Camp = flipped ? 'red' : 'black';
   const bottomCamp: Camp = flipped ? 'black' : 'red';
 
@@ -3215,27 +3254,7 @@ export default function App() {
                     retryMistakePly={retryMistakePly}
                     retryFeedback={retryFeedback}
                     onJumpPly={handleJumpPly}
-                    onStartRetryMistake={(mistakeMove) => {
-                      const prevPly = Math.max(0, mistakeMove.ply - 1);
-                      setVariationMoves(null);
-                      setBranchOriginPly(null);
-                      handleJumpPly(prevPly, false);
-                      setRetryMistakePly(mistakeMove.ply);
-                      if (
-                        mistakeMove.bestFrom &&
-                        mistakeMove.bestTo &&
-                        mistakeMove.bestAlternative
-                      ) {
-                        setRetryTargetMove({
-                          from: mistakeMove.bestFrom,
-                          to: mistakeMove.bestTo,
-                          notation: mistakeMove.bestAlternative,
-                        });
-                        setRetryFeedback(
-                          `已回到第 ${mistakeMove.ply} 手失误前！请在左侧棋盘尝试走出正着（提示：${mistakeMove.bestAlternative}）`
-                        );
-                      }
-                    }}
+                    onStartRetryMistake={handleStartRetryMistake}
                     onPlayBestAlternative={executeMoveOnBoard}
                     onLoadSampleGame={handleLoadSampleMasterGame}
                     onOpenImportModal={handleOpenImportModal}
@@ -3321,122 +3340,16 @@ export default function App() {
         onOpenModal={setActiveModal}
         onSwitchWorkspace={handleSwitchWorkspace}
         onOpenOpeningBook={handleGoToOpeningWorkspace}
-        onApplyFen={(fenStr) => {
-          const parsed = parseFenToPieces(fenStr);
-          if (!parsed) return false;
-          handleTransferToStudy({
-            basePieces: parsed.pieces,
-            baseTurn: parsed.turn,
-            currentPieces: parsed.pieces,
-            currentTurn: parsed.turn,
-            moves: [],
-            ply: 0,
-            nextMetadata: {
-              opening: '导入 FEN 局面',
-              isFavorite: false,
-            },
-          });
-          return true;
-        }}
-        onApplyPgnSession={(pgnText, fenFallback) => {
-          const session = parsePgnTextToSession(pgnText, fenFallback);
-          if (!session) return false;
-          handleTransferToStudy({
-            basePieces: session.basePieces,
-            baseTurn: session.baseTurn,
-            currentPieces: session.finalPieces,
-            currentTurn: session.finalTurn,
-            moves: session.moves,
-            ply: session.moves.length,
-            nextMetadata: {
-              opening: session.moves.length > 0 ? '导入 PGN 棋谱' : '导入 FEN 局面',
-              ...session.metadata,
-              isFavorite: false,
-            },
-          });
-          return true;
-        }}
+        onApplyFen={handleApplyFenModal}
+        onApplyPgnSession={handleApplyPgnSessionModal}
         onSaveMetadata={setMetadata}
         onSaveCurrentGameToLibrary={handleSaveCurrentGameToLibrary}
         canSaveCurrentGame={canSaveCurrentGame}
         isExistingUserSave={isExistingUserSave}
         onExportLibraryGame={handleExportLibraryGame}
-        onLoadLibraryGame={(game) => {
-          const baseMeta: Partial<GameMetadata> = {
-            redPlayer: game.redPlayer,
-            blackPlayer: game.blackPlayer,
-            event: game.event,
-            date: game.date,
-            result: game.result,
-            opening: game.opening,
-            isFavorite: game.isFavorite,
-          };
-          if (game.movesData && game.movesData.length > 0) {
-            const parsedBase = parseFenToPieces(game.baseFen || INITIAL_FEN);
-            const basePieces = parsedBase ? parsedBase.pieces : createInitialPieces('even');
-            const baseTurn = parsedBase ? parsedBase.turn : 'red';
-            const replayed = replayCompactMoves(basePieces, game.movesData, baseTurn);
-            handleTransferToStudy({
-              basePieces,
-              baseTurn,
-              currentPieces: replayed.finalPieces,
-              currentTurn: replayed.finalTurn,
-              moves: replayed.moves,
-              ply: replayed.moves.length,
-              nextMetadata: baseMeta,
-              libraryGameId: game.id,
-            });
-            return;
-          }
-          if (game.fen) {
-            const parsed = parseFenToPieces(game.fen);
-            if (parsed) {
-              handleTransferToStudy({
-                basePieces: parsed.pieces,
-                baseTurn: parsed.turn,
-                currentPieces: parsed.pieces,
-                currentTurn: parsed.turn,
-                moves: [],
-                ply: 0,
-                nextMetadata: baseMeta,
-                libraryGameId: game.id,
-              });
-              return;
-            }
-          }
-          const sampleSession = getSampleSession();
-          handleTransferToStudy({
-            basePieces: sampleSession.initialPieces,
-            baseTurn: 'red',
-            currentPieces: sampleSession.moves[11]?.piecesSnapshot || createInitialPieces(),
-            currentTurn: 'red',
-            moves: sampleSession.moves,
-            ply: 12,
-            nextMetadata: baseMeta,
-            libraryGameId: game.id,
-          });
-        }}
-        onToggleLibraryFavorite={(id) => {
-          let nextFavState: boolean | null = null;
-          setLibraryGames((prev) =>
-            prev.map((g) => {
-              if (g.id !== id) return g;
-              nextFavState = !g.isFavorite;
-              return { ...g, isFavorite: nextFavState };
-            })
-          );
-          if (id === activeLibraryGameId && nextFavState !== null) {
-            const syncedFav = nextFavState;
-            setMetadata((prev) => ({ ...prev, isFavorite: syncedFav }));
-          }
-        }}
-        onDeleteLibraryGame={(id) => {
-          setLibraryGames((prev) => prev.filter((g) => g.id !== id));
-          if (id === activeLibraryGameId) {
-            setActiveLibraryGameId(null);
-            setMetadata((prev) => ({ ...prev, isFavorite: false }));
-          }
-        }}
+        onLoadLibraryGame={handleLoadLibraryGameModal}
+        onToggleLibraryFavorite={handleToggleLibraryFavoriteModal}
+        onDeleteLibraryGame={handleDeleteLibraryGameModal}
         onChangeAppTheme={setAppTheme}
         onChangeFontScale={setFontScale}
         onChangeSoundEnabled={setSoundEnabled}
@@ -3453,15 +3366,7 @@ export default function App() {
         onInstallEngine={handleInstallEngine}
         onResetEngineMissing={handleResetEngineMissing}
         onAddCustomEngine={handleAddCustomEngine}
-        onUpdateConnectState={(next) => {
-          setConnectState(next);
-          if (next.connected) {
-            setWorkspace('study');
-            if (next.autoAnalyze) {
-              setIsAnalyzing(true);
-            }
-          }
-        }}
+        onUpdateConnectState={handleUpdateConnectStateModal}
         onTriggerHint={handleTriggerHint}
       />
     </div>

@@ -40,6 +40,129 @@ interface MoveListProps {
   onDisconnectExternal?: () => void;
 }
 
+function getQualityBadgeStyle(q?: MoveQuality): string {
+  switch (q) {
+    case '妙':
+      return 'text-[var(--xq-badge-best)] border-[var(--xq-badge-best)]/45 bg-[var(--xq-badge-best)]/12 font-semibold';
+    case '优':
+      return 'text-[var(--xq-badge-best)] border-[var(--xq-badge-best)]/30 bg-[var(--xq-badge-best)]/8';
+    case '良':
+      return 'xq-text-secondary border-[var(--xq-border-subtle)] bg-[var(--xq-bg-elevated)]';
+    case '缓':
+      return 'text-[var(--xq-badge-inaccuracy)] border-[var(--xq-badge-inaccuracy)]/40 bg-[var(--xq-badge-inaccuracy)]/12 font-medium';
+    case '败':
+      return 'text-[var(--xq-badge-blunder)] border-[var(--xq-badge-blunder)]/50 bg-[var(--xq-badge-blunder)]/15 font-semibold';
+    default:
+      return '';
+  }
+}
+
+interface MoveRoundRowProps {
+  roundNumber: number;
+  isOddRow: boolean;
+  redMove?: MoveRecord;
+  blackMove?: MoveRecord;
+  isRedSelected: boolean;
+  isBlackSelected: boolean;
+  activeRowRef?: React.RefObject<HTMLDivElement | null>;
+  onSelectPly: (ply: number, useVariation?: boolean) => void;
+}
+
+const MoveRoundRow: React.FC<MoveRoundRowProps> = React.memo(({
+  roundNumber,
+  isOddRow,
+  redMove,
+  blackMove,
+  isRedSelected,
+  isBlackSelected,
+  activeRowRef,
+  onSelectPly,
+}) => (
+  <div
+    ref={isRedSelected || isBlackSelected ? activeRowRef : undefined}
+    className={`grid grid-cols-12 items-center px-2 ${
+      isOddRow ? 'bg-[var(--xq-bg-canvas)]/45' : ''
+    }`}
+  >
+    {/* 回合序号 */}
+    <div className="col-span-2 py-1 text-center font-mono-tabular text-xs xq-text-muted">
+      {roundNumber}.
+    </div>
+
+    {/* 红方着法单元格 */}
+    <div className="col-span-5">
+      {redMove && (
+        <button
+          type="button"
+          onClick={() => onSelectPly(redMove.ply, false)}
+          className={`w-full px-2 py-1 rounded-md text-left flex items-center justify-between gap-1 transition-colors cursor-pointer ${
+            isRedSelected
+              ? 'bg-[var(--xq-bg-active)] ring-1 ring-inset ring-[var(--xq-accent-gold)]'
+              : 'hover:bg-[var(--xq-bg-hover)]'
+          }`}
+        >
+          <span className="font-serif-sc font-bold text-sm text-[var(--xq-accent-crimson)] whitespace-nowrap">
+            {redMove.notation}
+          </span>
+          <div className="flex items-center gap-1 shrink-0">
+            {redMove.quality && (
+              <span
+                className={`px-1 py-0.5 text-xs leading-none rounded border ${getQualityBadgeStyle(
+                  redMove.quality
+                )}`}
+              >
+                {redMove.quality}
+              </span>
+            )}
+            <span className="font-mono-tabular text-xs xq-text-secondary min-w-[2.4rem] text-right">
+              {redMove.evalScore >= 0
+                ? `+${redMove.evalScore.toFixed(1)}`
+                : redMove.evalScore.toFixed(1)}
+            </span>
+          </div>
+        </button>
+      )}
+    </div>
+
+    {/* 黑方着法单元格 */}
+    <div className="col-span-5">
+      {blackMove ? (
+        <button
+          type="button"
+          onClick={() => onSelectPly(blackMove.ply, false)}
+          className={`w-full px-2 py-1 rounded-md text-left flex items-center justify-between gap-1 transition-colors cursor-pointer ${
+            isBlackSelected
+              ? 'bg-[var(--xq-bg-active)] ring-1 ring-inset ring-[var(--xq-accent-gold)]'
+              : 'hover:bg-[var(--xq-bg-hover)]'
+          }`}
+        >
+          <span className="font-serif-sc font-bold text-sm xq-text-primary whitespace-nowrap">
+            {blackMove.notation}
+          </span>
+          <div className="flex items-center gap-1 shrink-0">
+            {blackMove.quality && (
+              <span
+                className={`px-1 py-0.5 text-xs leading-none rounded border ${getQualityBadgeStyle(
+                  blackMove.quality
+                )}`}
+              >
+                {blackMove.quality}
+              </span>
+            )}
+            <span className="font-mono-tabular text-xs xq-text-secondary min-w-[2.4rem] text-right">
+              {blackMove.evalScore >= 0
+                ? `+${blackMove.evalScore.toFixed(1)}`
+                : blackMove.evalScore.toFixed(1)}
+            </span>
+          </div>
+        </button>
+      ) : (
+        <div className="px-2 py-1 text-xs xq-text-muted">—</div>
+      )}
+    </div>
+  </div>
+));
+
 export const MoveList: React.FC<MoveListProps> = React.memo(({
   mainMoves,
   variationMoves,
@@ -65,22 +188,6 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
   onDisconnectExternal,
 }) => {
   const [savedNotice, setSavedNotice] = useState(false);
-  const getQualityBadgeStyle = (q?: MoveQuality) => {
-    switch (q) {
-      case '妙':
-        return 'text-[var(--xq-badge-best)] border-[var(--xq-badge-best)]/45 bg-[var(--xq-badge-best)]/12 font-semibold';
-      case '优':
-        return 'text-[var(--xq-badge-best)] border-[var(--xq-badge-best)]/30 bg-[var(--xq-badge-best)]/8';
-      case '良':
-        return 'xq-text-secondary border-[var(--xq-border-subtle)] bg-[var(--xq-bg-elevated)]';
-      case '缓':
-        return 'text-[var(--xq-badge-inaccuracy)] border-[var(--xq-badge-inaccuracy)]/40 bg-[var(--xq-badge-inaccuracy)]/12 font-medium';
-      case '败':
-        return 'text-[var(--xq-badge-blunder)] border-[var(--xq-badge-blunder)]/50 bg-[var(--xq-badge-blunder)]/15 font-semibold';
-      default:
-        return '';
-    }
-  };
 
   // 将单列手数配对为「红黑双栏回合行」(Round 1: ply 1 Red + ply 2 Black)
   const rounds = useMemo(() => {
@@ -356,89 +463,16 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
 
           return (
             <React.Fragment key={`round-${r.roundNumber}`}>
-              <div
-                ref={isRedSelected || isBlackSelected ? activeRowRef : undefined}
-                className={`grid grid-cols-12 items-center px-2 ${
-                  idx % 2 === 1 ? 'bg-[var(--xq-bg-canvas)]/45' : ''
-                }`}
-              >
-                {/* 回合序号 */}
-                <div className="col-span-2 py-1 text-center font-mono-tabular text-xs xq-text-muted">
-                  {r.roundNumber}.
-                </div>
-
-                {/* 红方着法单元格 */}
-                <div className="col-span-5">
-                  {r.redMove && (
-                    <button
-                      type="button"
-                      onClick={() => onSelectPly(r.redMove!.ply, false)}
-                      className={`w-full px-2 py-1 rounded-md text-left flex items-center justify-between gap-1 transition-colors cursor-pointer ${
-                        isRedSelected
-                          ? 'bg-[var(--xq-bg-active)] ring-1 ring-inset ring-[var(--xq-accent-gold)]'
-                          : 'hover:bg-[var(--xq-bg-hover)]'
-                      }`}
-                    >
-                      <span className="font-serif-sc font-bold text-sm text-[var(--xq-accent-crimson)] whitespace-nowrap">
-                        {r.redMove.notation}
-                      </span>
-                      <div className="flex items-center gap-1 shrink-0">
-                        {r.redMove.quality && (
-                          <span
-                            className={`px-1 py-0.5 text-xs leading-none rounded border ${getQualityBadgeStyle(
-                              r.redMove.quality
-                            )}`}
-                          >
-                            {r.redMove.quality}
-                          </span>
-                        )}
-                        <span className="font-mono-tabular text-xs xq-text-secondary min-w-[2.4rem] text-right">
-                          {r.redMove.evalScore >= 0
-                            ? `+${r.redMove.evalScore.toFixed(1)}`
-                            : r.redMove.evalScore.toFixed(1)}
-                        </span>
-                      </div>
-                    </button>
-                  )}
-                </div>
-
-                {/* 黑方着法单元格 */}
-                <div className="col-span-5">
-                  {r.blackMove ? (
-                    <button
-                      type="button"
-                      onClick={() => onSelectPly(r.blackMove!.ply, false)}
-                      className={`w-full px-2 py-1 rounded-md text-left flex items-center justify-between gap-1 transition-colors cursor-pointer ${
-                        isBlackSelected
-                          ? 'bg-[var(--xq-bg-active)] ring-1 ring-inset ring-[var(--xq-accent-gold)]'
-                          : 'hover:bg-[var(--xq-bg-hover)]'
-                      }`}
-                    >
-                      <span className="font-serif-sc font-bold text-sm xq-text-primary whitespace-nowrap">
-                        {r.blackMove.notation}
-                      </span>
-                      <div className="flex items-center gap-1 shrink-0">
-                        {r.blackMove.quality && (
-                          <span
-                            className={`px-1 py-0.5 text-xs leading-none rounded border ${getQualityBadgeStyle(
-                              r.blackMove.quality
-                            )}`}
-                          >
-                            {r.blackMove.quality}
-                          </span>
-                        )}
-                        <span className="font-mono-tabular text-xs xq-text-secondary min-w-[2.4rem] text-right">
-                          {r.blackMove.evalScore >= 0
-                            ? `+${r.blackMove.evalScore.toFixed(1)}`
-                            : r.blackMove.evalScore.toFixed(1)}
-                        </span>
-                      </div>
-                    </button>
-                  ) : (
-                    <div className="px-2 py-1 text-xs xq-text-muted">—</div>
-                  )}
-                </div>
-              </div>
+              <MoveRoundRow
+                roundNumber={r.roundNumber}
+                isOddRow={idx % 2 === 1}
+                redMove={r.redMove}
+                blackMove={r.blackMove}
+                isRedSelected={!!isRedSelected}
+                isBlackSelected={!!isBlackSelected}
+                activeRowRef={isRedSelected || isBlackSelected ? activeRowRef : undefined}
+                onSelectPly={onSelectPly}
+              />
 
               {/* 内联推演支线展示盒 (紧贴分叉回合下方展开) */}
               {showBranchHere && variationMoves && (

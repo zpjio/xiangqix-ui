@@ -134,7 +134,7 @@ const SAMPLE_IMAGE_RECOGNITIONS: {
   },
 ];
 
-export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
+export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
   activeModal,
   appTheme,
   fontScale,
@@ -283,150 +283,166 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
     exportIncludeNotes,
   ]);
 
-  const commands = [
-    {
-      id: 'cmd-study',
-      label: '切换至「复盘分析」',
-      shortcut: '1',
-      action: () => {
-        onSwitchWorkspace('study');
-        onClose();
+  const filteredCommands = useMemo(() => {
+    if (activeModal !== 'command-palette') return [];
+    const commands = [
+      {
+        id: 'cmd-study',
+        label: '切换至「复盘分析」',
+        shortcut: '1',
+        action: () => {
+          onSwitchWorkspace('study');
+          onClose();
+        },
       },
-    },
-    {
-      id: 'cmd-opening',
-      label: '进入「开局研习」（定式树探索 · 变例对练）',
-      shortcut: '2',
-      action: () => {
-        onSwitchWorkspace('opening');
-        onClose();
+      {
+        id: 'cmd-opening',
+        label: '进入「开局研习」（定式树探索 · 变例对练）',
+        shortcut: '2',
+        action: () => {
+          onSwitchWorkspace('opening');
+          onClose();
+        },
       },
-    },
-    {
-      id: 'cmd-challenge',
-      label: '进入「残局题库」（七星聚会 / 野马操田）',
-      shortcut: '3',
-      action: () => {
-        onSwitchWorkspace('challenge');
-        onClose();
+      {
+        id: 'cmd-challenge',
+        label: '进入「残局题库」（七星聚会 / 野马操田）',
+        shortcut: '3',
+        action: () => {
+          onSwitchWorkspace('challenge');
+          onClose();
+        },
       },
-    },
-    {
-      id: 'cmd-play',
-      label: '开启「人机对弈」（支持分先/让左马/让双马）',
-      shortcut: '4',
-      action: () => {
-        onSwitchWorkspace('play');
-        onClose();
+      {
+        id: 'cmd-play',
+        label: '开启「人机对弈」（支持分先/让左马/让双马）',
+        shortcut: '4',
+        action: () => {
+          onSwitchWorkspace('play');
+          onClose();
+        },
       },
-    },
-    {
-      id: 'cmd-setup',
-      label: '打开「摆子编辑」自由摆设局面',
-      shortcut: '5',
-      action: () => {
-        onSwitchWorkspace('setup');
-        onClose();
+      {
+        id: 'cmd-setup',
+        label: '打开「摆子编辑」自由摆设局面',
+        shortcut: '5',
+        action: () => {
+          onSwitchWorkspace('setup');
+          onClose();
+        },
       },
-    },
-    {
-      id: 'cmd-export',
-      label: '导出当前对局（下载 .pgn / .fen / 复制微信文本）',
-      shortcut: 'E',
-      action: () => {
-        setFenPgnTab('export');
-        if (onOpenModal) {
-          onOpenModal('fen-pgn');
-        }
+      {
+        id: 'cmd-export',
+        label: '导出当前对局（下载 .pgn / .fen / 复制微信文本）',
+        shortcut: 'E',
+        action: () => {
+          setFenPgnTab('export');
+          if (onOpenModal) {
+            onOpenModal('fen-pgn');
+          }
+        },
       },
-    },
-    {
-      id: 'cmd-import-fen',
-      label: '导入 FEN / PGN 棋谱至「复盘分析」',
-      shortcut: 'F',
-      action: () => {
-        setFenPgnTab('import');
-        setImportMode('fen-pgn');
-        if (onOpenModal) {
-          onOpenModal('fen-pgn');
-        }
+      {
+        id: 'cmd-import-fen',
+        label: '导入 FEN / PGN 棋谱至「复盘分析」',
+        shortcut: 'F',
+        action: () => {
+          setFenPgnTab('import');
+          setImportMode('fen-pgn');
+          if (onOpenModal) {
+            onOpenModal('fen-pgn');
+          }
+        },
       },
-    },
-    {
-      id: 'cmd-image-board',
-      label: '从图片识别导入至「复盘分析」（截图识谱）',
-      shortcut: 'I',
-      action: () => {
-        setFenPgnTab('import');
-        setImportMode('image');
-        if (onOpenModal) {
-          onOpenModal('fen-pgn');
-        }
+      {
+        id: 'cmd-image-board',
+        label: '从图片识别导入至「复盘分析」（截图识谱）',
+        shortcut: 'I',
+        action: () => {
+          setFenPgnTab('import');
+          setImportMode('image');
+          if (onOpenModal) {
+            onOpenModal('fen-pgn');
+          }
+        },
       },
-    },
-    {
-      id: 'cmd-connect',
-      label: '连线外部平台同步观棋分析（天天/JJ象棋）',
-      shortcut: 'L',
-      action: () => {
-        onUpdateConnectState({
-          connected: true,
-          platform: 'tiantian',
-          platformLabel: '天天象棋桌面版',
-          autoAnalyze: true,
-        });
-        onSwitchWorkspace('study');
-        onClose();
+      {
+        id: 'cmd-connect',
+        label: '连线外部平台同步观棋分析（天天/JJ象棋）',
+        shortcut: 'L',
+        action: () => {
+          onUpdateConnectState({
+            connected: true,
+            platform: 'tiantian',
+            platformLabel: '天天象棋桌面版',
+            autoAnalyze: true,
+          });
+          onSwitchWorkspace('study');
+          onClose();
+        },
       },
-    },
-    {
-      id: 'cmd-compare',
-      label: compareMode
-        ? '关闭「双擎并行对比」恢复单引擎视图'
-        : '开启「双擎并行对比」（皮卡鱼 vs 旋风/天机同盘交叉印证）',
-      shortcut: 'C',
-      action: () => {
-        onToggleCompareMode();
-        onSwitchWorkspace('study');
-        onClose();
+      {
+        id: 'cmd-compare',
+        label: compareMode
+          ? '关闭「双擎并行对比」恢复单引擎视图'
+          : '开启「双擎并行对比」（皮卡鱼 vs 旋风/天机同盘交叉印证）',
+        shortcut: 'C',
+        action: () => {
+          onToggleCompareMode();
+          onSwitchWorkspace('study');
+          onClose();
+        },
       },
-    },
-    {
-      id: 'cmd-hint',
-      label: '请求引擎「支招」',
-      shortcut: 'H',
-      action: () => {
-        onTriggerHint();
-        onClose();
+      {
+        id: 'cmd-hint',
+        label: '请求引擎「支招」',
+        shortcut: 'H',
+        action: () => {
+          onTriggerHint();
+          onClose();
+        },
       },
-    },
-    {
-      id: 'cmd-theme',
-      label: '循环切换护眼主题（深色夜案 → 清朗浅色 → 温润护眼）',
-      shortcut: 'T',
-      action: () => {
-        onChangeAppTheme(
-          appTheme === 'dark' ? 'light' : appTheme === 'light' ? 'eyecare' : 'dark'
-        );
-        onClose();
+      {
+        id: 'cmd-theme',
+        label: '循环切换护眼主题（深色夜案 → 清朗浅色 → 温润护眼）',
+        shortcut: 'T',
+        action: () => {
+          onChangeAppTheme(
+            appTheme === 'dark' ? 'light' : appTheme === 'light' ? 'eyecare' : 'dark'
+          );
+          onClose();
+        },
       },
-    },
-    {
-      id: 'cmd-theme-eyecare',
-      label: '直达「温润护眼」低蓝光纸质模式',
-      shortcut: 'Y',
-      action: () => {
-        onChangeAppTheme('eyecare');
-        onClose();
+      {
+        id: 'cmd-theme-eyecare',
+        label: '直达「温润护眼」低蓝光纸质模式',
+        shortcut: 'Y',
+        action: () => {
+          onChangeAppTheme('eyecare');
+          onClose();
+        },
       },
-    },
-  ];
-
-  const filteredCommands = commands.filter((c) =>
-    c.label.toLowerCase().includes(cmdQuery.trim().toLowerCase())
-  );
+    ];
+    const q = cmdQuery.trim().toLowerCase();
+    return q ? commands.filter((c) => c.label.toLowerCase().includes(q)) : commands;
+  }, [
+    activeModal,
+    cmdQuery,
+    compareMode,
+    appTheme,
+    onSwitchWorkspace,
+    onClose,
+    onOpenModal,
+    onUpdateConnectState,
+    onToggleCompareMode,
+    onTriggerHint,
+    onChangeAppTheme,
+  ]);
 
   const libraryStats = useMemo(() => {
+    if (activeModal !== 'library') {
+      return { total: libraryGames.length, fav: 0, master: 0, ancient: 0, user: 0 };
+    }
     let fav = 0;
     let master = 0;
     let ancient = 0;
@@ -438,7 +454,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
       else if (g.category === 'user') user++;
     }
     return { total: libraryGames.length, fav, master, ancient, user };
-  }, [libraryGames]);
+  }, [activeModal, libraryGames]);
 
   const filteredLibrary = useMemo(() => {
     if (activeModal !== 'library') return [];
@@ -1934,4 +1950,4 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
       </div>
     </div>
   );
-};
+});
