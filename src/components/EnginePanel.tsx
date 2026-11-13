@@ -167,7 +167,7 @@ export const EnginePanel: React.FC<EnginePanelProps> = React.memo(({
       {compareMode && (
         <div className="px-3.5 py-1.5 border-b xq-border bg-[var(--xq-bg-canvas)]/70 flex items-center gap-1.5">
           <div className="flex-1 min-w-0 flex items-center gap-1">
-            <span className="px-1.5 py-0.5 rounded bg-[#10B981] text-white font-bold text-xs shrink-0">
+            <span className="px-1.5 py-0.5 rounded bg-[var(--xq-accent-jade)] text-[#F4EFE2] font-bold text-xs shrink-0">
               主
             </span>
             <div className="flex-1 min-w-0">
@@ -175,7 +175,7 @@ export const EnginePanel: React.FC<EnginePanelProps> = React.memo(({
                 ariaLabel="选择对比主引擎"
                 value={primaryEngine.id}
                 onChange={onChangePrimaryEngine}
-                triggerClassName="px-1.5 py-1 font-medium border-[#10B981]/45 bg-[var(--xq-bg-surface)] focus:border-[#10B981]"
+                triggerClassName="px-1.5 py-1 font-medium border-[var(--xq-accent-jade)]/45 bg-[var(--xq-bg-surface)] focus:border-[var(--xq-accent-jade)]"
                 menuMinWidthClass="min-w-[11.5rem]"
                 options={engines.map((eng) => ({
                   value: eng.id,
@@ -195,7 +195,7 @@ export const EnginePanel: React.FC<EnginePanelProps> = React.memo(({
           </button>
 
           <div className="flex-1 min-w-0 flex items-center gap-1">
-            <span className="px-1.5 py-0.5 rounded bg-[#3B82F6] text-white font-bold text-xs shrink-0">
+            <span className="px-1.5 py-0.5 rounded bg-[var(--xq-accent-azure)] text-[#F4EFE2] font-bold text-xs shrink-0">
               副
             </span>
             <div className="flex-1 min-w-0">
@@ -204,7 +204,7 @@ export const EnginePanel: React.FC<EnginePanelProps> = React.memo(({
                 value={secondaryEngine.id}
                 onChange={onChangeSecondaryEngine}
                 menuAlign="right"
-                triggerClassName="px-1.5 py-1 font-medium border-[#3B82F6]/45 bg-[var(--xq-bg-surface)] focus:border-[#3B82F6]"
+                triggerClassName="px-1.5 py-1 font-medium border-[var(--xq-accent-azure)]/45 bg-[var(--xq-bg-surface)] focus:border-[var(--xq-accent-azure)]"
                 menuMinWidthClass="min-w-[11.5rem]"
                 options={engines.map((eng) => ({
                   value: eng.id,
@@ -296,7 +296,7 @@ export const EnginePanel: React.FC<EnginePanelProps> = React.memo(({
           {/* 顶部一行局势定性语 + 引擎风格标签 + 深度算力指标 + 评分 */}
           <div className="px-2.5 py-1.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)] flex items-center justify-between gap-2 text-[0.8125rem]">
             <div className="flex items-center gap-1.5 min-w-0">
-              <span className="px-1.5 py-0.5 rounded text-xs font-mono-tabular bg-[#10B981]/15 text-[#10B981] border border-[#10B981]/30 shrink-0">
+              <span className="px-1.5 py-0.5 rounded text-xs font-mono-tabular bg-[var(--xq-accent-jade)]/15 text-[var(--xq-accent-jade)] border border-[var(--xq-accent-jade)]/30 shrink-0">
                 {primaryEngine.shortName}·{primaryEngine.styleLabel}
               </span>
               <span className="font-medium xq-text-primary truncate">
@@ -307,7 +307,7 @@ export const EnginePanel: React.FC<EnginePanelProps> = React.memo(({
               <span className="text-xs xq-text-muted">
                 d={primaryTop.depth}·{primaryTop.nps}k
               </span>
-              <span className="font-bold text-sm text-[#10B981]">
+              <span className="font-bold text-sm text-[var(--xq-accent-jade)]">
                 {formatScore(primaryTop.scoreCp)}
               </span>
             </div>
@@ -340,7 +340,7 @@ export const EnginePanel: React.FC<EnginePanelProps> = React.memo(({
                   <span
                     className={`w-5 h-5 rounded text-xs font-mono-tabular font-bold flex items-center justify-center shrink-0 ${
                       line.multipv === 1
-                        ? 'bg-[#059669] text-white'
+                        ? 'bg-[var(--xq-btn-engine-bg)] text-[var(--xq-btn-engine-text)]'
                         : 'bg-[var(--xq-bg-canvas)] xq-text-secondary border xq-border'
                     }`}
                   >
@@ -370,10 +370,10 @@ export const EnginePanel: React.FC<EnginePanelProps> = React.memo(({
           {/* 1. 顶部双擎共识/分歧诊断横幅 */}
           {secondaryEngine.status === 'ready' && secondaryTop ? (
             isConsensus ? (
-              <div className="px-2.5 py-1.5 rounded-md border border-[#10B981]/40 bg-[#10B981]/10 flex items-center justify-between gap-2 text-[0.8125rem]">
+              <div className="px-2.5 py-1.5 rounded-md border border-[var(--xq-accent-jade)]/40 bg-[var(--xq-accent-jade)]/10 flex items-center justify-between gap-2 text-[0.8125rem]">
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-[#10B981] shrink-0" />
-                  <span className="font-semibold text-[#10B981] shrink-0">双擎共识：</span>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-[var(--xq-accent-jade)] shrink-0" />
+                  <span className="font-semibold text-[var(--xq-accent-jade)] shrink-0">双擎共识：</span>
                   <span className="xq-text-primary truncate">
                     一致首推{' '}
                     <strong className="font-serif-sc text-[var(--xq-accent-gold)]">
@@ -394,11 +394,11 @@ export const EnginePanel: React.FC<EnginePanelProps> = React.memo(({
                   </span>
                   <span className="xq-text-primary truncate">
                     {primaryEngine.shortName}主推{' '}
-                    <strong className="font-serif-sc text-[#10B981]">
+                    <strong className="font-serif-sc text-[var(--xq-accent-jade)]">
                       {primaryTop.firstMove.notation}
                     </strong>{' '}
                     · {secondaryEngine.shortName}主推{' '}
-                    <strong className="font-serif-sc text-[#3B82F6]">
+                    <strong className="font-serif-sc text-[var(--xq-accent-azure)]">
                       {secondaryTop.firstMove.notation}
                     </strong>
                   </span>
@@ -415,11 +415,11 @@ export const EnginePanel: React.FC<EnginePanelProps> = React.memo(({
             </div>
           )}
 
-          {/* 2. 主引擎紧凑卡片 [主 · 翠绿 #10B981] */}
-          <div className="rounded-md border border-[#10B981]/35 bg-[var(--xq-bg-canvas)] p-2 space-y-1.5">
+          {/* 2. 主引擎紧凑卡片 */}
+          <div className="rounded-md border border-[var(--xq-accent-jade)]/35 bg-[var(--xq-bg-canvas)] p-2 space-y-1.5">
             <div className="flex flex-wrap items-center justify-between gap-2 text-[0.8125rem]">
               <div className="flex items-center gap-1.5 min-w-0">
-                <span className="px-1.5 py-0.5 rounded bg-[#10B981] text-white font-bold text-xs shrink-0">
+                <span className="px-1.5 py-0.5 rounded bg-[var(--xq-accent-jade)] text-[#F4EFE2] font-bold text-xs shrink-0">
                   主擎
                 </span>
                 <span className="font-semibold xq-text-primary truncate">
@@ -433,7 +433,7 @@ export const EnginePanel: React.FC<EnginePanelProps> = React.memo(({
                 <span className="text-xs xq-text-muted">
                   d={primaryTop.depth}·{primaryTop.nps}k
                 </span>
-                <span className="font-bold text-[#10B981]">
+                <span className="font-bold text-[var(--xq-accent-jade)]">
                   {formatScore(primaryTop.scoreCp)}
                 </span>
               </div>
@@ -459,13 +459,13 @@ export const EnginePanel: React.FC<EnginePanelProps> = React.memo(({
                     onHoverMultiPVMove(null);
                     onSelectMultiPVMove(line.firstMove.from, line.firstMove.to);
                   }}
-                  className="w-full px-2 py-1 rounded border xq-border hover:border-[#10B981] hover:bg-[var(--xq-bg-hover)] text-left flex items-center justify-between gap-2 cursor-pointer transition-colors"
+                  className="w-full px-2 py-1 rounded border xq-border hover:border-[var(--xq-accent-jade)] hover:bg-[var(--xq-bg-hover)] text-left flex items-center justify-between gap-2 cursor-pointer transition-colors"
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-xs font-mono-tabular xq-text-muted min-w-[2.9rem] shrink-0">
                       {formatScore(line.scoreCp)}
                     </span>
-                    <span className="font-serif-sc font-bold text-sm text-[#10B981] shrink-0">
+                    <span className="font-serif-sc font-bold text-sm text-[var(--xq-accent-jade)] shrink-0">
                       {line.firstMove.notation}
                     </span>
                     <span className="text-[0.8125rem] font-serif-sc xq-text-secondary truncate">
@@ -478,11 +478,11 @@ export const EnginePanel: React.FC<EnginePanelProps> = React.memo(({
             </div>
           </div>
 
-          {/* 3. 副引擎紧凑卡片 [副 · 天青蓝 #3B82F6] */}
-          <div className="rounded-md border border-[#3B82F6]/35 bg-[var(--xq-bg-canvas)] p-2 space-y-1.5">
+          {/* 3. 副引擎紧凑卡片 */}
+          <div className="rounded-md border border-[var(--xq-accent-azure)]/35 bg-[var(--xq-bg-canvas)] p-2 space-y-1.5">
             <div className="flex flex-wrap items-center justify-between gap-2 text-[0.8125rem]">
               <div className="flex items-center gap-1.5 min-w-0">
-                <span className="px-1.5 py-0.5 rounded bg-[#3B82F6] text-white font-bold text-xs shrink-0">
+                <span className="px-1.5 py-0.5 rounded bg-[var(--xq-accent-azure)] text-[#F4EFE2] font-bold text-xs shrink-0">
                   副擎
                 </span>
                 <span className="font-semibold xq-text-primary truncate">
@@ -498,7 +498,7 @@ export const EnginePanel: React.FC<EnginePanelProps> = React.memo(({
                   <span className="text-xs xq-text-muted">
                     d={secondaryTop.depth}·{secondaryTop.nps}k
                   </span>
-                  <span className="font-bold text-[#3B82F6]">
+                  <span className="font-bold text-[var(--xq-accent-azure)]">
                     {formatScore(secondaryTop.scoreCp)}
                   </span>
                 </div>
@@ -525,13 +525,13 @@ export const EnginePanel: React.FC<EnginePanelProps> = React.memo(({
                   <span className="xq-text-secondary">
                     正在下载安装 {secondaryEngine.name}…
                   </span>
-                  <span className="font-mono-tabular font-bold text-[#3B82F6]">
+                  <span className="font-mono-tabular font-bold text-[var(--xq-accent-azure)]">
                     {secondaryEngine.installProgress}%
                   </span>
                 </div>
                 <div className="w-full h-1.5 rounded-full bg-[var(--xq-bg-elevated)] overflow-hidden">
                   <div
-                    className="h-full bg-[#3B82F6] transition-all duration-150"
+                    className="h-full bg-[var(--xq-accent-azure)] transition-all duration-150"
                     style={{ width: `${secondaryEngine.installProgress}%` }}
                   />
                 </div>
@@ -557,13 +557,13 @@ export const EnginePanel: React.FC<EnginePanelProps> = React.memo(({
                       onHoverMultiPVMove(null);
                       onSelectMultiPVMove(line.firstMove.from, line.firstMove.to);
                     }}
-                    className="w-full px-2 py-1 rounded border xq-border hover:border-[#3B82F6] hover:bg-[var(--xq-bg-hover)] text-left flex items-center justify-between gap-2 cursor-pointer transition-colors"
+                    className="w-full px-2 py-1 rounded border xq-border hover:border-[var(--xq-accent-azure)] hover:bg-[var(--xq-bg-hover)] text-left flex items-center justify-between gap-2 cursor-pointer transition-colors"
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-xs font-mono-tabular xq-text-muted min-w-[2.9rem] shrink-0">
                         {formatScore(line.scoreCp)}
                       </span>
-                      <span className="font-serif-sc font-bold text-sm text-[#3B82F6] shrink-0">
+                      <span className="font-serif-sc font-bold text-sm text-[var(--xq-accent-azure)] shrink-0">
                         {line.firstMove.notation}
                       </span>
                       <span className="text-[0.8125rem] font-serif-sc xq-text-secondary truncate">

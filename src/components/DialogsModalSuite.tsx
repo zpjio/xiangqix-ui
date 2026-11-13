@@ -402,10 +402,21 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
     },
     {
       id: 'cmd-theme',
-      label: '切换深浅外观主题',
+      label: '循环切换护眼主题（深色夜案 → 清朗浅色 → 温润护眼）',
       shortcut: 'T',
       action: () => {
-        onChangeAppTheme(appTheme === 'dark' ? 'light' : 'dark');
+        onChangeAppTheme(
+          appTheme === 'dark' ? 'light' : appTheme === 'light' ? 'eyecare' : 'dark'
+        );
+        onClose();
+      },
+    },
+    {
+      id: 'cmd-theme-eyecare',
+      label: '直达「温润护眼」低蓝光纸质模式',
+      shortcut: 'Y',
+      action: () => {
+        onChangeAppTheme('eyecare');
         onClose();
       },
     },
@@ -506,7 +517,9 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
       className="fixed inset-0 z-50 flex items-center justify-center p-4 transition-colors duration-150"
       style={{
         backgroundColor:
-          activeModal === 'settings' ? 'rgba(0, 0, 0, 0.14)' : 'var(--xq-bg-backdrop)',
+          activeModal === 'settings'
+            ? 'var(--xq-bg-settings-backdrop)'
+            : 'var(--xq-bg-backdrop)',
       }}
     >
       <div
@@ -750,7 +763,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                   >
                     <div className="min-w-0">
                       <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 text-[0.8125rem]">
-                        <span className="font-semibold text-[#C8372D] truncate">
+                        <span className="font-semibold text-[var(--xq-accent-crimson)] truncate">
                           {game.redPlayer}
                         </span>
                         <span className="xq-text-muted">vs</span>
@@ -764,7 +777,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                           {game.pliesCount}手
                         </span>
                         <span className="xq-text-muted">·</span>
-                        <span className="font-mono-tabular text-xs text-[#10B981] whitespace-nowrap">
+                        <span className="font-mono-tabular text-xs text-[var(--xq-accent-jade)] whitespace-nowrap">
                           {game.accuracyRed}% / {game.accuracyBlack}%
                         </span>
                       </div>
@@ -909,7 +922,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                       className="px-3 py-1.5 rounded-md xq-btn-secondary flex items-center gap-1 cursor-pointer whitespace-nowrap"
                     >
                       {copiedFen ? (
-                        <Check className="w-3.5 h-3.5 text-[#10B981]" />
+                        <Check className="w-3.5 h-3.5 text-[var(--xq-accent-jade)]" />
                       ) : (
                         <Copy className="w-3.5 h-3.5" />
                       )}
@@ -1000,7 +1013,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                       className="px-3.5 py-1.5 rounded-md xq-btn-secondary flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
                     >
                       {copiedExportText ? (
-                        <Check className="w-3.5 h-3.5 text-[#10B981]" />
+                        <Check className="w-3.5 h-3.5 text-[var(--xq-accent-jade)]" />
                       ) : (
                         <Copy className="w-3.5 h-3.5" />
                       )}
@@ -1174,7 +1187,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                         className="w-full p-2.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)] font-mono-tabular text-xs leading-relaxed"
                       />
                       {parsedPgnPreview && parsedPgnPreview.moves.length > 0 && (
-                        <div className="text-xs text-[#10B981] font-mono-tabular">
+                        <div className="text-xs text-[var(--xq-accent-jade)] font-mono-tabular">
                           已识别 PGN 棋谱：共 {parsedPgnPreview.moves.length} 手合法着法，将完整还原并导入至「复盘分析」
                         </div>
                       )}
@@ -1598,7 +1611,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         {eng.status === 'ready' ? (
-                          <CheckCircle2 className="w-3.5 h-3.5 text-[#10B981] shrink-0" />
+                          <CheckCircle2 className="w-3.5 h-3.5 text-[var(--xq-accent-jade)] shrink-0" />
                         ) : (
                           <AlertTriangle className="w-3.5 h-3.5 text-[var(--xq-accent-gold)] shrink-0" />
                         )}
@@ -1607,12 +1620,12 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                           {eng.protocol} · {eng.styleLabel}
                         </span>
                         {isPrimary && (
-                          <span className="px-1.5 py-0.2 rounded text-xs font-bold bg-[#10B981] text-white shrink-0">
+                          <span className="px-1.5 py-0.2 rounded text-xs font-bold bg-[var(--xq-accent-jade)] text-[#F4EFE2] shrink-0">
                             主擎
                           </span>
                         )}
                         {isSecondary && (
-                          <span className="px-1.5 py-0.2 rounded text-xs font-bold bg-[#3B82F6] text-white shrink-0">
+                          <span className="px-1.5 py-0.2 rounded text-xs font-bold bg-[var(--xq-accent-azure)] text-[#F4EFE2] shrink-0">
                             副擎
                           </span>
                         )}
@@ -1672,26 +1685,31 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
             {/* 第一部分：外观与棋具 */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="p-2.5 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] space-y-1.5">
-                <div className="font-semibold text-xs xq-text-secondary">界面主题（与顶栏按钮同步）</div>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => onChangeAppTheme('dark')}
-                    className={`py-1.5 rounded-md text-xs cursor-pointer ${
-                      appTheme === 'dark' ? 'xq-btn-option-active' : 'xq-btn-option'
-                    }`}
-                  >
-                    深色模式
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onChangeAppTheme('light')}
-                    className={`py-1.5 rounded-md text-xs cursor-pointer ${
-                      appTheme === 'light' ? 'xq-btn-option-active' : 'xq-btn-option'
-                    }`}
-                  >
-                    浅色模式
-                  </button>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold text-xs xq-text-secondary">
+                    界面主题（与顶栏按钮同步）
+                  </span>
+                  <span className="text-xs xq-text-muted">低蓝光防眩校准</span>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(
+                    [
+                      { id: 'dark', label: '深色夜案' },
+                      { id: 'light', label: '清朗浅色' },
+                      { id: 'eyecare', label: '温润护眼' },
+                    ] as const
+                  ).map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => onChangeAppTheme(item.id)}
+                      className={`py-1.5 rounded-md text-xs cursor-pointer whitespace-nowrap ${
+                        appTheme === item.id ? 'xq-btn-option-active' : 'xq-btn-option'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
                 </div>
               </div>
 

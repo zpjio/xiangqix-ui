@@ -103,11 +103,13 @@ export const GameReviewPanel: React.FC<GameReviewPanelProps> = React.memo(({
         <div className="p-3 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] space-y-1">
           <div className="flex items-center justify-between gap-1 flex-wrap">
             <span className="xq-text-secondary font-medium">红方精准度</span>
-            <span className="text-xs px-1.5 py-0.5 rounded bg-[#C8372D]/15 text-[#E04F44]">
+            <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--xq-accent-crimson)]/12 text-[var(--xq-accent-crimson)]">
               {redErrors === 0 ? '主控全局' : `失误 ${redErrors}`}
             </span>
           </div>
-          <div className="text-xl font-mono-tabular font-bold text-[#C8372D]">{redAcc}</div>
+          <div className="text-xl font-mono-tabular font-bold text-[var(--xq-accent-crimson)]">
+            {redAcc}
+          </div>
           <div className="text-xs xq-text-muted flex items-center gap-1.5 flex-wrap font-mono-tabular">
             <span>妙 {countQuality(redMoves, '妙')}</span>
             <span>·</span>
@@ -120,7 +122,7 @@ export const GameReviewPanel: React.FC<GameReviewPanelProps> = React.memo(({
         <div className="p-3 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] space-y-1">
           <div className="flex items-center justify-between gap-1 flex-wrap">
             <span className="xq-text-secondary font-medium">黑方精准度</span>
-            <span className="text-xs px-1.5 py-0.5 rounded bg-[#D06228]/20 text-[#E8834A]">
+            <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--xq-accent-amber)]/15 text-[var(--xq-accent-amber)]">
               {countQuality(blackMoves, '败') > 0 ? '中局受挫' : '稳健应对'}
             </span>
           </div>
@@ -130,7 +132,7 @@ export const GameReviewPanel: React.FC<GameReviewPanelProps> = React.memo(({
             <span>·</span>
             <span>缓 {countQuality(blackMoves, '缓')}</span>
             <span>·</span>
-            <span className="text-[#E04F44]">败 {countQuality(blackMoves, '败')}</span>
+            <span className="text-[var(--xq-accent-crimson)]">败 {countQuality(blackMoves, '败')}</span>
           </div>
         </div>
       </div>
@@ -144,7 +146,7 @@ export const GameReviewPanel: React.FC<GameReviewPanelProps> = React.memo(({
 
       {/* 3. 败着重练实时反馈横幅 */}
       {retryFeedback && (
-        <div className="p-2.5 rounded-lg border border-[#D4AF37] bg-[#D4AF37]/15 text-[0.8125rem] flex items-center gap-2">
+        <div className="p-2.5 rounded-lg border border-[var(--xq-accent-gold)] bg-[var(--xq-accent-gold)]/15 text-[0.8125rem] flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-[var(--xq-accent-gold)] shrink-0" />
           <span className="font-medium">{retryFeedback}</span>
         </div>
@@ -172,7 +174,7 @@ export const GameReviewPanel: React.FC<GameReviewPanelProps> = React.memo(({
                 key={`mistake-card-${m.ply}`}
                 className={`p-3 rounded-lg border transition-colors space-y-2 ${
                   isRetryingThis
-                    ? 'border-[#D4AF37] bg-[#D4AF37]/10'
+                    ? 'border-[var(--xq-accent-gold)] bg-[var(--xq-accent-gold)]/10'
                     : 'xq-border bg-[var(--xq-bg-canvas)]'
                 }`}
               >
@@ -185,8 +187,8 @@ export const GameReviewPanel: React.FC<GameReviewPanelProps> = React.memo(({
                     <span
                       className={`px-1.5 py-0.5 rounded text-xs font-bold ${
                         m.quality === '败'
-                          ? 'bg-[#C8372D] text-white'
-                          : 'bg-[#D06228]/25 text-[#E8834A] border border-[#D06228]/50'
+                          ? 'bg-[var(--xq-eval-red)] text-[#F4EFE2]'
+                          : 'bg-[var(--xq-accent-amber)]/20 text-[var(--xq-accent-amber)] border border-[var(--xq-accent-amber)]/45'
                       }`}
                     >
                       {m.quality}着
@@ -195,7 +197,7 @@ export const GameReviewPanel: React.FC<GameReviewPanelProps> = React.memo(({
                       第{m.ply}手
                     </span>
                     <span className="font-serif-sc font-bold text-[0.9375rem]">{m.notation}</span>
-                    <span className="font-mono-tabular text-xs text-[#E04F44]">
+                    <span className="font-mono-tabular text-xs text-[var(--xq-accent-crimson)]">
                       (评分 {m.evalScore >= 0 ? `+${m.evalScore.toFixed(2)}` : m.evalScore.toFixed(2)})
                     </span>
                   </button>
@@ -220,7 +222,7 @@ export const GameReviewPanel: React.FC<GameReviewPanelProps> = React.memo(({
                   <div className="pt-1.5 border-t xq-border flex items-center justify-between gap-2 text-xs flex-wrap">
                     <span className="xq-text-muted">
                       推荐正着：
-                      <strong className="font-serif-sc text-[#46B886] ml-1">
+                      <strong className="font-serif-sc text-[var(--xq-accent-jade)] ml-1">
                         {m.bestAlternative}
                       </strong>
                     </span>

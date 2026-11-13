@@ -44,7 +44,7 @@ export interface MoveRecord {
 export type BoardTheme = 'xuan-rosewood' | 'imperial-lacquer' | 'song-celadon';
 export type PieceCraftStyle = 'boxwood-ebony' | 'ebony-gilt' | 'mutton-jade';
 export type FontScheme = 'kaiti-serif' | 'calligraphy-brush' | 'seal-script';
-export type AppTheme = 'dark' | 'light';
+export type AppTheme = 'dark' | 'light' | 'eyecare';
 export type FontScale = 'standard' | 'large' | 'xlarge';
 
 export interface ImpactEffect {

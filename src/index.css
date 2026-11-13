@@ -2,119 +2,329 @@
 @custom-variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
 
 /* ============================================================================
-   象棋X (XiangqiX) 设计简报 §8 标准 Token 体系 (--xq-* & xq-*)
-   支持 html[data-theme="dark"] (紫檀夜案) 与 html[data-theme="light"] (宣纸书斋)
+   象棋X (XiangqiX) 三态护眼配色体系 (--xq-* & xq-*)
+   支持 html[data-theme="dark"] (深色夜案) · light (清朗浅色) · eyecare (温润护眼)
    ============================================================================ */
 
 :root,
 html[data-theme="dark"] {
   color-scheme: dark;
-  --xq-bg-canvas: #121316;
-  --xq-bg-surface: #181A1F;
-  --xq-bg-elevated: #21242C;
-  --xq-bg-hover: #2A2E38;
-  --xq-bg-active: #323744;
-  --xq-bg-backdrop: rgba(9, 10, 13, 0.72);
+  --xq-bg-canvas: #161514;
+  --xq-bg-surface: #1D1B1A;
+  --xq-bg-elevated: #262422;
+  --xq-bg-hover: #2F2C29;
+  --xq-bg-active: #393531;
+  --xq-bg-backdrop: rgba(14, 13, 12, 0.72);
+  --xq-bg-settings-backdrop: rgba(14, 13, 12, 0.24);
 
-  --xq-text-primary: #F3F4F6;
-  --xq-text-secondary: #A1A7B3;
-  --xq-text-muted: #6E7685;
-  --xq-text-inverse: #121316;
+  --xq-text-primary: #E5E1D8;
+  --xq-text-secondary: #ABA498;
+  --xq-text-muted: #827B70;
+  --xq-text-inverse: #161514;
 
-  --xq-border-subtle: rgba(255, 255, 255, 0.09);
-  --xq-border-strong: rgba(255, 255, 255, 0.18);
+  --xq-border-subtle: rgba(229, 225, 216, 0.09);
+  --xq-border-strong: rgba(229, 225, 216, 0.18);
 
-  --xq-accent-primary: #D49B35;
-  --xq-accent-primary-hover: #E0A842;
-  --xq-accent-gold: #E5A93C;
-  --xq-accent-jade: #10B981;
+  --xq-accent-primary: #C89337;
+  --xq-accent-primary-hover: #D4A148;
+  --xq-accent-gold: #D4A148;
+  --xq-accent-jade: #2B9B74;
+  --xq-accent-crimson: #D9685E;
+  --xq-accent-crimson-strong: #B83A32;
+  --xq-accent-azure: #5B8FD9;
+  --xq-accent-amber: #D9923B;
 
-  /* 统一按钮语义变量 (Dark) */
-  --xq-btn-primary-bg: #D49B35;
-  --xq-btn-primary-hover: #E0A842;
-  --xq-btn-primary-text: #121316;
-  --xq-btn-primary-border: #E5B55A;
+  /* 统一按钮语义变量 (Dark · 柔化防眩光) */
+  --xq-btn-primary-bg: #C89337;
+  --xq-btn-primary-hover: #D4A148;
+  --xq-btn-primary-text: #161514;
+  --xq-btn-primary-border: #D9AA55;
 
-  --xq-btn-secondary-bg: #22262F;
-  --xq-btn-secondary-hover: #2C313D;
-  --xq-btn-secondary-text: #E5E7EB;
-  --xq-btn-secondary-border: rgba(255, 255, 255, 0.12);
+  --xq-btn-secondary-bg: #252220;
+  --xq-btn-secondary-hover: #302C29;
+  --xq-btn-secondary-text: #DDD7CC;
+  --xq-btn-secondary-border: rgba(229, 225, 216, 0.12);
 
-  --xq-btn-option-bg: #1A1D24;
-  --xq-btn-option-hover: #242832;
-  --xq-btn-option-text: #A1A7B3;
-  --xq-btn-option-border: rgba(255, 255, 255, 0.09);
+  --xq-btn-option-bg: #1B1918;
+  --xq-btn-option-hover: #272422;
+  --xq-btn-option-text: #ABA498;
+  --xq-btn-option-border: rgba(229, 225, 216, 0.10);
 
-  --xq-btn-option-active-bg: rgba(212, 155, 53, 0.18);
-  --xq-btn-option-active-text: #F5C45E;
-  --xq-btn-option-active-border: #D49B35;
+  --xq-btn-option-active-bg: rgba(200, 147, 55, 0.17);
+  --xq-btn-option-active-text: #E8BA67;
+  --xq-btn-option-active-border: #C89337;
 
-  --xq-mode-explore: #E5A93C;
-  --xq-mode-play: #10B981;
-  --xq-mode-setup: #F59E0B;
-  --xq-mode-connect: #3B82F6;
+  --xq-btn-engine-bg: #1F7A5C;
+  --xq-btn-engine-hover: #19684E;
+  --xq-btn-engine-text: #F2EDE2;
+  --xq-btn-engine-border: #175C45;
 
-  --xq-eval-red: #C8372D;
-  --xq-eval-black: #27272A;
+  --xq-mode-explore: #D4A148;
+  --xq-mode-play: #2B9B74;
+  --xq-mode-setup: #D9923B;
+  --xq-mode-connect: #5B8FD9;
 
-  --xq-badge-best: #10B981;
-  --xq-badge-good: #34D399;
-  --xq-badge-inaccuracy: #F59E0B;
-  --xq-badge-mistake: #F97316;
-  --xq-badge-blunder: #EF4444;
+  --xq-eval-red: #AD3A32;
+  --xq-eval-black: #2A2623;
+
+  --xq-badge-best: #2B9B74;
+  --xq-badge-good: #45B08B;
+  --xq-badge-inaccuracy: #D9923B;
+  --xq-badge-mistake: #D8773A;
+  --xq-badge-blunder: #D9685E;
+
+  /* 棋子与木盘柔化 Token (Dark) */
+  --xq-piece-boxwood-1: #EAD4B2;
+  --xq-piece-boxwood-2: #D8BA8E;
+  --xq-piece-boxwood-3: #BE9A68;
+  --xq-piece-boxwood-4: #967248;
+  --xq-piece-ebony-1: #3E3631;
+  --xq-piece-ebony-2: #28221F;
+  --xq-piece-ebony-3: #1B1715;
+  --xq-piece-ebony-4: #120F0D;
+  --xq-piece-ebony-red-1: #4B201D;
+  --xq-piece-ebony-red-2: #351513;
+  --xq-piece-ebony-red-3: #240C0B;
+  --xq-piece-ebony-red-4: #170706;
+  --xq-piece-jade-1: #EFE8D9;
+  --xq-piece-jade-2: #E2D8C4;
+  --xq-piece-jade-3: #CDC0AA;
+  --xq-piece-jade-4: #B0A28A;
+
+  --xq-piece-shadow-main: 0 5px 10px -2px rgba(10, 6, 3, 0.62), 0 2px 4px rgba(10, 6, 3, 0.44);
+  --xq-piece-rim-light: rgba(247, 237, 216, 0.42);
+  --xq-piece-rim-dark: rgba(82, 52, 24, 0.52);
+  --xq-piece-dark-rim-light: rgba(242, 232, 214, 0.14);
+  --xq-piece-jade-rim-light: rgba(250, 244, 230, 0.56);
+  --xq-piece-svg-outer-red: rgba(248, 238, 220, 0.34);
+  --xq-piece-svg-outer-dark: rgba(235, 225, 205, 0.12);
+
+  --xq-engraved-red: #9E2D29;
+  --xq-engraved-gold: #CFA952;
+  --xq-engraved-crimson-gold: #D96552;
+  --xq-engraved-ink: #231F1B;
+  --xq-piece-ring-red: #9E2D29;
+  --xq-piece-ring-gold: #CFA952;
+  --xq-piece-ring-crimson: #D45F4C;
+  --xq-piece-ring-ink: #2E2924;
+
+  --xq-frame-zitan-bg: linear-gradient(145deg, #342219 0%, #241711 52%, #1B110D 100%);
+  --xq-frame-shadow: 0 14px 30px -8px rgba(0, 0, 0, 0.56), 0 4px 12px -4px rgba(0, 0, 0, 0.38);
+  --xq-frame-inset-gold: rgba(207, 169, 82, 0.22);
 
   --xq-font-scale: 1;
 }
 
 html[data-theme="light"] {
   color-scheme: light;
-  --xq-bg-canvas: #F2F4F7;
-  --xq-bg-surface: #FFFFFF;
-  --xq-bg-elevated: #F8FAFC;
-  --xq-bg-hover: #EDF1F7;
-  --xq-bg-active: #E2E8F0;
-  --xq-bg-backdrop: rgba(15, 23, 42, 0.42);
+  --xq-bg-canvas: #EAECE8;
+  --xq-bg-surface: #F7F7F4;
+  --xq-bg-elevated: #FBFBF9;
+  --xq-bg-hover: #E2E5DF;
+  --xq-bg-active: #D7DBD3;
+  --xq-bg-backdrop: rgba(37, 39, 36, 0.38);
+  --xq-bg-settings-backdrop: rgba(37, 39, 36, 0.16);
 
-  --xq-text-primary: #18181B;
-  --xq-text-secondary: #475569;
-  --xq-text-muted: #64748B;
-  --xq-text-inverse: #FFFFFF;
+  --xq-text-primary: #252724;
+  --xq-text-secondary: #525650;
+  --xq-text-muted: #6C7169;
+  --xq-text-inverse: #F7F7F4;
 
-  --xq-border-subtle: rgba(15, 23, 42, 0.1);
-  --xq-border-strong: rgba(15, 23, 42, 0.2);
+  --xq-border-subtle: rgba(37, 39, 36, 0.10);
+  --xq-border-strong: rgba(37, 39, 36, 0.19);
 
-  --xq-accent-primary: #B47814;
-  --xq-accent-primary-hover: #9A650E;
-  --xq-accent-gold: #9A6708;
-  --xq-accent-jade: #059669;
+  --xq-accent-primary: #A66E17;
+  --xq-accent-primary-hover: #8E5D12;
+  --xq-accent-gold: #946212;
+  --xq-accent-jade: #1F7D5C;
+  --xq-accent-crimson: #A8332B;
+  --xq-accent-crimson-strong: #962B28;
+  --xq-accent-azure: #3B6FB6;
+  --xq-accent-amber: #B86E18;
 
-  /* 统一按钮语义变量 (Light) */
-  --xq-btn-primary-bg: #B47814;
-  --xq-btn-primary-hover: #9A650E;
-  --xq-btn-primary-text: #FFFFFF;
-  --xq-btn-primary-border: #9A650E;
+  /* 统一按钮语义变量 (Light · 清朗无刺眼纯白) */
+  --xq-btn-primary-bg: #A66E17;
+  --xq-btn-primary-hover: #8E5D12;
+  --xq-btn-primary-text: #FAF8F3;
+  --xq-btn-primary-border: #8E5D12;
 
-  --xq-btn-secondary-bg: #FFFFFF;
-  --xq-btn-secondary-hover: #F1F5F9;
-  --xq-btn-secondary-text: #1E293B;
-  --xq-btn-secondary-border: rgba(15, 23, 42, 0.16);
+  --xq-btn-secondary-bg: #F3F4F0;
+  --xq-btn-secondary-hover: #E6E9E2;
+  --xq-btn-secondary-text: #252724;
+  --xq-btn-secondary-border: rgba(37, 39, 36, 0.15);
 
-  --xq-btn-option-bg: #F8FAFC;
-  --xq-btn-option-hover: #EEF2F6;
-  --xq-btn-option-text: #475569;
-  --xq-btn-option-border: rgba(15, 23, 42, 0.12);
+  --xq-btn-option-bg: #F1F2EE;
+  --xq-btn-option-hover: #E5E8E2;
+  --xq-btn-option-text: #525650;
+  --xq-btn-option-border: rgba(37, 39, 36, 0.12);
 
-  --xq-btn-option-active-bg: rgba(180, 120, 20, 0.13);
-  --xq-btn-option-active-text: #855506;
-  --xq-btn-option-active-border: #B47814;
+  --xq-btn-option-active-bg: rgba(166, 110, 23, 0.13);
+  --xq-btn-option-active-text: #7D510D;
+  --xq-btn-option-active-border: #A66E17;
 
-  --xq-mode-explore: #9A6708;
-  --xq-mode-play: #059669;
-  --xq-mode-setup: #D97706;
-  --xq-mode-connect: #2563EB;
+  --xq-btn-engine-bg: #1F7D5C;
+  --xq-btn-engine-hover: #19684C;
+  --xq-btn-engine-text: #FAF8F3;
+  --xq-btn-engine-border: #175C43;
 
-  --xq-eval-red: #B82925;
-  --xq-eval-black: #27272A;
+  --xq-mode-explore: #946212;
+  --xq-mode-play: #1F7D5C;
+  --xq-mode-setup: #B86E18;
+  --xq-mode-connect: #3B6FB6;
+
+  --xq-eval-red: #A3332C;
+  --xq-eval-black: #302E2B;
+
+  --xq-badge-best: #1F7D5C;
+  --xq-badge-good: #2B8A68;
+  --xq-badge-inaccuracy: #B86E18;
+  --xq-badge-mistake: #BF5C24;
+  --xq-badge-blunder: #A8332B;
+
+  /* 棋子与木盘柔化 Token (Light) */
+  --xq-piece-boxwood-1: #EEDBB9;
+  --xq-piece-boxwood-2: #DCC094;
+  --xq-piece-boxwood-3: #C2A06E;
+  --xq-piece-boxwood-4: #9D7B4E;
+  --xq-piece-ebony-1: #413A34;
+  --xq-piece-ebony-2: #2C2622;
+  --xq-piece-ebony-3: #1F1B18;
+  --xq-piece-ebony-4: #161311;
+  --xq-piece-ebony-red-1: #502420;
+  --xq-piece-ebony-red-2: #3A1815;
+  --xq-piece-ebony-red-3: #280F0D;
+  --xq-piece-ebony-red-4: #1A0908;
+  --xq-piece-jade-1: #F3EFE5;
+  --xq-piece-jade-2: #E6DFCF;
+  --xq-piece-jade-3: #D2C7B3;
+  --xq-piece-jade-4: #B6A992;
+
+  --xq-piece-shadow-main: 0 4px 9px -2px rgba(37, 34, 28, 0.42), 0 1px 3px rgba(37, 34, 28, 0.28);
+  --xq-piece-rim-light: rgba(252, 246, 232, 0.5);
+  --xq-piece-rim-dark: rgba(92, 62, 30, 0.46);
+  --xq-piece-dark-rim-light: rgba(245, 240, 230, 0.14);
+  --xq-piece-jade-rim-light: rgba(252, 248, 240, 0.62);
+  --xq-piece-svg-outer-red: rgba(250, 244, 232, 0.38);
+  --xq-piece-svg-outer-dark: rgba(245, 238, 224, 0.12);
+
+  --xq-engraved-red: #9B2825;
+  --xq-engraved-gold: #D1AA54;
+  --xq-engraved-crimson-gold: #DC6552;
+  --xq-engraved-ink: #24201C;
+  --xq-piece-ring-red: #9B2825;
+  --xq-piece-ring-gold: #CFA952;
+  --xq-piece-ring-crimson: #D45F4C;
+  --xq-piece-ring-ink: #2E2924;
+
+  --xq-frame-zitan-bg: linear-gradient(145deg, #422B20 0%, #2F1E16 52%, #231610 100%);
+  --xq-frame-shadow: 0 12px 26px -8px rgba(37, 34, 28, 0.36), 0 4px 10px -4px rgba(37, 34, 28, 0.22);
+  --xq-frame-inset-gold: rgba(207, 169, 82, 0.22);
+}
+
+html[data-theme="eyecare"] {
+  color-scheme: light;
+  --xq-bg-canvas: #E5DEC9;
+  --xq-bg-surface: #EDE7D6;
+  --xq-bg-elevated: #F2ECDD;
+  --xq-bg-hover: #DCD4BC;
+  --xq-bg-active: #D2C8AD;
+  --xq-bg-backdrop: rgba(45, 40, 33, 0.34);
+  --xq-bg-settings-backdrop: rgba(45, 40, 33, 0.16);
+
+  --xq-text-primary: #2D2821;
+  --xq-text-secondary: #584F42;
+  --xq-text-muted: #706556;
+  --xq-text-inverse: #F2ECDD;
+
+  --xq-border-subtle: rgba(45, 40, 33, 0.11);
+  --xq-border-strong: rgba(45, 40, 33, 0.21);
+
+  --xq-accent-primary: #9E681B;
+  --xq-accent-primary-hover: #875714;
+  --xq-accent-gold: #8E5D16;
+  --xq-accent-jade: #2A7053;
+  --xq-accent-crimson: #962B28;
+  --xq-accent-crimson-strong: #852421;
+  --xq-accent-azure: #3B6896;
+  --xq-accent-amber: #A6651A;
+
+  /* 统一按钮语义变量 (EyeCare · 温润低蓝光羊皮纸) */
+  --xq-btn-primary-bg: #9E681B;
+  --xq-btn-primary-hover: #875714;
+  --xq-btn-primary-text: #F4EFE2;
+  --xq-btn-primary-border: #875714;
+
+  --xq-btn-secondary-bg: #EAE3D0;
+  --xq-btn-secondary-hover: #DFD6BF;
+  --xq-btn-secondary-text: #2D2821;
+  --xq-btn-secondary-border: rgba(45, 40, 33, 0.16);
+
+  --xq-btn-option-bg: #E8E1CD;
+  --xq-btn-option-hover: #DCD4BC;
+  --xq-btn-option-text: #584F42;
+  --xq-btn-option-border: rgba(45, 40, 33, 0.13);
+
+  --xq-btn-option-active-bg: rgba(158, 104, 27, 0.15);
+  --xq-btn-option-active-text: #734A10;
+  --xq-btn-option-active-border: #9E681B;
+
+  --xq-btn-engine-bg: #2A7053;
+  --xq-btn-engine-hover: #225D44;
+  --xq-btn-engine-text: #F4EFE2;
+  --xq-btn-engine-border: #1E523C;
+
+  --xq-mode-explore: #8E5D16;
+  --xq-mode-play: #2A7053;
+  --xq-mode-setup: #A6651A;
+  --xq-mode-connect: #3B6896;
+
+  --xq-eval-red: #962B28;
+  --xq-eval-black: #363028;
+
+  --xq-badge-best: #2A7053;
+  --xq-badge-good: #358262;
+  --xq-badge-inaccuracy: #A6651A;
+  --xq-badge-mistake: #AD5624;
+  --xq-badge-blunder: #962B28;
+
+  /* 棋子与木盘柔化 Token (EyeCare · 哑光暖黄杨与柔和炭黑) */
+  --xq-piece-boxwood-1: #E9D9B8;
+  --xq-piece-boxwood-2: #D9C398;
+  --xq-piece-boxwood-3: #C3A675;
+  --xq-piece-boxwood-4: #A18254;
+  --xq-piece-ebony-1: #453E38;
+  --xq-piece-ebony-2: #332D28;
+  --xq-piece-ebony-3: #26211D;
+  --xq-piece-ebony-4: #1C1815;
+  --xq-piece-ebony-red-1: #542B26;
+  --xq-piece-ebony-red-2: #3F1E1A;
+  --xq-piece-ebony-red-3: #2E1411;
+  --xq-piece-ebony-red-4: #200D0B;
+  --xq-piece-jade-1: #EDE6D5;
+  --xq-piece-jade-2: #E1D8C3;
+  --xq-piece-jade-3: #CFC3AB;
+  --xq-piece-jade-4: #B5A68C;
+
+  --xq-piece-shadow-main: 0 4px 8px -2px rgba(45, 36, 24, 0.34), 0 1px 3px rgba(45, 36, 24, 0.22);
+  --xq-piece-rim-light: rgba(250, 242, 224, 0.38);
+  --xq-piece-rim-dark: rgba(92, 66, 36, 0.36);
+  --xq-piece-dark-rim-light: rgba(242, 232, 212, 0.11);
+  --xq-piece-jade-rim-light: rgba(250, 244, 230, 0.44);
+  --xq-piece-svg-outer-red: rgba(248, 238, 218, 0.30);
+  --xq-piece-svg-outer-dark: rgba(235, 224, 202, 0.10);
+
+  --xq-engraved-red: #962B28;
+  --xq-engraved-gold: #CFA952;
+  --xq-engraved-crimson-gold: #D26552;
+  --xq-engraved-ink: #2D2821;
+  --xq-piece-ring-red: #962B28;
+  --xq-piece-ring-gold: #CFA952;
+  --xq-piece-ring-crimson: #CF6250;
+  --xq-piece-ring-ink: #363028;
+
+  --xq-frame-zitan-bg: linear-gradient(145deg, #4B3629 0%, #3A281E 52%, #2D1E16 100%);
+  --xq-frame-shadow: 0 10px 22px -6px rgba(45, 36, 24, 0.30), 0 3px 8px -2px rgba(45, 36, 24, 0.18);
+  --xq-frame-inset-gold: rgba(207, 169, 82, 0.20);
 }
 
 html[data-font-scale="standard"] {
@@ -209,7 +419,7 @@ html[data-font-scale="xlarge"] {
   color: var(--xq-text-muted);
 }
 
-/* ==================== 全局统一按钮规范体系 (适配 Dark / Light 双主题) ==================== */
+/* ==================== 全局统一按钮规范体系 (适配 Dark / Light / EyeCare 三主题) ==================== */
 .xq-btn-primary {
   background-color: var(--xq-btn-primary-bg);
   color: var(--xq-btn-primary-text);
@@ -256,126 +466,121 @@ html[data-font-scale="xlarge"] {
 }
 
 .xq-btn-engine-on {
-  background-color: #059669;
-  color: #FFFFFF;
-  border: 1px solid #047857;
+  background-color: var(--xq-btn-engine-bg);
+  color: var(--xq-btn-engine-text);
+  border: 1px solid var(--xq-btn-engine-border);
   font-weight: 600;
   transition: background-color 150ms ease;
 }
 
 .xq-btn-engine-on:hover:not(:disabled) {
-  background-color: #047857;
+  background-color: var(--xq-btn-engine-hover);
 }
 
 .xq-btn-danger {
-  background-color: rgba(239, 68, 68, 0.12);
-  color: #EF4444;
-  border: 1px solid rgba(239, 68, 68, 0.4);
+  background-color: color-mix(in srgb, var(--xq-accent-crimson) 12%, transparent);
+  color: var(--xq-accent-crimson);
+  border: 1px solid color-mix(in srgb, var(--xq-accent-crimson) 38%, transparent);
   font-weight: 500;
   transition: background-color 150ms ease;
 }
 
 .xq-btn-danger:hover:not(:disabled) {
-  background-color: rgba(239, 68, 68, 0.22);
+  background-color: color-mix(in srgb, var(--xq-accent-crimson) 20%, transparent);
 }
 
-/* ==================== 《象棋考工》棋子立体木雕旋纹与阴刻内阴影 ==================== */
+/* ==================== 《象棋考工》棋子立体木雕旋纹与防眩光阴刻内阴影 ==================== */
 .piece-token-red {
   background: radial-gradient(
     circle at 32% 28%,
-    #F3DFC1 0%,
-    #DFC196 42%,
-    #C5A06E 78%,
-    #9C784C 100%
+    var(--xq-piece-boxwood-1) 0%,
+    var(--xq-piece-boxwood-2) 42%,
+    var(--xq-piece-boxwood-3) 78%,
+    var(--xq-piece-boxwood-4) 100%
   );
   box-shadow:
-    0 6px 12px -2px rgba(15, 8, 4, 0.72),
-    0 2px 4px rgba(15, 8, 4, 0.55),
-    inset 0 2px 3px rgba(255, 248, 231, 0.75),
-    inset 0 -3px 6px rgba(92, 60, 28, 0.65);
+    var(--xq-piece-shadow-main),
+    inset 0 2px 3px var(--xq-piece-rim-light),
+    inset 0 -3px 6px var(--xq-piece-rim-dark);
 }
 
 .piece-token-black {
   background: radial-gradient(
     circle at 32% 28%,
-    #3D3530 0%,
-    #26201D 45%,
-    #181412 80%,
-    #0E0B0A 100%
+    var(--xq-piece-ebony-1) 0%,
+    var(--xq-piece-ebony-2) 45%,
+    var(--xq-piece-ebony-3) 80%,
+    var(--xq-piece-ebony-4) 100%
   );
   box-shadow:
-    0 6px 12px -2px rgba(10, 6, 3, 0.8),
-    0 2px 4px rgba(10, 6, 3, 0.6),
-    inset 0 2px 3px rgba(255, 255, 255, 0.18),
-    inset 0 -3px 6px rgba(0, 0, 0, 0.85);
+    var(--xq-piece-shadow-main),
+    inset 0 2px 3px var(--xq-piece-dark-rim-light),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.58);
 }
 
 .piece-ebony-red {
   background: radial-gradient(
     circle at 32% 28%,
-    #4E1E1B 0%,
-    #361210 48%,
-    #240A09 82%,
-    #160504 100%
+    var(--xq-piece-ebony-red-1) 0%,
+    var(--xq-piece-ebony-red-2) 48%,
+    var(--xq-piece-ebony-red-3) 82%,
+    var(--xq-piece-ebony-red-4) 100%
   );
   box-shadow:
-    0 6px 12px -2px rgba(10, 6, 3, 0.8),
-    0 2px 4px rgba(10, 6, 3, 0.6),
-    inset 0 2px 3px rgba(255, 200, 180, 0.22),
-    inset 0 -3px 6px rgba(0, 0, 0, 0.85);
+    var(--xq-piece-shadow-main),
+    inset 0 2px 3px rgba(255, 200, 180, 0.16),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.58);
 }
 
 .piece-jade-red,
 .piece-jade-black {
   background: radial-gradient(
     circle at 32% 28%,
-    #FAF6EE 0%,
-    #ECE4D4 48%,
-    #D6CBB8 84%,
-    #B8AA93 100%
+    var(--xq-piece-jade-1) 0%,
+    var(--xq-piece-jade-2) 48%,
+    var(--xq-piece-jade-3) 84%,
+    var(--xq-piece-jade-4) 100%
   );
   box-shadow:
-    0 6px 12px -2px rgba(20, 14, 8, 0.65),
-    0 2px 4px rgba(20, 14, 8, 0.45),
-    inset 0 2px 4px rgba(255, 255, 255, 0.9),
-    inset 0 -3px 6px rgba(130, 115, 95, 0.5);
+    var(--xq-piece-shadow-main),
+    inset 0 2px 4px var(--xq-piece-jade-rim-light),
+    inset 0 -3px 6px rgba(120, 105, 85, 0.36);
 }
 
 .engraved-red-char {
-  color: #A62222;
+  color: var(--xq-engraved-red);
   text-shadow:
-    0 1px 0 rgba(255, 245, 225, 0.7),
-    0 -1px 1px rgba(70, 10, 10, 0.65);
+    0 1px 0 rgba(255, 245, 225, 0.45),
+    0 -1px 1px rgba(70, 14, 14, 0.42);
 }
 
 .engraved-gold-char {
-  color: #DFB654;
+  color: var(--xq-engraved-gold);
   text-shadow:
-    0 1px 1px rgba(0, 0, 0, 0.85),
-    0 0 6px rgba(212, 175, 55, 0.25);
+    0 1px 1px rgba(0, 0, 0, 0.65),
+    0 0 4px rgba(207, 169, 82, 0.18);
 }
 
 .engraved-crimson-gold-char {
-  color: #E85D4A;
+  color: var(--xq-engraved-crimson-gold);
   text-shadow:
-    0 1px 1px rgba(0, 0, 0, 0.9),
-    0 0 6px rgba(232, 93, 74, 0.3);
+    0 1px 1px rgba(0, 0, 0, 0.7),
+    0 0 4px rgba(217, 101, 82, 0.22);
 }
 
 .engraved-ink-char {
-  color: #1C1917;
+  color: var(--xq-engraved-ink);
   text-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.75),
-    0 -1px 1px rgba(0, 0, 0, 0.5);
+    0 1px 0 rgba(255, 252, 244, 0.52),
+    0 -1px 1px rgba(0, 0, 0, 0.35);
 }
 
 .zitan-board-frame {
-  background: linear-gradient(145deg, #362219 0%, #241610 50%, #1B100C 100%);
+  background: var(--xq-frame-zitan-bg);
   box-shadow:
-    0 18px 36px -10px rgba(0, 0, 0, 0.68),
-    0 6px 16px -4px rgba(0, 0, 0, 0.5),
-    inset 0 1px 2px rgba(212, 175, 55, 0.28),
-    inset 0 -2px 4px rgba(0, 0, 0, 0.8);
+    var(--xq-frame-shadow),
+    inset 0 1px 2px var(--xq-frame-inset-gold),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.55);
 }
 
 /* ==================== 落子物理碰撞：朱砂粉尘与木屑散落特效 ==================== */

@@ -111,11 +111,11 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
   const getBadgeTextStyle = (badge?: string) => {
     switch (badge) {
       case '陷阱':
-        return 'text-[#EF4444] font-semibold';
+        return 'text-[var(--xq-accent-crimson)] font-semibold';
       case '激烈':
-        return 'text-[#F59E0B] font-medium';
+        return 'text-[var(--xq-accent-amber)] font-medium';
       case '主流':
-        return 'text-[#10B981] font-medium';
+        return 'text-[var(--xq-accent-jade)] font-medium';
       case '古谱':
         return 'text-[var(--xq-accent-gold)] font-medium';
       case '稳健':
@@ -336,7 +336,7 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
                       <div className="flex items-center gap-2 min-w-0">
                         <span
                           className={`font-serif-sc font-bold text-sm shrink-0 ${
-                            turn === 'red' ? 'text-[#EF4444]' : 'xq-text-primary'
+                            turn === 'red' ? 'text-[var(--xq-accent-crimson)]' : 'xq-text-primary'
                           }`}
                         >
                           {mv.notation}
@@ -360,15 +360,15 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
                       <div className="flex-1 min-w-[6rem] h-1.5 rounded-full overflow-hidden flex bg-[var(--xq-bg-canvas)] border border-[var(--xq-border-subtle)]">
                         <div
                           style={{ width: `${mv.redWinPct}%` }}
-                          className="h-full bg-[#C8372D]"
+                          className="h-full bg-[var(--xq-eval-red)]"
                         />
                         <div
                           style={{ width: `${mv.drawPct}%` }}
-                          className="h-full bg-[#64748B]"
+                          className="h-full bg-[#7A756D]"
                         />
                         <div
                           style={{ width: `${mv.blackWinPct}%` }}
-                          className="h-full bg-[#27272A]"
+                          className="h-full bg-[var(--xq-eval-black)]"
                         />
                       </div>
                       <span className="text-xs font-mono-tabular xq-text-muted shrink-0">
@@ -534,7 +534,7 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
                           {preset.title}
                         </span>
                         {prog && prog.completedCount > 0 && (
-                          <span className="text-xs text-[#10B981] font-mono-tabular font-semibold shrink-0 flex items-center gap-1">
+                          <span className="text-xs text-[var(--xq-accent-jade)] font-mono-tabular font-semibold shrink-0 flex items-center gap-1">
                             <CheckCircle2 className="w-3.5 h-3.5" />
                             最佳 {prog.bestAccuracyPct}%
                           </span>
@@ -604,15 +604,15 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
                 <div className="h-1.5 w-full rounded-full overflow-hidden bg-[var(--xq-bg-surface)] border border-[var(--xq-border-subtle)]">
                   <div
                     style={{ width: `${drillProgressPct}%` }}
-                    className="h-full bg-[#10B981] transition-[width] duration-200"
+                    className="h-full bg-[var(--xq-accent-jade)] transition-[width] duration-200"
                   />
                 </div>
               </div>
 
               {/* 实时对练反馈卡片 */}
               {drillState.status === 'completed' ? (
-                <div className="p-3.5 rounded-lg border border-[#10B981]/50 bg-[#10B981]/10 space-y-2.5">
-                  <div className="flex items-center gap-2 text-[#10B981] font-semibold text-sm">
+                <div className="p-3.5 rounded-lg border border-[var(--xq-accent-jade)]/50 bg-[var(--xq-accent-jade)]/10 space-y-2.5">
+                  <div className="flex items-center gap-2 text-[var(--xq-accent-jade)] font-semibold text-sm">
                     <CheckCircle2 className="w-4 h-4 shrink-0" />
                     <span>定式通关！</span>
                   </div>
@@ -641,8 +641,8 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
                   </div>
                 </div>
               ) : drillState.status === 'mistake' ? (
-                <div className="p-3 rounded-lg border border-[#EF4444]/50 bg-[#EF4444]/10 space-y-2">
-                  <div className="flex items-center gap-1.5 text-[#EF4444] text-sm font-semibold">
+                <div className="p-3 rounded-lg border border-[var(--xq-accent-crimson)]/50 bg-[var(--xq-accent-crimson)]/10 space-y-2">
+                  <div className="flex items-center gap-1.5 text-[var(--xq-accent-crimson)] text-sm font-semibold">
                     <AlertTriangle className="w-4 h-4 shrink-0" />
                     <span>偏离定式主线</span>
                   </div>
@@ -714,7 +714,7 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
                         key={idx}
                         className={`px-2 py-0.5 rounded border text-xs font-serif-sc ${
                           playedMove
-                            ? 'border-[#10B981]/40 bg-[#10B981]/10 text-[#10B981]'
+                            ? 'border-[var(--xq-accent-jade)]/40 bg-[var(--xq-accent-jade)]/10 text-[var(--xq-accent-jade)]'
                             : isCurrent
                             ? 'border-[var(--xq-accent-gold)] text-[var(--xq-accent-gold)] font-semibold'
                             : 'xq-border xq-text-muted'

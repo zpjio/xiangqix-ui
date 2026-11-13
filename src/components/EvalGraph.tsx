@@ -55,23 +55,36 @@ export const EvalGraph: React.FC<EvalGraphProps> = React.memo(({
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible">
           <defs>
             <linearGradient id="evalAreaRed2" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#C8372D" stopOpacity="0.42" />
-              <stop offset="50%" stopColor="#C8372D" stopOpacity="0.06" />
-              <stop offset="100%" stopColor="#2A2421" stopOpacity="0.32" />
+              <stop offset="0%" stopColor="var(--xq-eval-red)" stopOpacity="0.38" />
+              <stop offset="50%" stopColor="var(--xq-eval-red)" stopOpacity="0.06" />
+              <stop offset="100%" stopColor="var(--xq-eval-black)" stopOpacity="0.28" />
             </linearGradient>
           </defs>
 
-          <text x="2" y="15" fontSize="11" className="fill-[#C8372D] font-serif-sc font-bold">
+          <text
+            x="2"
+            y="15"
+            fontSize="11"
+            fill="var(--xq-accent-crimson)"
+            className="font-serif-sc font-bold"
+          >
             红优
           </text>
-          <text x="2" y={midY + 3} fontSize="10" className="fill-[#827363] font-mono-tabular">
+          <text
+            x="2"
+            y={midY + 3}
+            fontSize="10"
+            fill="var(--xq-text-muted)"
+            className="font-mono-tabular"
+          >
             0.0
           </text>
           <text
             x="2"
             y={height - 5}
             fontSize="11"
-            className="fill-[#827363] font-serif-sc font-bold"
+            fill="var(--xq-text-muted)"
+            className="font-serif-sc font-bold"
           >
             黑优
           </text>
@@ -89,7 +102,7 @@ export const EvalGraph: React.FC<EvalGraphProps> = React.memo(({
           <polygon points={areaCoords} fill="url(#evalAreaRed2)" />
           <polyline
             fill="none"
-            stroke="#C8372D"
+            stroke="var(--xq-accent-crimson)"
             strokeWidth="2"
             points={lineCoords}
             strokeLinecap="round"
@@ -101,7 +114,7 @@ export const EvalGraph: React.FC<EvalGraphProps> = React.memo(({
             y1={5}
             x2={toX(currentPly)}
             y2={height - 5}
-            stroke="#D4AF37"
+            stroke="var(--xq-accent-gold)"
             strokeWidth="1.5"
           />
 
@@ -124,17 +137,17 @@ export const EvalGraph: React.FC<EvalGraphProps> = React.memo(({
                   r={isCurrent ? 4.5 : isMistake ? 4 : 2.5}
                   fill={
                     isCurrent
-                      ? '#D4AF37'
+                      ? 'var(--xq-accent-gold)'
                       : pt.quality === '败'
-                      ? '#C8372D'
+                      ? 'var(--xq-badge-blunder)'
                       : pt.quality === '缓'
-                      ? '#D06228'
+                      ? 'var(--xq-badge-inaccuracy)'
                       : pt.quality === '妙'
-                      ? '#2E7D5B'
-                      : '#EFE6D8'
+                      ? 'var(--xq-badge-best)'
+                      : 'var(--xq-text-secondary)'
                   }
-                  stroke="#18120E"
-                  strokeWidth="1"
+                  stroke="var(--xq-bg-surface)"
+                  strokeWidth="1.2"
                 />
               </g>
             );

@@ -68,15 +68,15 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
   const getQualityBadgeStyle = (q?: MoveQuality) => {
     switch (q) {
       case '妙':
-        return 'text-[#10B981] border-[#10B981]/45 bg-[#10B981]/12 font-semibold';
+        return 'text-[var(--xq-badge-best)] border-[var(--xq-badge-best)]/45 bg-[var(--xq-badge-best)]/12 font-semibold';
       case '优':
-        return 'text-[#10B981] border-[#10B981]/30 bg-[#10B981]/8';
+        return 'text-[var(--xq-badge-best)] border-[var(--xq-badge-best)]/30 bg-[var(--xq-badge-best)]/8';
       case '良':
         return 'xq-text-secondary border-[var(--xq-border-subtle)] bg-[var(--xq-bg-elevated)]';
       case '缓':
-        return 'text-[#F59E0B] border-[#F59E0B]/40 bg-[#F59E0B]/12 font-medium';
+        return 'text-[var(--xq-badge-inaccuracy)] border-[var(--xq-badge-inaccuracy)]/40 bg-[var(--xq-badge-inaccuracy)]/12 font-medium';
       case '败':
-        return 'text-[#EF4444] border-[#EF4444]/50 bg-[#EF4444]/15 font-semibold';
+        return 'text-[var(--xq-badge-blunder)] border-[var(--xq-badge-blunder)]/50 bg-[var(--xq-badge-blunder)]/15 font-semibold';
       default:
         return '';
     }
@@ -116,7 +116,9 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
           onClick={onOpenGameInfo}
           className="text-left min-w-0 flex-1 hover:underline cursor-pointer truncate"
         >
-          <span className="font-semibold text-[#EF4444]">{metadata.redPlayer}</span>
+          <span className="font-semibold text-[var(--xq-accent-crimson)]">
+            {metadata.redPlayer}
+          </span>
           <span className="xq-text-muted mx-1.5">vs</span>
           <span className="font-semibold">{metadata.blackPlayer}</span>
           <span className="xq-text-muted mx-1.5">·</span>
@@ -147,7 +149,7 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
               }`}
             >
               {savedNotice ? (
-                <Check className="w-3 h-3 text-[#10B981]" />
+                <Check className="w-3 h-3 text-[var(--xq-accent-jade)]" />
               ) : (
                 <BookmarkPlus className="w-3 h-3 text-[var(--xq-accent-gold)]" />
               )}
@@ -200,9 +202,9 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
 
       {/* 若处于外部平台连线观棋中，在棋谱顶部显示轻量连线同步条 */}
       {connectState?.connected && (
-        <div className="px-3.5 py-1.5 border-b border-[#10B981]/40 bg-[#10B981]/10 flex flex-wrap items-center justify-between gap-2 text-[0.8125rem] shrink-0">
-          <div className="flex items-center gap-1.5 text-[#10B981] font-medium min-w-0">
-            <span className="w-2 h-2 rounded-full bg-[#10B981] animate-pulse shrink-0" />
+        <div className="px-3.5 py-1.5 border-b border-[var(--xq-accent-jade)]/40 bg-[var(--xq-accent-jade)]/10 flex flex-wrap items-center justify-between gap-2 text-[0.8125rem] shrink-0">
+          <div className="flex items-center gap-1.5 text-[var(--xq-accent-jade)] font-medium min-w-0">
+            <span className="w-2 h-2 rounded-full bg-[var(--xq-accent-jade)] animate-pulse shrink-0" />
             <span className="truncate">
               正在同步：{connectState.platformLabel}
             </span>
@@ -377,7 +379,7 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
                           : 'hover:bg-[var(--xq-bg-hover)]'
                       }`}
                     >
-                      <span className="font-serif-sc font-bold text-sm text-[#EF4444] whitespace-nowrap">
+                      <span className="font-serif-sc font-bold text-sm text-[var(--xq-accent-crimson)] whitespace-nowrap">
                         {r.redMove.notation}
                       </span>
                       <div className="flex items-center gap-1 shrink-0">
@@ -455,7 +457,7 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
                         onClick={() => onSelectPly(vm.ply, true)}
                         className={`px-2 py-0.5 rounded text-[0.8125rem] font-serif-sc font-bold border transition-colors cursor-pointer ${
                           currentPly === vm.ply
-                            ? 'bg-[var(--xq-accent-gold)] text-[#121316] border-[var(--xq-accent-gold)]'
+                            ? 'bg-[var(--xq-btn-primary-bg)] text-[var(--xq-btn-primary-text)] border-[var(--xq-btn-primary-border)]'
                             : 'bg-[var(--xq-bg-surface)] xq-border hover:border-[var(--xq-accent-gold)]'
                         }`}
                       >
@@ -479,7 +481,7 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
                 第 {activeMoveRecord.ply} 手 · {activeMoveRecord.notation}
               </span>
               {activeMoveRecord.bestAlternative && (
-                <span className="text-xs text-[#10B981] font-medium">
+                <span className="text-xs text-[var(--xq-accent-jade)] font-medium">
                   推荐正着：{activeMoveRecord.bestAlternative}
                 </span>
               )}

@@ -96,7 +96,7 @@ export const ChallengeWorkbench: React.FC<ChallengeWorkbenchProps> = React.memo(
         <div className="h-1.5 w-full rounded-full overflow-hidden bg-[var(--xq-bg-canvas)] border border-[var(--xq-border-subtle)]">
           <div
             style={{ width: `${completionPct}%` }}
-            className="h-full bg-[#10B981] transition-[width] duration-200"
+            className="h-full bg-[var(--xq-accent-jade)] transition-[width] duration-200"
           />
         </div>
 
@@ -224,7 +224,7 @@ export const ChallengeWorkbench: React.FC<ChallengeWorkbenchProps> = React.memo(
                         }}
                         title={isSolved ? '点击重置为未破关' : '手动标记为已破关'}
                         className={`flex items-center gap-1 text-xs cursor-pointer hover:underline ${
-                          isSolved ? 'text-[#10B981] font-semibold' : 'xq-text-muted'
+                          isSolved ? 'text-[var(--xq-accent-jade)] font-semibold' : 'xq-text-muted'
                         }`}
                       >
                         <CheckCircle2 className="w-3.5 h-3.5" />

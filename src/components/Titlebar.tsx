@@ -2,6 +2,7 @@ import React from 'react';
 import {
   BookOpen,
   Command,
+  Eye,
   FileCode2,
   Link2,
   Moon,
@@ -43,6 +44,13 @@ export const Titlebar: React.FC<TitlebarProps> = React.memo(({
     { id: 'setup', label: '摆子编辑' },
   ];
 
+  const themeTooltip =
+    appTheme === 'dark'
+      ? '当前：深色夜案（点击切换至清朗浅色）'
+      : appTheme === 'light'
+      ? '当前：清朗浅色（点击切换至温润护眼）'
+      : '当前：温润护眼（点击切换至深色夜案）';
+
   return (
     <header className="min-h-13 py-1.5 px-5 lg:px-6 border-b xq-surface flex items-center justify-between gap-4 xl:gap-8 select-none shrink-0 z-40">
       {/* Zone 1: 单行品牌印记 (Single-element Brand Wordmark) */}
@@ -54,7 +62,7 @@ export const Titlebar: React.FC<TitlebarProps> = React.memo(({
         }}
         className="font-serif-sc font-bold text-base tracking-wide xq-text-primary whitespace-nowrap shrink-0 flex items-center gap-2.5"
       >
-        <span className="w-6 h-6 rounded-md bg-[#C8372D] inline-flex items-center justify-center text-white text-xs font-bold shadow-xs">
+        <span className="w-6 h-6 rounded-md bg-[var(--xq-eval-red)] inline-flex items-center justify-center text-[#F6F1E7] text-xs font-bold shadow-xs">
           象
         </span>
         <span>象棋X</span>
@@ -113,14 +121,17 @@ export const Titlebar: React.FC<TitlebarProps> = React.memo(({
           }`}
         >
           {isConnected ? (
-            <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+            <span className="w-2 h-2 rounded-full bg-[#F4EFE2] animate-pulse" />
           ) : (
             <Link2 className="w-3.5 h-3.5 opacity-80" />
           )}
           <span>{isConnected ? '连线中' : '连线'}</span>
         </button>
 
-        <span className="w-px h-4 bg-[var(--xq-border)] mx-0.5 shrink-0" aria-hidden="true" />
+        <span
+          className="w-px h-4 bg-[var(--xq-border-subtle)] mx-0.5 shrink-0"
+          aria-hidden="true"
+        />
 
         <button
           type="button"
@@ -148,13 +159,16 @@ export const Titlebar: React.FC<TitlebarProps> = React.memo(({
         <button
           type="button"
           onClick={onToggleTheme}
-          title={appTheme === 'dark' ? '切换至浅色模式' : '切换至深色模式'}
+          title={themeTooltip}
+          aria-label={themeTooltip}
           className="p-1.5 rounded-md xq-btn-secondary cursor-pointer"
         >
           {appTheme === 'dark' ? (
+            <Moon className="w-4 h-4 text-[var(--xq-accent-gold)]" />
+          ) : appTheme === 'light' ? (
             <Sun className="w-4 h-4 text-[var(--xq-accent-gold)]" />
           ) : (
-            <Moon className="w-4 h-4 xq-text-secondary" />
+            <Eye className="w-4 h-4 text-[var(--xq-accent-jade)]" />
           )}
         </button>
 

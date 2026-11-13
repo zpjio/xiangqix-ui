@@ -80,8 +80,8 @@ export const SetupWorkbench: React.FC<SetupWorkbenchProps> = React.memo(({
         <div
           className={`px-2.5 py-1.5 rounded-md border flex items-center justify-between gap-2 ${
             isPositionValid
-              ? 'border-[#10B981]/35 bg-[#10B981]/10 text-[#10B981]'
-              : 'border-[#EF4444]/40 bg-[#EF4444]/10 text-[#EF4444]'
+              ? 'border-[var(--xq-accent-jade)]/35 bg-[var(--xq-accent-jade)]/10 text-[var(--xq-accent-jade)]'
+              : 'border-[var(--xq-accent-crimson)]/40 bg-[var(--xq-accent-crimson)]/10 text-[var(--xq-accent-crimson)]'
           }`}
         >
           <div className="flex items-center gap-1.5 font-medium">
@@ -133,12 +133,12 @@ export const SetupWorkbench: React.FC<SetupWorkbenchProps> = React.memo(({
                       disabled
                         ? 'opacity-40 cursor-not-allowed xq-border'
                         : isSelected
-                        ? 'border-[#C8372D] bg-[#C8372D]/15 cursor-pointer'
+                        ? 'border-[var(--xq-accent-crimson)] bg-[var(--xq-accent-crimson)]/14 cursor-pointer'
                         : 'xq-border hover:bg-[var(--xq-bg-hover)] cursor-pointer'
                     }`}
                   >
                     <div className="flex items-center gap-2">
-                      <span className="font-serif-sc font-bold text-[#A62222] bg-[#EAD2B0] w-6 h-6 rounded-full flex items-center justify-center border border-[#9E2A2B]/50 text-xs">
+                      <span className="font-serif-sc font-bold text-[var(--xq-engraved-red)] bg-[var(--xq-piece-boxwood-2)] w-6 h-6 rounded-full flex items-center justify-center border border-[var(--xq-engraved-red)]/45 text-xs">
                         {label}
                       </span>
                       <span className="font-medium xq-text-primary">
@@ -184,12 +184,12 @@ export const SetupWorkbench: React.FC<SetupWorkbenchProps> = React.memo(({
                       disabled
                         ? 'opacity-40 cursor-not-allowed xq-border'
                         : isSelected
-                        ? 'border-[#D4AF37] bg-[#D4AF37]/15 cursor-pointer'
+                        ? 'border-[var(--xq-accent-gold)] bg-[var(--xq-accent-gold)]/15 cursor-pointer'
                         : 'xq-border hover:bg-[var(--xq-bg-hover)] cursor-pointer'
                     }`}
                   >
                     <div className="flex items-center gap-2">
-                      <span className="font-serif-sc font-bold text-[#DFB654] bg-[#241E1B] w-6 h-6 rounded-full flex items-center justify-center border border-[#D4AF37]/40 text-xs">
+                      <span className="font-serif-sc font-bold text-[var(--xq-engraved-gold)] bg-[var(--xq-piece-ebony-2)] w-6 h-6 rounded-full flex items-center justify-center border border-[var(--xq-engraved-gold)]/45 text-xs">
                         {label}
                       </span>
                       <span className="font-medium xq-text-primary">
@@ -265,7 +265,7 @@ export const SetupWorkbench: React.FC<SetupWorkbenchProps> = React.memo(({
           >
             {copiedFen ? (
               <>
-                <Check className="w-3 h-3 text-[#10B981]" />
+                <Check className="w-3 h-3 text-[var(--xq-accent-jade)]" />
                 <span>已复制</span>
               </>
             ) : (

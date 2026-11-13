@@ -226,7 +226,13 @@ export default function App() {
   const initialStudy = useMemo(() => readStoredStudySession(), []);
 
   // ==================== 1. 全局外观与主题状态 ====================
-  const [appTheme, setAppTheme] = useState<AppTheme>(initialPrefs.appTheme || 'dark');
+  const [appTheme, setAppTheme] = useState<AppTheme>(() =>
+    initialPrefs.appTheme === 'light' ||
+    initialPrefs.appTheme === 'eyecare' ||
+    initialPrefs.appTheme === 'dark'
+      ? initialPrefs.appTheme
+      : 'dark'
+  );
   const [fontScale, setFontScale] = useState<FontScale>(initialPrefs.fontScale || 'standard');
   const [soundEnabled, setSoundEnabled] = useState<boolean>(
     initialPrefs.soundEnabled ?? true
@@ -2092,7 +2098,10 @@ export default function App() {
   // 稳定回调引用：配合 React.memo 子组件避免无效重渲染
   const handleToggleSound = useCallback(() => setSoundEnabled((prev) => !prev), []);
   const handleToggleTheme = useCallback(
-    () => setAppTheme((prev) => (prev === 'dark' ? 'light' : 'dark')),
+    () =>
+      setAppTheme((prev) =>
+        prev === 'dark' ? 'light' : prev === 'light' ? 'eyecare' : 'dark'
+      ),
     []
   );
   const handleToggleCompareMode = useCallback(() => setCompareMode((prev) => !prev), []);
@@ -2784,6 +2793,7 @@ export default function App() {
                     : '新开一局'
                 }
                 boardTheme={boardTheme}
+                appTheme={appTheme}
                 craftStyle={craftStyle}
                 fontScheme={fontScheme}
                 useTraditionalChar={useTraditionalChar}

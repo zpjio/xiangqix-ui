@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { ArrowRightCircle, RotateCcw, X } from 'lucide-react';
 import {
+  AppTheme,
   BoardTheme,
   Camp,
   CheckAttackLine,
@@ -48,6 +49,7 @@ interface BoardProps {
   onTerminalRestartAction?: () => void;
   terminalRestartLabel?: string;
   boardTheme: BoardTheme;
+  appTheme?: AppTheme;
   craftStyle: PieceCraftStyle;
   fontScheme: FontScheme;
   useTraditionalChar: boolean;
@@ -61,50 +63,115 @@ const STEP = 95;
 const OFFSET_X = 70;
 const OFFSET_Y = 72;
 
-const THEME_PALETTES: Record<
-  BoardTheme,
-  {
-    surfaceStart: string;
-    surfaceMid: string;
-    surfaceEnd: string;
-    inkLine: string;
-    riverText: string;
-    sealRed: string;
-    coordText: string;
-    frameClass: string;
+interface BoardSurfacePalette {
+  surfaceStart: string;
+  surfaceMid: string;
+  surfaceEnd: string;
+  inkLine: string;
+  riverText: string;
+  sealRed: string;
+  frameClass: string;
+}
+
+function getBoardSurfacePalette(
+  boardTheme: BoardTheme,
+  appTheme: AppTheme
+): BoardSurfacePalette {
+  if (boardTheme === 'xuan-rosewood') {
+    if (appTheme === 'eyecare') {
+      return {
+        surfaceStart: '#D2BA91',
+        surfaceMid: '#C8AF84',
+        surfaceEnd: '#B89C6D',
+        inkLine: '#2D2821',
+        riverText: '#3A3126',
+        sealRed: '#962B28',
+        frameClass: 'zitan-board-frame border-[#614737]',
+      };
+    }
+    if (appTheme === 'dark') {
+      return {
+        surfaceStart: '#D2BA91',
+        surfaceMid: '#C6AB7D',
+        surfaceEnd: '#B49565',
+        inkLine: '#28201B',
+        riverText: '#372920',
+        sealRed: '#962B28',
+        frameClass: 'zitan-board-frame border-[#543828]',
+      };
+    }
+    return {
+      surfaceStart: '#DEC8A1',
+      surfaceMid: '#D3B88B',
+      surfaceEnd: '#C2A271',
+      inkLine: '#2B221C',
+      riverText: '#3A2B21',
+      sealRed: '#962B28',
+      frameClass: 'zitan-board-frame border-[#5B3E2D]',
+    };
   }
-> = {
-  'xuan-rosewood': {
-    surfaceStart: '#E6D2B0',
-    surfaceMid: '#DBC299',
-    surfaceEnd: '#C8AA7A',
-    inkLine: '#2B221C',
-    riverText: '#3A2B21',
-    sealRed: '#9E2A2B',
-    coordText: '#C5A880',
-    frameClass: 'zitan-board-frame border-[#543828]',
-  },
-  'imperial-lacquer': {
-    surfaceStart: '#231614',
-    surfaceMid: '#1A100E',
-    surfaceEnd: '#120A09',
-    inkLine: '#C8A252',
-    riverText: '#D4AF37',
-    sealRed: '#B83227',
-    coordText: '#D4AF37',
-    frameClass: 'bg-[#140B09] border-[#6E5225] shadow-[0_18px_36px_rgba(0,0,0,0.85)]',
-  },
-  'song-celadon': {
-    surfaceStart: '#DCE3DC',
-    surfaceMid: '#CBD5CC',
-    surfaceEnd: '#B5C3B7',
+
+  if (boardTheme === 'imperial-lacquer') {
+    if (appTheme === 'eyecare' || appTheme === 'light') {
+      return {
+        surfaceStart: '#2A1D19',
+        surfaceMid: '#211613',
+        surfaceEnd: '#19100E',
+        inkLine: '#C6A358',
+        riverText: '#CFA952',
+        sealRed: '#A3332C',
+        frameClass:
+          'bg-[#1D1310] border-[#6B5129] shadow-[var(--xq-frame-shadow)]',
+      };
+    }
+    return {
+      surfaceStart: '#231715',
+      surfaceMid: '#1B110F',
+      surfaceEnd: '#140C0B',
+      inkLine: '#C49F52',
+      riverText: '#CFA952',
+      sealRed: '#A8332B',
+      frameClass:
+        'bg-[#160E0C] border-[#664C24] shadow-[var(--xq-frame-shadow)]',
+    };
+  }
+
+  // 'song-celadon'
+  if (appTheme === 'eyecare') {
+    return {
+      surfaceStart: '#C9CEBE',
+      surfaceMid: '#BCC3B1',
+      surfaceEnd: '#AAB39E',
+      inkLine: '#2A3126',
+      riverText: '#313B2C',
+      sealRed: '#962B28',
+      frameClass:
+        'bg-[#293129] border-[#526052] shadow-[var(--xq-frame-shadow)]',
+    };
+  }
+  if (appTheme === 'dark') {
+    return {
+      surfaceStart: '#C2CDC3',
+      surfaceMid: '#B4C1B5',
+      surfaceEnd: '#A1B0A3',
+      inkLine: '#243028',
+      riverText: '#2C3B31',
+      sealRed: '#962B28',
+      frameClass:
+        'bg-[#1E2621] border-[#425247] shadow-[var(--xq-frame-shadow)]',
+    };
+  }
+  return {
+    surfaceStart: '#CFD8CF',
+    surfaceMid: '#C2CEC3',
+    surfaceEnd: '#B0BEB2',
     inkLine: '#243028',
     riverText: '#2C3B31',
-    sealRed: '#9E2A2B',
-    coordText: '#BCC7BE',
-    frameClass: 'bg-[#1E2621] border-[#425247] shadow-[0_18px_36px_rgba(0,0,0,0.8)]',
-  },
-};
+    sealRed: '#962B28',
+    frameClass:
+      'bg-[#242D27] border-[#4B5C50] shadow-[var(--xq-frame-shadow)]',
+  };
+}
 
 const FIDUCIAL_POSITIONS: [number, number][] = [
   [2, 1],
@@ -194,9 +261,12 @@ const ImpactDustBurst: React.FC<{ camp: Camp; isCapture: boolean; effectId: numb
 };
 
 /* ==================== 第 1 层：静态盘面纹理与网格 SVG（独立缓存，隔离 feTurbulence 重栅格化） ==================== */
-const StaticBoardSurface: React.FC<{ boardTheme: BoardTheme; flipped: boolean }> = React.memo(
-  ({ boardTheme, flipped }) => {
-    const themeColors = THEME_PALETTES[boardTheme];
+const StaticBoardSurface: React.FC<{
+  boardTheme: BoardTheme;
+  appTheme: AppTheme;
+  flipped: boolean;
+}> = React.memo(({ boardTheme, appTheme, flipped }) => {
+  const themeColors = getBoardSurfacePalette(boardTheme, appTheme);
     const topNumerals = flipped ? [...RED_ROAD_NUMERALS].reverse() : BLACK_ROAD_NUMERALS;
     const bottomNumerals = flipped ? [...BLACK_ROAD_NUMERALS].reverse() : RED_ROAD_NUMERALS;
 
@@ -562,7 +632,7 @@ const DynamicArrowLayer: React.FC<{
               x="0"
               y="5"
               textAnchor="middle"
-              fill="#FAF5EB"
+              fill="#F4EFE2"
               className="font-mono-tabular text-[13px] font-semibold"
             >
               {arrow.scoreText}
@@ -588,7 +658,7 @@ const DynamicArrowLayer: React.FC<{
             markerHeight="5.5"
             orient="auto-start-reverse"
           >
-            <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#10B981" fillOpacity="0.95" />
+            <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="var(--xq-accent-jade)" fillOpacity="0.92" />
           </marker>
           <marker
             id="arrow-secondary"
@@ -610,7 +680,7 @@ const DynamicArrowLayer: React.FC<{
             markerHeight="5.5"
             orient="auto-start-reverse"
           >
-            <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#D93829" fillOpacity="0.95" />
+            <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#C93A2E" fillOpacity="0.92" />
           </marker>
           <marker
             id="arrow-ghost"
@@ -621,7 +691,7 @@ const DynamicArrowLayer: React.FC<{
             markerHeight="5.5"
             orient="auto-start-reverse"
           >
-            <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#D4AF37" fillOpacity="0.95" />
+            <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#CFA952" fillOpacity="0.92" />
           </marker>
           <marker
             id="arrow-compare-secondary"
@@ -632,7 +702,7 @@ const DynamicArrowLayer: React.FC<{
             markerHeight="5.5"
             orient="auto-start-reverse"
           >
-            <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#3B82F6" fillOpacity="0.95" />
+            <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="var(--xq-accent-azure)" fillOpacity="0.92" />
           </marker>
         </defs>
 
@@ -715,7 +785,7 @@ const DynamicArrowLayer: React.FC<{
           renderSvgArrow(
             arrow,
             `pv-arrow-${arrow.rank}`,
-            arrow.rank === 1 ? '#10B981' : '#B87D1E',
+            arrow.rank === 1 ? 'var(--xq-accent-jade)' : '#B87D1E',
             arrow.rank === 1 ? 'arrow-primary' : 'arrow-secondary',
             arrow.rank !== 1,
             arrow.isConsensus ? '14' : arrow.rank === 1 ? '13' : '7.5',
@@ -728,7 +798,7 @@ const DynamicArrowLayer: React.FC<{
           renderSvgArrow(
             secondaryPvArrow,
             'secondary-engine-arrow',
-            '#3B82F6',
+            'var(--xq-accent-azure)',
             'arrow-compare-secondary',
             false,
             '11.5',
@@ -737,15 +807,15 @@ const DynamicArrowLayer: React.FC<{
 
         {/* 对手威胁雷达箭头 */}
         {threatArrow &&
-          renderSvgArrow(threatArrow, 'threat-arrow', '#D93829', 'arrow-threat', true, '10')}
+          renderSvgArrow(threatArrow, 'threat-arrow', '#C93A2E', 'arrow-threat', true, '10')}
 
         {/* 锦囊提示箭头 */}
         {hintArrow &&
-          renderSvgArrow(hintArrow, 'hint-arrow', '#D4AF37', 'arrow-ghost', false, '14')}
+          renderSvgArrow(hintArrow, 'hint-arrow', '#CFA952', 'arrow-ghost', false, '14')}
 
         {/* 悬停幽灵预览箭头 */}
         {hoveredArrow &&
-          renderSvgArrow(hoveredArrow, 'hovered-arrow', '#D4AF37', 'arrow-ghost', false, '14')}
+          renderSvgArrow(hoveredArrow, 'hovered-arrow', '#CFA952', 'arrow-ghost', false, '14')}
       </svg>
     );
   }
@@ -817,10 +887,10 @@ const IntersectionCell: React.FC<{
           >
             {isLegalTarget ? (
               <span className="relative flex items-center justify-center w-5 h-5">
-                <span className="w-3.5 h-3.5 rounded-full bg-[#3E6B52] border border-[#D4AF37] shadow-[0_0_8px_rgba(62,107,82,0.85)] transition-transform group-hover:scale-125" />
+                <span className="w-3.5 h-3.5 rounded-full bg-[#3A684F] border border-[#CFA952] shadow-[0_0_6px_rgba(58,104,79,0.68)] transition-transform group-hover:scale-125" />
               </span>
             ) : (
-              <span className="w-2 h-2 rounded-full bg-transparent group-hover:bg-[#9E2A2B]/25 transition-colors" />
+              <span className="w-2 h-2 rounded-full bg-transparent group-hover:bg-[#962B28]/25 transition-colors" />
             )}
           </button>
         )}
@@ -887,6 +957,7 @@ export const Board: React.FC<BoardProps> = React.memo(
     onTerminalRestartAction,
     terminalRestartLabel = '重开一局',
     boardTheme,
+    appTheme = 'dark',
     craftStyle,
     fontScheme,
     useTraditionalChar,
@@ -895,7 +966,7 @@ export const Board: React.FC<BoardProps> = React.memo(
     isVariationActive = false,
     onSelectIntersection,
   }) => {
-    const themeColors = THEME_PALETTES[boardTheme];
+    const themeColors = getBoardSurfacePalette(boardTheme, appTheme);
 
     const boardGrid = useMemo(() => buildBoardGrid(pieces), [pieces]);
 
@@ -923,11 +994,11 @@ export const Board: React.FC<BoardProps> = React.memo(
     const anyCheckPos = redCheckPos || blackCheckPos;
 
     const modeRimClass = isVariationActive
-      ? 'ring-2 ring-[#D4AF37] shadow-[0_0_24px_rgba(212,175,55,0.28)]'
+      ? 'ring-2 ring-[#CFA952] shadow-[0_0_18px_rgba(207,169,82,0.22)]'
       : workspace === 'challenge'
-      ? 'ring-1 ring-[#C8372D]/60'
+      ? 'ring-1 ring-[#B83A32]/50'
       : workspace === 'setup'
-      ? 'ring-2 ring-[#C87D3B]'
+      ? 'ring-2 ring-[#BD7738]'
       : '';
 
     const verticalReserve = workspace === 'setup' ? '4.75rem' : '8.5rem';
@@ -946,10 +1017,10 @@ export const Board: React.FC<BoardProps> = React.memo(
             className={`relative rounded-xl p-2 sm:p-2.5 border-2 transition-all duration-200 ${themeColors.frameClass} ${modeRimClass}`}
           >
             {/* 四个传统黄铜回纹包角 */}
-            <span className="absolute top-1.5 left-1.5 w-4 h-4 border-t-2 border-l-2 border-[#D4AF37]/50 pointer-events-none" />
-            <span className="absolute top-1.5 right-1.5 w-4 h-4 border-t-2 border-r-2 border-[#D4AF37]/50 pointer-events-none" />
-            <span className="absolute bottom-1.5 left-1.5 w-4 h-4 border-b-2 border-l-2 border-[#D4AF37]/50 pointer-events-none" />
-            <span className="absolute bottom-1.5 right-1.5 w-4 h-4 border-b-2 border-r-2 border-[#D4AF37]/50 pointer-events-none" />
+            <span className="absolute top-1.5 left-1.5 w-4 h-4 border-t-2 border-l-2 border-[#CFA952]/45 pointer-events-none" />
+            <span className="absolute top-1.5 right-1.5 w-4 h-4 border-t-2 border-r-2 border-[#CFA952]/45 pointer-events-none" />
+            <span className="absolute bottom-1.5 left-1.5 w-4 h-4 border-b-2 border-l-2 border-[#CFA952]/45 pointer-events-none" />
+            <span className="absolute bottom-1.5 right-1.5 w-4 h-4 border-b-2 border-r-2 border-[#CFA952]/45 pointer-events-none" />
 
             {/* 终局或将军角标（绝杀收起后可点按再现） */}
             {terminalOutcome ? (
@@ -957,14 +1028,14 @@ export const Board: React.FC<BoardProps> = React.memo(
                 type="button"
                 onClick={onRestoreTerminal}
                 title="点击查看终局结果卡片"
-                className="absolute top-3 right-4 z-40 px-2.5 py-0.5 rounded bg-[#9E2A2B] text-[#FAF5EB] text-xs font-serif-sc font-bold tracking-widest shadow-lg border border-[#D4AF37]/75 cursor-pointer hover:bg-[#B83227] transition-colors"
+                className="absolute top-3 right-4 z-40 px-2.5 py-0.5 rounded bg-[#962B28] text-[#F4EFE2] text-xs font-serif-sc font-bold tracking-widest shadow-md border border-[#CFA952]/65 cursor-pointer hover:bg-[#AA332E] transition-colors"
               >
                 {terminalOutcome.kind === 'checkmate' ? '絕殺' : '困斃'} ·{' '}
                 {terminalOutcome.winner === 'red' ? '紅勝' : '黑勝'}
               </button>
             ) : (
               anyCheckPos && (
-                <div className="absolute top-3 right-4 z-40 px-2.5 py-0.5 rounded bg-[#C8372D] text-[#FAF5EB] text-xs font-serif-sc font-bold tracking-widest shadow-lg border border-[#D4AF37]/60 pointer-events-none">
+                <div className="absolute top-3 right-4 z-40 px-2.5 py-0.5 rounded bg-[#B83A32] text-[#F4EFE2] text-xs font-serif-sc font-bold tracking-widest shadow-md border border-[#CFA952]/55 pointer-events-none">
                   將軍
                 </div>
               )
@@ -972,14 +1043,18 @@ export const Board: React.FC<BoardProps> = React.memo(
 
             {/* 内联推演支线激活提示角标 */}
             {isVariationActive && (
-              <div className="absolute top-3 left-4 z-40 px-2 py-0.5 rounded bg-[#D4AF37] text-[#18120E] text-xs font-semibold shadow pointer-events-none">
+              <div className="absolute top-3 left-4 z-40 px-2 py-0.5 rounded bg-[#CFA952] text-[#18120E] text-xs font-semibold shadow pointer-events-none">
                 推演分支中
               </div>
             )}
 
             {/* 内部盘面画布 (宽高比 9:10，提供 inline-size 容器以供棋子刻字等比缩放) */}
             <div className="relative w-full aspect-[9/10] rounded-lg overflow-hidden shadow-inner [container-type:inline-size]">
-              <StaticBoardSurface boardTheme={boardTheme} flipped={flipped} />
+              <StaticBoardSurface
+                boardTheme={boardTheme}
+                appTheme={appTheme}
+                flipped={flipped}
+              />
 
               <DynamicArrowLayer
                 flipped={flipped}
@@ -999,11 +1074,11 @@ export const Board: React.FC<BoardProps> = React.memo(
                   aria-hidden="true"
                   className="absolute top-[15%] left-1/2 -translate-x-1/2 z-40 pointer-events-none"
                 >
-                  <div className="animate-check-seal px-5 py-2 rounded-lg border-2 border-[#D4AF37]/80 bg-[#8F1D19]/92 shadow-[0_12px_28px_rgba(0,0,0,0.65)] flex flex-col items-center gap-0.5">
-                    <span className="font-calligraphy text-3xl sm:text-4xl leading-none tracking-[0.22em] text-[#FAF5EB] drop-shadow">
+                  <div className="animate-check-seal px-5 py-2 rounded-lg border-2 border-[#CFA952]/75 bg-[#8B2420]/92 shadow-[0_10px_24px_rgba(16,12,8,0.52)] flex flex-col items-center gap-0.5">
+                    <span className="font-calligraphy text-3xl sm:text-4xl leading-none tracking-[0.22em] text-[#F4EFE2] drop-shadow">
                       將軍
                     </span>
-                    <span className="text-xs font-serif-sc tracking-widest text-[#F5D68A]">
+                    <span className="text-xs font-serif-sc tracking-widest text-[#EED38A]">
                       {checkSealEffect.camp === 'red' ? '紅帥受將 · 須應將' : '黑將受將 · 須應將'}
                     </span>
                   </div>
@@ -1013,23 +1088,23 @@ export const Board: React.FC<BoardProps> = React.memo(
               {/* 将死 / 绝杀 / 困毙 终局印章（支持自由收起查看棋盘与一键复盘/重开） */}
               {terminalOutcome && !terminalDismissed && (
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 w-[min(90%,21rem)] pointer-events-auto">
-                  <div className="animate-endgame-seal relative rounded-xl border-2 border-[#D4AF37]/80 bg-[#17110F]/94 px-5 py-4 text-center shadow-[0_22px_50px_rgba(0,0,0,0.82)]">
+                  <div className="animate-endgame-seal relative rounded-xl border-2 border-[#CFA952]/75 bg-[#1B1613]/94 px-5 py-4 text-center shadow-[0_18px_42px_rgba(12,10,8,0.68)]">
                     {onDismissTerminal && (
                       <button
                         type="button"
                         onClick={onDismissTerminal}
                         title="收起印章继续查看棋盘"
-                        className="absolute top-2.5 right-2.5 p-1 rounded-md text-[#C5A880] hover:text-[#FAF5EB] hover:bg-white/10 cursor-pointer transition-colors"
+                        className="absolute top-2.5 right-2.5 p-1 rounded-md text-[#C5A880] hover:text-[#F4EFE2] hover:bg-white/10 cursor-pointer transition-colors"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
                     )}
 
-                    <div className="inline-flex items-center justify-center px-3 py-0.5 rounded border border-[#D4AF37]/50 bg-[#9E2A2B]/90 font-calligraphy text-2xl tracking-[0.25em] text-[#FAF5EB] mb-2">
+                    <div className="inline-flex items-center justify-center px-3 py-0.5 rounded border border-[#CFA952]/50 bg-[#962B28]/90 font-calligraphy text-2xl tracking-[0.25em] text-[#F4EFE2] mb-2">
                       {terminalOutcome.kind === 'checkmate' ? '絕殺' : '困斃'}
                     </div>
 
-                    <div className="text-base font-serif-sc font-bold text-[#FAF5EB]">
+                    <div className="text-base font-serif-sc font-bold text-[#F4EFE2]">
                       {terminalOutcome.winner === 'red' ? '红方获胜' : '黑方获胜'}
                     </div>
                     <p className="mt-1 text-[0.8125rem] text-[#C5A880]">

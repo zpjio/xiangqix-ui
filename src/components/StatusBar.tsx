@@ -69,7 +69,9 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({
     <footer className="min-h-8 py-1 px-6 border-t xq-surface flex items-center justify-between gap-3 text-xs select-none shrink-0">
       <div className="flex items-center gap-3 min-w-0">
         {illegalMoveWarning ? (
-          <span className="font-semibold text-[#F59E0B] truncate">{illegalMoveWarning}</span>
+          <span className="font-semibold text-[var(--xq-accent-amber)] truncate">
+            {illegalMoveWarning}
+          </span>
         ) : (
           <span className="font-medium xq-text-secondary truncate">{getWorkspaceLabel()}</span>
         )}
@@ -86,7 +88,7 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({
         {terminalOutcome ? (
           <>
             <span aria-hidden="true">·</span>
-            <span className="text-[#EF4444] font-semibold">
+            <span className="text-[var(--xq-accent-crimson)] font-semibold">
               {terminalOutcome.winner === 'red' ? '红胜' : '黑胜'} ·{' '}
               {terminalOutcome.kind === 'checkmate' ? '绝杀' : '困毙'}
             </span>
@@ -95,7 +97,7 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({
           inCheckCamp && (
             <>
               <span aria-hidden="true">·</span>
-              <span className="text-[#EF4444] font-semibold">
+              <span className="text-[var(--xq-accent-crimson)] font-semibold">
                 {inCheckCamp === 'red' ? '红帅受将 · 须先应将' : '黑将受将 · 须先应将'}
               </span>
             </>

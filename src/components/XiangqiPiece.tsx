@@ -55,12 +55,12 @@ export const XiangqiPiece: React.FC<XiangqiPieceProps> = React.memo(({
 
   const getRingStrokeColor = (camp: Camp, style: PieceCraftStyle) => {
     if (style === 'boxwood-ebony') {
-      return camp === 'red' ? '#9E2A2B' : '#D4AF37';
+      return camp === 'red' ? 'var(--xq-piece-ring-red)' : 'var(--xq-piece-ring-gold)';
     }
     if (style === 'ebony-gilt') {
-      return camp === 'red' ? '#E05342' : '#D4AF37';
+      return camp === 'red' ? 'var(--xq-piece-ring-crimson)' : 'var(--xq-piece-ring-gold)';
     }
-    return camp === 'red' ? '#A62626' : '#292524';
+    return camp === 'red' ? 'var(--xq-piece-ring-red)' : 'var(--xq-piece-ring-ink)';
   };
 
   const getFontClass = (scheme: FontScheme) => {
@@ -86,19 +86,19 @@ export const XiangqiPiece: React.FC<XiangqiPieceProps> = React.memo(({
       type="button"
       onClick={handleClick}
       aria-label={`${isRed ? '红方' : '黑方'}${char}`}
-      className={`group relative rounded-full select-none cursor-pointer flex items-center justify-center transition-transform duration-150 ease-out focus-visible:outline-2 focus-visible:outline-[#D4AF37] ${sizeClass} ${getSurfaceClass(
+      className={`group relative rounded-full select-none cursor-pointer flex items-center justify-center transition-transform duration-150 ease-out focus-visible:outline-2 focus-visible:outline-[var(--xq-accent-gold)] ${sizeClass} ${getSurfaceClass(
         piece.camp,
         craftStyle
       )} ${
         isSelected
-          ? '-translate-y-1.5 scale-110 ring-2 ring-[#D4AF37] shadow-[0_14px_24px_rgba(0,0,0,0.85)] z-30'
+          ? '-translate-y-1.5 scale-110 ring-2 ring-[#CFA952] shadow-[0_10px_18px_rgba(20,14,8,0.48)] z-30'
           : 'hover:-translate-y-0.5 active:translate-y-0 z-10'
       } ${isAlertShaking ? 'animate-illegal-shake' : ''}`}
     >
       {/* 上一步落子微光光环 */}
       {isLastMove && !isSelected && (
         <span
-          className="absolute -inset-1 rounded-full border border-[#D4AF37]/80 pointer-events-none"
+          className="absolute -inset-1 rounded-full border border-[#CFA952]/75 pointer-events-none"
           aria-hidden="true"
         />
       )}
@@ -106,7 +106,7 @@ export const XiangqiPiece: React.FC<XiangqiPieceProps> = React.memo(({
       {/* 将军状态朱砂警示环 */}
       {isInCheck && (
         <span
-          className="absolute -inset-1.5 rounded-full border-2 border-[#E03126] shadow-[0_0_16px_rgba(224,49,38,0.9)] pointer-events-none"
+          className="absolute -inset-1.5 rounded-full border-2 border-[#C8372D] shadow-[0_0_12px_rgba(200,55,45,0.68)] pointer-events-none"
           aria-hidden="true"
         />
       )}
@@ -124,8 +124,8 @@ export const XiangqiPiece: React.FC<XiangqiPieceProps> = React.memo(({
           fill="none"
           stroke={
             isRed && craftStyle !== 'ebony-gilt'
-              ? 'rgba(255,250,240,0.5)'
-              : 'rgba(255,255,255,0.14)'
+              ? 'var(--xq-piece-svg-outer-red)'
+              : 'var(--xq-piece-svg-outer-dark)'
           }
           strokeWidth="1"
         />
@@ -136,7 +136,7 @@ export const XiangqiPiece: React.FC<XiangqiPieceProps> = React.memo(({
           fill="none"
           stroke={ringColor}
           strokeWidth="2.2"
-          strokeOpacity="0.88"
+          strokeOpacity="0.86"
         />
 
         {isRed ? (

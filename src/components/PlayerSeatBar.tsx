@@ -29,8 +29,8 @@ export const PlayerSeatBar: React.FC<PlayerSeatBarProps> = React.memo(({
         <span
           className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold border shrink-0 ${
             isRed
-              ? 'bg-[#C8372D]/12 text-[#EF4444] border-[#C8372D]/40'
-              : 'bg-zinc-800/80 text-zinc-200 border-zinc-600/50'
+              ? 'bg-[var(--xq-accent-crimson)]/12 text-[var(--xq-accent-crimson)] border-[var(--xq-accent-crimson)]/40'
+              : 'bg-[var(--xq-eval-black)] text-[#EFE6D8] border-[var(--xq-border-strong)]'
           }`}
         >
           {isRed ? '红' : '黑'}
@@ -61,7 +61,7 @@ export const PlayerSeatBar: React.FC<PlayerSeatBarProps> = React.memo(({
         )}
 
         {isInCheck && (
-          <span className="px-1.5 py-0.5 rounded bg-[#C8372D] text-white text-xs font-semibold whitespace-nowrap">
+          <span className="px-1.5 py-0.5 rounded bg-[var(--xq-eval-red)] text-[#F4EFE2] text-xs font-semibold whitespace-nowrap">
             将军
           </span>
         )}
@@ -69,7 +69,7 @@ export const PlayerSeatBar: React.FC<PlayerSeatBarProps> = React.memo(({
         {isTurn && (
           <span
             className={`text-xs font-semibold whitespace-nowrap ${
-              isRed ? 'text-[#EF4444]' : 'text-[var(--xq-accent-gold)]'
+              isRed ? 'text-[var(--xq-accent-crimson)]' : 'text-[var(--xq-accent-gold)]'
             }`}
           >
             行棋中
