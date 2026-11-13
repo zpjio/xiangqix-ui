@@ -27,7 +27,7 @@ interface BoardNavProps {
   onTriggerHint: () => void;
 }
 
-export const BoardNav: React.FC<BoardNavProps> = ({
+export const BoardNav: React.FC<BoardNavProps> = React.memo(({
   workspace,
   currentPly,
   totalPlies,
@@ -165,4 +165,4 @@ export const BoardNav: React.FC<BoardNavProps> = ({
       </div>
     </div>
   );
-};
+});

@@ -34,7 +34,7 @@ const PIECE_QUOTA: { type: PieceType; max: number }[] = [
   { type: 'general', max: 1 },
 ];
 
-export const SetupWorkbench: React.FC<SetupWorkbenchProps> = ({
+export const SetupWorkbench: React.FC<SetupWorkbenchProps> = React.memo(({
   pieces,
   useTraditionalChar,
   setupSelectedTemplate,
@@ -292,4 +292,4 @@ export const SetupWorkbench: React.FC<SetupWorkbenchProps> = ({
       </div>
     </div>
   );
-};
+});

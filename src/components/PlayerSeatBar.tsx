@@ -11,7 +11,7 @@ interface PlayerSeatBarProps {
   onEditGameInfo?: () => void;
 }
 
-export const PlayerSeatBar: React.FC<PlayerSeatBarProps> = ({
+export const PlayerSeatBar: React.FC<PlayerSeatBarProps> = React.memo(({
   camp,
   playerName,
   subtitle,
@@ -80,4 +80,4 @@ export const PlayerSeatBar: React.FC<PlayerSeatBarProps> = ({
       </div>
     </div>
   );
-};
+});

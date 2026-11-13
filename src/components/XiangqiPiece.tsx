@@ -11,10 +11,11 @@ interface XiangqiPieceProps {
   fontScheme: FontScheme;
   useTraditionalChar: boolean;
   onClick?: () => void;
+  onSelectIntersection?: (row: number, col: number) => void;
   sizeClass?: string;
 }
 
-export const XiangqiPiece: React.FC<XiangqiPieceProps> = ({
+export const XiangqiPiece: React.FC<XiangqiPieceProps> = React.memo(({
   piece,
   isSelected = false,
   isLastMove = false,
@@ -23,6 +24,7 @@ export const XiangqiPiece: React.FC<XiangqiPieceProps> = ({
   fontScheme,
   useTraditionalChar,
   onClick,
+  onSelectIntersection,
   sizeClass = 'w-full h-full',
 }) => {
   const isRed = piece.camp === 'red';
@@ -69,10 +71,18 @@ export const XiangqiPiece: React.FC<XiangqiPieceProps> = ({
   const isGeneral = piece.type === 'general';
   const octagonPoints = '50,12 77,23 88,50 77,77 50,88 23,77 12,50 23,23';
 
+  const handleClick = () => {
+    if (onSelectIntersection) {
+      onSelectIntersection(piece.row, piece.col);
+    } else {
+      onClick?.();
+    }
+  };
+
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={handleClick}
       aria-label={`${isRed ? '红方' : '黑方'}${char}`}
       className={`group relative rounded-full select-none cursor-pointer flex items-center justify-center transition-transform duration-150 ease-out focus-visible:outline-2 focus-visible:outline-[#D4AF37] ${sizeClass} ${getSurfaceClass(
         piece.camp,
@@ -192,4 +202,4 @@ export const XiangqiPiece: React.FC<XiangqiPieceProps> = ({
       </span>
     </button>
   );
-};
+});

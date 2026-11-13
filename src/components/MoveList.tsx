@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import {
   BookOpen,
   Check,
@@ -31,7 +31,7 @@ interface MoveListProps {
   onDisconnectExternal?: () => void;
 }
 
-export const MoveList: React.FC<MoveListProps> = ({
+export const MoveList: React.FC<MoveListProps> = React.memo(({
   mainMoves,
   variationMoves,
   branchOriginPly,
@@ -67,26 +67,28 @@ export const MoveList: React.FC<MoveListProps> = ({
   };
 
   // 将单列手数配对为「红黑双栏回合行」(Round 1: ply 1 Red + ply 2 Black)
-  const rounds: {
-    roundNumber: number;
-    redMove?: MoveRecord;
-    blackMove?: MoveRecord;
-  }[] = [];
-
-  for (let i = 0; i < mainMoves.length; i += 2) {
-    rounds.push({
-      roundNumber: Math.floor(i / 2) + 1,
-      redMove: mainMoves[i],
-      blackMove: mainMoves[i + 1],
-    });
-  }
+  const rounds = useMemo(() => {
+    const list: {
+      roundNumber: number;
+      redMove?: MoveRecord;
+      blackMove?: MoveRecord;
+    }[] = [];
+    for (let i = 0; i < mainMoves.length; i += 2) {
+      list.push({
+        roundNumber: Math.floor(i / 2) + 1,
+        redMove: mainMoves[i],
+        blackMove: mainMoves[i + 1],
+      });
+    }
+    return list;
+  }, [mainMoves]);
 
   const activeMoveList = variationMoves || mainMoves;
   const activeMoveRecord = currentPly > 0 ? activeMoveList[currentPly - 1] : null;
   const activeRowRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    activeRowRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    activeRowRef.current?.scrollIntoView({ block: 'nearest', behavior: 'auto' });
   }, [currentPly]);
 
   return (
@@ -413,4 +415,4 @@ export const MoveList: React.FC<MoveListProps> = ({
       </div>
     </div>
   );
-};
+});

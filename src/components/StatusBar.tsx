@@ -17,7 +17,7 @@ interface StatusBarProps {
   advantageSummary: string;
 }
 
-export const StatusBar: React.FC<StatusBarProps> = ({
+export const StatusBar: React.FC<StatusBarProps> = React.memo(({
   workspace,
   isAnalyzing,
   compareMode = false,
@@ -79,4 +79,4 @@ export const StatusBar: React.FC<StatusBarProps> = ({
       </div>
     </footer>
   );
-};
+});

@@ -44,8 +44,9 @@
      - `导入 FEN / 识盘`（打开导入/图片识别弹窗）；
      - `打开棋谱库`（浏览历史或收藏对局）。
 2. **本地持久化（`localStorage`）**
-   - **复盘会话 (`xiangqix_study_session_v1`)**：仅当 `workspace === 'study'` 时自动保存，包含当前盘面 `pieces`、基准起点盘面 `basePieces`、基准先行方 `baseTurn`、主谱 `mainMoves`、支线 `variationMoves`、分叉点 `branchOriginPly`、当前手数 `currentPly`、当前行棋方 `turn`、对局元数据 `metadata`、棋盘翻转状态 `flipped`。
+   - **复盘会话 (`xiangqix_study_session_v1`)**：仅当 `workspace === 'study'` 时自动保存，包含当前盘面 `pieces`、基准起点盘面 `basePieces`、基准先行方 `baseTurn`、主谱 `mainMoves`、支线 `variationMoves`、分叉点 `branchOriginPly`、当前手数 `currentPly`、当前行棋方 `turn`、对局元数据 `metadata`、棋盘翻转状态 `flipped`。为避免快速步进或自动回放期间频繁同步序列化阻塞主线程，写入采用 **`350ms` 防抖调度**，并在切换离开 `study` 工作台、触发 `pagehide` / `beforeunload` 或组件卸载时立即同步落盘。
    - **全局偏好 (`xiangqix_prefs_v1`)**：保存主题、字号、音效、棋盘/棋子工艺、简繁字形、主/副引擎 ID、双擎对比开关、MultiPV 条数、深度、线程数、Hash 内存等配置。
+   - **按需延迟初始化**：示范名局棋谱与当前盘面 FEN/PGN 导出字符串均采用惰性按需生成，不在冷启动或无弹窗常规走子渲染期间预先计算。
 
 ---
 
@@ -151,7 +152,11 @@
 | **5. 截图识图转 FEN** | `DialogsModalSuite` 中 `importMode === 'image'` | 接收上传或粘贴的图片 `File / Blob`，调用棋盘识别模型推理返回 FEN | `FormData (image)` + `{ turn: 'red' \| 'black' }` | `{ fen: string, confidence: number, summary: string }` |
 | **6. 外部平台连线与云谱库** | `connectState`、`handleSyncNextExternalMove`、`libraryGames` | 桌面端窗口抓图监听外部平台落子推送；棋谱库/收藏 CRUD 持久化 | `{ platform, autoAnalyze }` / 棋谱 CRUD 参数 | 外部落子事件 `{ from, to }` 或全盘 `fen`；标准 `LibraryGameItem[]` |
 
-> **规则与合法性备注**：前端 `src/utils/xiangqiRules.ts` 已实现完整的中国象棋走子合法性（含蹩马腿、塞象眼、炮隔子、将帅不对脸、应将与自杀保护）及 FEN/PGN 互转；若后端同时保存 PGN/ICCS 走法，建议统一以 **标准象棋 FEN + ICCS 坐标串（如 `h2e2`）** 作为前后端传输基准格式。
+> **规则与合法性备注**：前端 `src/utils/xiangqiRules.ts` 已实现完整的中国象棋走子合法性（含蹩马腿、塞象眼、炮隔子、将帅不对脸、应将与自杀保护）及 FEN/PGN 互转；内部采用 90 格扁平数组 `buildBoardGrid` 实现 O(1) 棋盘格查询，并通过“将/帅为中心向外射线/日字反探”完成 O(1) 将军校验。若后端同时保存 PGN/ICCS 走法，建议统一以 **标准象棋 FEN + ICCS 坐标串（如 `h2e2`）** 作为前后端传输基准格式。
+
+### 引擎分析调度与前端渲染防阻塞契约（对接真实引擎时保持一致）
+- **快速步进防抖与过渡调度**：在连续键盘翻步（`← / →`）或 `850ms` 自动回放期间，引擎分析任务（MultiPV 与威胁雷达）经过 **`120ms` 防抖** + React `useDeferredValue` 低优先级队列调度；当分析目标尚未追平当前最新盘面时，棋盘隐藏旧手推荐箭头以免误导，`EvalBar` 立即回退展示当前着法记录分值（或即时静态分值），保证 60fps 交互响应；真实后端/原生进程对接时同样建议在连续跳步窗口内取消或去抖 `stop` / `go` 指令。
+- **三层隔离与精细化 Memo**：棋盘划分为「静态纹理与网格层（含 SVG `feTurbulence` 宣纸肌理与 `contain: layout paint style` 合成隔离）」、「动态箭矢层」、「交互落子与 90 格热区层」，配合全工作台组件 `React.memo` 与稳定回调引用，避免单步落子或悬停预览触发整盘与底纹重绘。
 
 ---
 
@@ -159,4 +164,5 @@
 
 | 日期 | 变更摘要 | 涉及模块 / 文档章节 |
 | :--- | :--- | :--- |
+| **2026-11-13** | **全链路前端响应性能优化与渲染调度规范**：<br>1. 规则引擎引入 90 格 O(1) 扁平索引与以将帅为中心的反探式将军检测；<br>2. 棋盘拆分静态底纹层 / 动态箭矢层 / 交互棋子层并配置 `contain` 合成隔离；<br>3. 复盘分析引入 `120ms` 防抖与 `useDeferredValue` 调度，快步翻谱时不闪烁旧箭头且 `EvalBar` 即时响应；<br>4. 复盘会话 `localStorage` 改为 `350ms` 防抖落盘 + 离页/切页即时 flush；示范棋谱与 FEN/PGN 改为惰性生成，全核心组件启用 `React.memo` 与稳定回调。 | 第 2 节、第 6 节新增调度契约 |
 | **2026-11-12** | **四大工作空间交互重构与引擎作用域收口**：<br>1. 仅在「复盘分析」显示引擎舱与胜率评估柱；<br>2. 合并「启动」「立即分析」为单个「开始分析 / 暂停分析」；<br>3. 残局题库、人机对弈、摆子编辑统一通过底部「转入复盘分析」/「完成摆子」携带局面与着法流转；<br>4. 清理残局工作台重复的「重摆」「查看正着提示」按钮；<br>5. 摆子子力库迁移至右侧专属工坊并增加子力限额与将帅合法性校验。 | 第 1~6 节全量建立 |

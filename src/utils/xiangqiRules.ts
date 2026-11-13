@@ -94,11 +94,31 @@ export function createKingsOnlyPieces(): Piece[] {
   ];
 }
 
+export function buildBoardGrid(pieces: Piece[]): (Piece | null)[] {
+  const grid: (Piece | null)[] = new Array(90).fill(null);
+  for (let i = 0; i < pieces.length; i++) {
+    const p = pieces[i];
+    if (p.row >= 0 && p.row <= 9 && p.col >= 0 && p.col <= 8) {
+      grid[p.row * 9 + p.col] = p;
+    }
+  }
+  return grid;
+}
+
+export function getPieceAtGrid(
+  grid: (Piece | null)[],
+  row: number,
+  col: number
+): Piece | null {
+  if (row < 0 || row > 9 || col < 0 || col > 8) return null;
+  return grid[row * 9 + col];
+}
+
 export function getPieceAt(pieces: Piece[], row: number, col: number): Piece | undefined {
   return pieces.find((p) => p.row === row && p.col === col);
 }
 
-// 计算红黑双方子力净分差
+// 计算红黑双方子力净分差（单次遍历 O(32) 统计）
 export function calculateMaterialAndCaptures(pieces: Piece[]): {
   redCapturedBlack: PieceType[];
   blackCapturedRed: PieceType[];
@@ -114,14 +134,39 @@ export function calculateMaterialAndCaptures(pieces: Piece[]): {
     { type: 'soldier', count: 5, weight: 1 },
   ];
 
+  const redCounts: Record<PieceType, number> = {
+    general: 0,
+    advisor: 0,
+    elephant: 0,
+    horse: 0,
+    chariot: 0,
+    cannon: 0,
+    soldier: 0,
+  };
+  const blackCounts: Record<PieceType, number> = {
+    general: 0,
+    advisor: 0,
+    elephant: 0,
+    horse: 0,
+    chariot: 0,
+    cannon: 0,
+    soldier: 0,
+  };
+
+  for (let i = 0; i < pieces.length; i++) {
+    const p = pieces[i];
+    if (p.camp === 'red') redCounts[p.type]++;
+    else blackCounts[p.type]++;
+  }
+
   const redCapturedBlack: PieceType[] = [];
   const blackCapturedRed: PieceType[] = [];
   let redTotal = 0;
   let blackTotal = 0;
 
   for (const item of initialQuota) {
-    const redAlive = pieces.filter((p) => p.camp === 'red' && p.type === item.type).length;
-    const blackAlive = pieces.filter((p) => p.camp === 'black' && p.type === item.type).length;
+    const redAlive = redCounts[item.type];
+    const blackAlive = blackCounts[item.type];
 
     redTotal += redAlive * item.weight;
     blackTotal += blackAlive * item.weight;
@@ -159,8 +204,8 @@ function isInsidePalace(camp: Camp, row: number, col: number): boolean {
   return row >= 7 && row <= 9;
 }
 
-function countObstaclesBetween(
-  pieces: Piece[],
+function countObstaclesBetweenGrid(
+  grid: (Piece | null)[],
   r1: number,
   c1: number,
   r2: number,
@@ -171,25 +216,30 @@ function countObstaclesBetween(
     const minC = Math.min(c1, c2);
     const maxC = Math.max(c1, c2);
     for (let c = minC + 1; c < maxC; c++) {
-      if (getPieceAt(pieces, r1, c)) count++;
+      if (grid[r1 * 9 + c]) count++;
     }
   } else if (c1 === c2) {
     const minR = Math.min(r1, r2);
     const maxR = Math.max(r1, r2);
     for (let r = minR + 1; r < maxR; r++) {
-      if (getPieceAt(pieces, r, c1)) count++;
+      if (grid[r * 9 + c1]) count++;
     }
   }
   return count;
 }
 
-export function getLegalMovesForPiece(piece: Piece, pieces: Piece[]): Position[] {
+export function getLegalMovesForPiece(
+  piece: Piece,
+  pieces: Piece[],
+  prebuiltGrid?: (Piece | null)[]
+): Position[] {
+  const grid = prebuiltGrid || buildBoardGrid(pieces);
   const moves: Position[] = [];
   const { row, col, camp, type } = piece;
 
   const tryAdd = (r: number, c: number) => {
     if (r < 0 || r > 9 || c < 0 || c > 8) return;
-    const target = getPieceAt(pieces, r, c);
+    const target = grid[r * 9 + c];
     if (!target || target.camp !== camp) {
       moves.push({ row: r, col: c });
     }
@@ -212,7 +262,7 @@ export function getLegalMovesForPiece(piece: Piece, pieces: Piece[]): Position[]
       }
       const enemyGeneral = pieces.find((p) => p.type === 'general' && p.camp !== camp);
       if (enemyGeneral && enemyGeneral.col === col) {
-        if (countObstaclesBetween(pieces, row, col, enemyGeneral.row, enemyGeneral.col) === 0) {
+        if (countObstaclesBetweenGrid(grid, row, col, enemyGeneral.row, enemyGeneral.col) === 0) {
           moves.push({ row: enemyGeneral.row, col: enemyGeneral.col });
         }
       }
@@ -248,7 +298,7 @@ export function getLegalMovesForPiece(piece: Piece, pieces: Piece[]): Position[]
         if (camp === 'red' && nr < 5) continue;
         const eyeR = row + dr / 2;
         const eyeC = col + dc / 2;
-        if (!getPieceAt(pieces, eyeR, eyeC)) {
+        if (!grid[eyeR * 9 + eyeC]) {
           tryAdd(nr, nc);
         }
       }
@@ -266,8 +316,9 @@ export function getLegalMovesForPiece(piece: Piece, pieces: Piece[]): Position[]
         { dr: 1, dc: 2, legR: 0, legC: 1 },
       ];
       for (const j of jumps) {
-        const legPiece = getPieceAt(pieces, row + j.legR, col + j.legC);
-        if (!legPiece) {
+        const lr = row + j.legR;
+        const lc = col + j.legC;
+        if (lr >= 0 && lr <= 9 && lc >= 0 && lc <= 8 && !grid[lr * 9 + lc]) {
           tryAdd(row + j.dr, col + j.dc);
         }
       }
@@ -284,7 +335,7 @@ export function getLegalMovesForPiece(piece: Piece, pieces: Piece[]): Position[]
         let nr = row + dr;
         let nc = col + dc;
         while (nr >= 0 && nr <= 9 && nc >= 0 && nc <= 8) {
-          const target = getPieceAt(pieces, nr, nc);
+          const target = grid[nr * 9 + nc];
           if (!target) {
             moves.push({ row: nr, col: nc });
           } else {
@@ -311,7 +362,7 @@ export function getLegalMovesForPiece(piece: Piece, pieces: Piece[]): Position[]
         let nc = col + dc;
         let jumped = false;
         while (nr >= 0 && nr <= 9 && nc >= 0 && nc <= 8) {
-          const target = getPieceAt(pieces, nr, nc);
+          const target = grid[nr * 9 + nc];
           if (!jumped) {
             if (!target) {
               moves.push({ row: nr, col: nc });
@@ -347,16 +398,89 @@ export function getLegalMovesForPiece(piece: Piece, pieces: Piece[]): Position[]
   return moves;
 }
 
-export function isCampInCheck(pieces: Piece[], camp: Camp): Position | null {
+// 向心射线将军检测：从将/帅位置向四向、马位与兵卒位反查，复杂度降为常数级 O(1)
+export function isCampInCheck(
+  pieces: Piece[],
+  camp: Camp,
+  prebuiltGrid?: (Piece | null)[]
+): Position | null {
   const general = pieces.find((p) => p.type === 'general' && p.camp === camp);
   if (!general) return null;
+  const grid = prebuiltGrid || buildBoardGrid(pieces);
+  const { row: gr, col: gc } = general;
   const enemyCamp: Camp = camp === 'red' ? 'black' : 'red';
-  for (const enemy of pieces.filter((p) => p.camp === enemyCamp)) {
-    const moves = getLegalMovesForPiece(enemy, pieces);
-    if (moves.some((m) => m.row === general.row && m.col === general.col)) {
-      return { row: general.row, col: general.col };
+
+  // 1. 车、炮与将帅照面（四向正交射线）
+  const orthoDirs = [
+    [-1, 0],
+    [1, 0],
+    [0, -1],
+    [0, 1],
+  ];
+  for (const [dr, dc] of orthoDirs) {
+    let nr = gr + dr;
+    let nc = gc + dc;
+    let screenFound = false;
+    while (nr >= 0 && nr <= 9 && nc >= 0 && nc <= 8) {
+      const p = grid[nr * 9 + nc];
+      if (p) {
+        if (!screenFound) {
+          if (p.camp === enemyCamp && (p.type === 'chariot' || p.type === 'general')) {
+            return { row: gr, col: gc };
+          }
+          screenFound = true;
+        } else {
+          if (p.camp === enemyCamp && p.type === 'cannon') {
+            return { row: gr, col: gc };
+          }
+          break;
+        }
+      }
+      nr += dr;
+      nc += dc;
     }
   }
+
+  // 2. 敌方马位反查（含蹩马腿检验：马腿紧邻敌马所在轴向）
+  const horseChecks = [
+    { hr: -2, hc: -1, legR: -1, legC: -1 },
+    { hr: -2, hc: 1, legR: -1, legC: 1 },
+    { hr: 2, hc: -1, legR: 1, legC: -1 },
+    { hr: 2, hc: 1, legR: 1, legC: 1 },
+    { hr: -1, hc: -2, legR: -1, legC: -1 },
+    { hr: 1, hc: -2, legR: 1, legC: -1 },
+    { hr: -1, hc: 2, legR: -1, legC: 1 },
+    { hr: 1, hc: 2, legR: 1, legC: 1 },
+  ];
+  for (const hc of horseChecks) {
+    const r = gr + hc.hr;
+    const c = gc + hc.hc;
+    if (r < 0 || r > 9 || c < 0 || c > 8) continue;
+    const p = grid[r * 9 + c];
+    if (p && p.camp === enemyCamp && p.type === 'horse') {
+      const lr = gr + hc.legR;
+      const lc = gc + hc.legC;
+      if (lr >= 0 && lr <= 9 && lc >= 0 && lc <= 8 && !grid[lr * 9 + lc]) {
+        return { row: gr, col: gc };
+      }
+    }
+  }
+
+  // 3. 敌方兵/卒反查（前方与左右临位）
+  const soldierFromRow = camp === 'red' ? gr - 1 : gr + 1;
+  const soldierSpots: [number, number][] = [
+    [soldierFromRow, gc],
+    [gr, gc - 1],
+    [gr, gc + 1],
+  ];
+  for (const [sr, sc] of soldierSpots) {
+    if (sr < 0 || sr > 9 || sc < 0 || sc > 8) continue;
+    const p = grid[sr * 9 + sc];
+    if (p && p.camp === enemyCamp && p.type === 'soldier') {
+      return { row: gr, col: gc };
+    }
+  }
+
   return null;
 }
 
@@ -429,12 +553,13 @@ export function piecesToFen(pieces: Piece[], turn: Camp = 'red'): string {
     },
   };
 
+  const grid = buildBoardGrid(pieces);
   const rows: string[] = [];
   for (let r = 0; r < 10; r++) {
     let empty = 0;
     let rowStr = '';
     for (let c = 0; c < 9; c++) {
-      const p = getPieceAt(pieces, r, c);
+      const p = grid[r * 9 + c];
       if (!p) {
         empty++;
       } else {
@@ -557,14 +682,17 @@ export function generateSimulatedMultiPV(
   threads = 8,
   hashMb = 512
 ): { lines: MultiPVLine[]; arrows: MultiPVArrow[] } {
+  const grid = buildBoardGrid(pieces);
   const baseEval = evaluateBoardScore(pieces);
   const candidates: { piece: Piece; from: Position; to: Position; notation: string; delta: number }[] =
     [];
 
-  for (const p of pieces.filter((item) => item.camp === turn)) {
-    const legal = getLegalMovesForPiece(p, pieces);
+  for (let i = 0; i < pieces.length; i++) {
+    const p = pieces[i];
+    if (p.camp !== turn) continue;
+    const legal = getLegalMovesForPiece(p, pieces, grid);
     for (const to of legal) {
-      const target = getPieceAt(pieces, to.row, to.col);
+      const target = grid[to.row * 9 + to.col];
       let priority = 0;
       if (target) {
         const capVal =

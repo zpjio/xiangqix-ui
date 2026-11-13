@@ -34,7 +34,7 @@ interface EnginePanelProps {
   onHoverMultiPVMove: (arrow: MultiPVArrow | null) => void;
 }
 
-export const EnginePanel: React.FC<EnginePanelProps> = ({
+export const EnginePanel: React.FC<EnginePanelProps> = React.memo(({
   engines,
   primaryEngineId,
   secondaryEngineId,
@@ -575,4 +575,4 @@ export const EnginePanel: React.FC<EnginePanelProps> = ({
       )}
     </section>
   );
-};
+});

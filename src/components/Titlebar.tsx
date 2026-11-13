@@ -23,7 +23,7 @@ interface TitlebarProps {
   onToggleTheme: () => void;
 }
 
-export const Titlebar: React.FC<TitlebarProps> = ({
+export const Titlebar: React.FC<TitlebarProps> = React.memo(({
   workspace,
   appTheme,
   soundEnabled,
@@ -162,4 +162,4 @@ export const Titlebar: React.FC<TitlebarProps> = ({
       </div>
     </header>
   );
-};
+});

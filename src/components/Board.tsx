@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   BoardTheme,
   Camp,
@@ -14,7 +14,7 @@ import {
 import {
   BLACK_ROAD_NUMERALS,
   RED_ROAD_NUMERALS,
-  getPieceAt,
+  buildBoardGrid,
   isCampInCheck,
 } from '../utils/xiangqiRules';
 import { XiangqiPiece } from './XiangqiPiece';
@@ -30,6 +30,8 @@ interface BoardProps {
   hoveredArrow?: MultiPVArrow | null;
   hintArrow?: MultiPVArrow | null;
   impactEffect?: ImpactEffect | null;
+  redCheckPos?: Position | null;
+  blackCheckPos?: Position | null;
   boardTheme: BoardTheme;
   craftStyle: PieceCraftStyle;
   fontScheme: FontScheme;
@@ -43,6 +45,68 @@ interface BoardProps {
 const STEP = 95;
 const OFFSET_X = 70;
 const OFFSET_Y = 72;
+
+const THEME_PALETTES: Record<
+  BoardTheme,
+  {
+    surfaceStart: string;
+    surfaceMid: string;
+    surfaceEnd: string;
+    inkLine: string;
+    riverText: string;
+    sealRed: string;
+    coordText: string;
+    frameClass: string;
+  }
+> = {
+  'xuan-rosewood': {
+    surfaceStart: '#E6D2B0',
+    surfaceMid: '#DBC299',
+    surfaceEnd: '#C8AA7A',
+    inkLine: '#2B221C',
+    riverText: '#3A2B21',
+    sealRed: '#9E2A2B',
+    coordText: '#C5A880',
+    frameClass: 'zitan-board-frame border-[#543828]',
+  },
+  'imperial-lacquer': {
+    surfaceStart: '#231614',
+    surfaceMid: '#1A100E',
+    surfaceEnd: '#120A09',
+    inkLine: '#C8A252',
+    riverText: '#D4AF37',
+    sealRed: '#B83227',
+    coordText: '#D4AF37',
+    frameClass: 'bg-[#140B09] border-[#6E5225] shadow-[0_18px_36px_rgba(0,0,0,0.85)]',
+  },
+  'song-celadon': {
+    surfaceStart: '#DCE3DC',
+    surfaceMid: '#CBD5CC',
+    surfaceEnd: '#B5C3B7',
+    inkLine: '#243028',
+    riverText: '#2C3B31',
+    sealRed: '#9E2A2B',
+    coordText: '#BCC7BE',
+    frameClass: 'bg-[#1E2621] border-[#425247] shadow-[0_18px_36px_rgba(0,0,0,0.8)]',
+  },
+};
+
+const FIDUCIAL_POSITIONS: [number, number][] = [
+  [2, 1],
+  [2, 7],
+  [7, 1],
+  [7, 7],
+  [3, 0],
+  [3, 2],
+  [3, 4],
+  [3, 6],
+  [3, 8],
+  [6, 0],
+  [6, 2],
+  [6, 4],
+  [6, 6],
+  [6, 8],
+];
 
 const ImpactDustBurst: React.FC<{ camp: Camp; isCapture: boolean; effectId: number }> = ({
   camp,
@@ -114,696 +178,775 @@ const ImpactDustBurst: React.FC<{ camp: Camp; isCapture: boolean; effectId: numb
   );
 };
 
-export const Board: React.FC<BoardProps> = ({
-  pieces,
-  selectedPieceId,
-  legalMoves,
-  lastMove,
-  multiPvArrows = [],
-  secondaryPvArrow = null,
-  threatArrow = null,
-  hoveredArrow = null,
-  hintArrow = null,
-  impactEffect = null,
-  boardTheme,
-  craftStyle,
-  fontScheme,
-  useTraditionalChar,
-  flipped,
-  workspace,
-  isVariationActive = false,
-  onSelectIntersection,
-}) => {
-  const themeColors = {
-    'xuan-rosewood': {
-      surfaceStart: '#E6D2B0',
-      surfaceMid: '#DBC299',
-      surfaceEnd: '#C8AA7A',
-      inkLine: '#2B221C',
-      riverText: '#3A2B21',
-      sealRed: '#9E2A2B',
-      coordText: '#C5A880',
-      frameClass: 'zitan-board-frame border-[#543828]',
-    },
-    'imperial-lacquer': {
-      surfaceStart: '#231614',
-      surfaceMid: '#1A100E',
-      surfaceEnd: '#120A09',
-      inkLine: '#C8A252',
-      riverText: '#D4AF37',
-      sealRed: '#B83227',
-      coordText: '#D4AF37',
-      frameClass: 'bg-[#140B09] border-[#6E5225] shadow-[0_18px_36px_rgba(0,0,0,0.85)]',
-    },
-    'song-celadon': {
-      surfaceStart: '#DCE3DC',
-      surfaceMid: '#CBD5CC',
-      surfaceEnd: '#B5C3B7',
-      inkLine: '#243028',
-      riverText: '#2C3B31',
-      sealRed: '#9E2A2B',
-      coordText: '#BCC7BE',
-      frameClass: 'bg-[#1E2621] border-[#425247] shadow-[0_18px_36px_rgba(0,0,0,0.8)]',
-    },
-  }[boardTheme];
+/* ==================== 第 1 层：静态盘面纹理与网格 SVG（独立缓存，隔离 feTurbulence 重栅格化） ==================== */
+const StaticBoardSurface: React.FC<{ boardTheme: BoardTheme; flipped: boolean }> = React.memo(
+  ({ boardTheme, flipped }) => {
+    const themeColors = THEME_PALETTES[boardTheme];
+    const topNumerals = flipped ? [...RED_ROAD_NUMERALS].reverse() : BLACK_ROAD_NUMERALS;
+    const bottomNumerals = flipped ? [...BLACK_ROAD_NUMERALS].reverse() : RED_ROAD_NUMERALS;
 
-  const toVisualCoord = (row: number, col: number) => ({
-    vRow: flipped ? 9 - row : row,
-    vCol: flipped ? 8 - col : col,
-  });
+    const renderFiducialMark = (row: number, col: number) => {
+      const cx = OFFSET_X + col * STEP;
+      const cy = OFFSET_Y + row * STEP;
+      const gap = 7;
+      const len = 16;
+      const paths: string[] = [];
 
-  const redCheckPos = isCampInCheck(pieces, 'red');
-  const blackCheckPos = isCampInCheck(pieces, 'black');
-  const anyCheckPos = redCheckPos || blackCheckPos;
+      if (col > 0) {
+        paths.push(
+          `M ${cx - gap - len} ${cy - gap} L ${cx - gap} ${cy - gap} L ${cx - gap} ${cy - gap - len}`
+        );
+        paths.push(
+          `M ${cx - gap - len} ${cy + gap} L ${cx - gap} ${cy + gap} L ${cx - gap} ${cy + gap + len}`
+        );
+      }
+      if (col < 8) {
+        paths.push(
+          `M ${cx + gap + len} ${cy - gap} L ${cx + gap} ${cy - gap} L ${cx + gap} ${cy - gap - len}`
+        );
+        paths.push(
+          `M ${cx + gap + len} ${cy + gap} L ${cx + gap} ${cy + gap} L ${cx + gap} ${cy + gap + len}`
+        );
+      }
 
-  const renderFiducialMark = (row: number, col: number) => {
-    const cx = OFFSET_X + col * STEP;
-    const cy = OFFSET_Y + row * STEP;
-    const gap = 7;
-    const len = 16;
-    const paths: string[] = [];
-
-    if (col > 0) {
-      paths.push(
-        `M ${cx - gap - len} ${cy - gap} L ${cx - gap} ${cy - gap} L ${cx - gap} ${cy - gap - len}`
-      );
-      paths.push(
-        `M ${cx - gap - len} ${cy + gap} L ${cx - gap} ${cy + gap} L ${cx - gap} ${cy + gap + len}`
-      );
-    }
-    if (col < 8) {
-      paths.push(
-        `M ${cx + gap + len} ${cy - gap} L ${cx + gap} ${cy - gap} L ${cx + gap} ${cy - gap - len}`
-      );
-      paths.push(
-        `M ${cx + gap + len} ${cy + gap} L ${cx + gap} ${cy + gap} L ${cx + gap} ${cy + gap + len}`
-      );
-    }
-
-    return (
-      <path
-        key={`mark-${row}-${col}`}
-        d={paths.join(' ')}
-        fill="none"
-        stroke={themeColors.inkLine}
-        strokeWidth="2"
-        strokeLinecap="square"
-        strokeOpacity="0.82"
-      />
-    );
-  };
-
-  const fiducialPositions: [number, number][] = [
-    [2, 1],
-    [2, 7],
-    [7, 1],
-    [7, 7],
-    [3, 0],
-    [3, 2],
-    [3, 4],
-    [3, 6],
-    [3, 8],
-    [6, 0],
-    [6, 2],
-    [6, 4],
-    [6, 6],
-    [6, 8],
-  ];
-
-  // 推演支线激活或特殊模式时的外缘光晕
-  const modeRimClass = isVariationActive
-    ? 'ring-2 ring-[#D4AF37] shadow-[0_0_24px_rgba(212,175,55,0.28)]'
-    : workspace === 'challenge'
-    ? 'ring-1 ring-[#C8372D]/60'
-    : workspace === 'setup'
-    ? 'ring-2 ring-[#C87D3B]'
-    : '';
-
-  const topNumerals = flipped ? [...RED_ROAD_NUMERALS].reverse() : BLACK_ROAD_NUMERALS;
-  const bottomNumerals = flipped ? [...BLACK_ROAD_NUMERALS].reverse() : RED_ROAD_NUMERALS;
-
-  const renderSvgArrow = (
-    arrow: MultiPVArrow,
-    key: string,
-    color: string,
-    markerId: string,
-    isDashed = false,
-    strokeW = '12',
-    labelRatio = 0.5
-  ) => {
-    const vf = toVisualCoord(arrow.from.row, arrow.from.col);
-    const vt = toVisualCoord(arrow.to.row, arrow.to.col);
-    const x1 = OFFSET_X + vf.vCol * STEP;
-    const y1 = OFFSET_Y + vf.vRow * STEP;
-    const x2 = OFFSET_X + vt.vCol * STEP;
-    const y2 = OFFSET_Y + vt.vRow * STEP;
-    const midX = x1 + (x2 - x1) * labelRatio;
-    const midY = y1 + (y2 - y1) * labelRatio;
-    const boxWidth = Math.max(76, arrow.scoreText.length * 10 + 18);
-
-    return (
-      <g key={key} className="pointer-events-none">
-        <line
-          x1={x1}
-          y1={y1}
-          x2={x2}
-          y2={y2}
-          stroke={color}
-          strokeWidth={strokeW}
-          strokeLinecap="round"
-          strokeDasharray={isDashed ? '12 8' : undefined}
-          strokeOpacity="0.88"
-          markerEnd={`url(#${markerId})`}
+      return (
+        <path
+          key={`mark-${row}-${col}`}
+          d={paths.join(' ')}
+          fill="none"
+          stroke={themeColors.inkLine}
+          strokeWidth="2"
+          strokeLinecap="square"
+          strokeOpacity="0.82"
         />
-        <g transform={`translate(${midX}, ${midY})`}>
-          <rect
-            x={-boxWidth / 2}
-            y="-13"
-            width={boxWidth}
-            height="26"
-            rx="6"
-            fill="#1A1412"
-            fillOpacity="0.92"
-            stroke={color}
-            strokeWidth="1.5"
-          />
-          <text
-            x="0"
-            y="5"
-            textAnchor="middle"
-            fill="#FAF5EB"
-            className="font-mono-tabular text-[13px] font-semibold"
-          >
-            {arrow.scoreText}
-          </text>
+      );
+    };
+
+    return (
+      <svg
+        viewBox="0 0 900 1000"
+        className="w-full h-full block pointer-events-none"
+        style={{ contain: 'layout paint style' }}
+        aria-label="中国象棋九路十线传统棋盘"
+      >
+        <defs>
+          <radialGradient id="xuanSurfaceGrad" cx="50%" cy="48%" r="65%">
+            <stop offset="0%" stopColor={themeColors.surfaceStart} />
+            <stop offset="65%" stopColor={themeColors.surfaceMid} />
+            <stop offset="100%" stopColor={themeColors.surfaceEnd} />
+          </radialGradient>
+
+          <filter id="xuanPaperNoise" x="0%" y="0%" width="100%" height="100%">
+            <feTurbulence
+              type="fractalNoise"
+              baseFrequency="0.04"
+              numOctaves="4"
+              result="noise"
+            />
+            <feColorMatrix
+              type="matrix"
+              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.045 0"
+              in="noise"
+              result="softNoise"
+            />
+            <feBlend in="SourceGraphic" in2="softNoise" mode="multiply" />
+          </filter>
+        </defs>
+
+        {/* 棋盘底板 */}
+        <rect
+          x="0"
+          y="0"
+          width="900"
+          height="1000"
+          fill="url(#xuanSurfaceGrad)"
+          filter="url(#xuanPaperNoise)"
+        />
+
+        {/* 盘内顶部与底部路数坐标 */}
+        <g className="font-serif-sc text-[22px] font-bold select-none" opacity="0.72">
+          {Array.from({ length: 9 }).map((_, col) => {
+            const x = OFFSET_X + col * STEP;
+            return (
+              <React.Fragment key={`coord-${col}`}>
+                <text
+                  x={x}
+                  y={38}
+                  textAnchor="middle"
+                  fill={themeColors.inkLine}
+                  className="font-mono-tabular"
+                >
+                  {topNumerals[col]}
+                </text>
+                <text x={x} y={978} textAnchor="middle" fill={themeColors.inkLine}>
+                  {bottomNumerals[col]}
+                </text>
+              </React.Fragment>
+            );
+          })}
         </g>
-      </g>
-    );
-  };
 
-  return (
-    <div className="relative flex items-center justify-center gap-3 select-none">
-      {/* 棋盘主体容器：随视口高度自适应缩放，确保与上下棋手栏、操控栏在一屏内完整容纳不产生滚动条 */}
-      <div className="relative w-[clamp(280px,calc((100vh-226px)*0.86),590px)] transition-all">
-        <div
-          className={`relative rounded-xl p-2 sm:p-2.5 border-2 transition-all duration-200 ${themeColors.frameClass} ${modeRimClass}`}
-        >
-          {/* 四个传统黄铜回纹包角 */}
-          <span className="absolute top-1.5 left-1.5 w-4 h-4 border-t-2 border-l-2 border-[#D4AF37]/50 pointer-events-none" />
-          <span className="absolute top-1.5 right-1.5 w-4 h-4 border-t-2 border-r-2 border-[#D4AF37]/50 pointer-events-none" />
-          <span className="absolute bottom-1.5 left-1.5 w-4 h-4 border-b-2 border-l-2 border-[#D4AF37]/50 pointer-events-none" />
-          <span className="absolute bottom-1.5 right-1.5 w-4 h-4 border-b-2 border-r-2 border-[#D4AF37]/50 pointer-events-none" />
+        {/* 外围双层重框 */}
+        <rect
+          x={OFFSET_X - 12}
+          y={OFFSET_Y - 12}
+          width={8 * STEP + 24}
+          height={9 * STEP + 24}
+          fill="none"
+          stroke={themeColors.inkLine}
+          strokeWidth="5"
+          strokeOpacity="0.9"
+        />
+        <rect
+          x={OFFSET_X}
+          y={OFFSET_Y}
+          width={8 * STEP}
+          height={9 * STEP}
+          fill="none"
+          stroke={themeColors.inkLine}
+          strokeWidth="2.4"
+          strokeOpacity="0.9"
+        />
 
-          {/* 将军浮层徽章 */}
-          {anyCheckPos && (
-            <div className="absolute top-3 right-4 z-40 px-2.5 py-0.5 rounded bg-[#C8372D] text-[#FAF5EB] text-xs font-serif-sc font-bold tracking-widest shadow-lg border border-[#D4AF37]/60 pointer-events-none">
-              將軍
-            </div>
-          )}
+        {/* 十条横线 */}
+        {Array.from({ length: 10 }).map((_, r) => {
+          const y = OFFSET_Y + r * STEP;
+          return (
+            <line
+              key={`h-line-${r}`}
+              x1={OFFSET_X}
+              y1={y}
+              x2={OFFSET_X + 8 * STEP}
+              y2={y}
+              stroke={themeColors.inkLine}
+              strokeWidth={r === 0 || r === 4 || r === 5 || r === 9 ? '2.6' : '2'}
+              strokeOpacity="0.86"
+            />
+          );
+        })}
 
-          {/* 内联推演支线激活提示角标 */}
-          {isVariationActive && (
-            <div className="absolute top-3 left-4 z-40 px-2 py-0.5 rounded bg-[#D4AF37] text-[#18120E] text-[11px] font-semibold shadow pointer-events-none">
-              推演分支中
-            </div>
-          )}
-
-          {/* 内部盘面画布 (宽高比 9:10) */}
-          <div className="relative w-full aspect-[9/10] rounded-lg overflow-hidden shadow-inner">
-            <svg
-              viewBox="0 0 900 1000"
-              className="w-full h-full block"
-              aria-label="中国象棋九路十线传统棋盘"
-            >
-              <defs>
-                <radialGradient id="xuanSurfaceGrad" cx="50%" cy="48%" r="65%">
-                  <stop offset="0%" stopColor={themeColors.surfaceStart} />
-                  <stop offset="65%" stopColor={themeColors.surfaceMid} />
-                  <stop offset="100%" stopColor={themeColors.surfaceEnd} />
-                </radialGradient>
-
-                <filter id="xuanPaperNoise" x="0%" y="0%" width="100%" height="100%">
-                  <feTurbulence
-                    type="fractalNoise"
-                    baseFrequency="0.04"
-                    numOctaves="4"
-                    result="noise"
-                  />
-                  <feColorMatrix
-                    type="matrix"
-                    values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.045 0"
-                    in="noise"
-                    result="softNoise"
-                  />
-                  <feBlend in="SourceGraphic" in2="softNoise" mode="multiply" />
-                </filter>
-
-                <marker
-                  id="arrow-primary"
-                  viewBox="0 0 10 10"
-                  refX="7"
-                  refY="5"
-                  markerWidth="5.5"
-                  markerHeight="5.5"
-                  orient="auto-start-reverse"
-                >
-                  <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#10B981" fillOpacity="0.95" />
-                </marker>
-                <marker
-                  id="arrow-secondary"
-                  viewBox="0 0 10 10"
-                  refX="7"
-                  refY="5"
-                  markerWidth="5"
-                  markerHeight="5"
-                  orient="auto-start-reverse"
-                >
-                  <path d="M 0 1.5 L 8.5 5 L 0 8.5 z" fill="#B87D1E" fillOpacity="0.82" />
-                </marker>
-                <marker
-                  id="arrow-threat"
-                  viewBox="0 0 10 10"
-                  refX="7"
-                  refY="5"
-                  markerWidth="5.5"
-                  markerHeight="5.5"
-                  orient="auto-start-reverse"
-                >
-                  <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#D93829" fillOpacity="0.95" />
-                </marker>
-                <marker
-                  id="arrow-ghost"
-                  viewBox="0 0 10 10"
-                  refX="7"
-                  refY="5"
-                  markerWidth="5.5"
-                  markerHeight="5.5"
-                  orient="auto-start-reverse"
-                >
-                  <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#D4AF37" fillOpacity="0.95" />
-                </marker>
-                <marker
-                  id="arrow-compare-secondary"
-                  viewBox="0 0 10 10"
-                  refX="7"
-                  refY="5"
-                  markerWidth="5.5"
-                  markerHeight="5.5"
-                  orient="auto-start-reverse"
-                >
-                  <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#3B82F6" fillOpacity="0.95" />
-                </marker>
-              </defs>
-
-              {/* 棋盘底板 */}
-              <rect
-                x="0"
-                y="0"
-                width="900"
-                height="1000"
-                fill="url(#xuanSurfaceGrad)"
-                filter="url(#xuanPaperNoise)"
-              />
-
-              {/* 盘内顶部与底部路数坐标 */}
-              <g className="font-serif-sc text-[22px] font-bold select-none" opacity="0.72">
-                {Array.from({ length: 9 }).map((_, col) => {
-                  const x = OFFSET_X + col * STEP;
-                  return (
-                    <React.Fragment key={`coord-${col}`}>
-                      <text
-                        x={x}
-                        y={38}
-                        textAnchor="middle"
-                        fill={themeColors.inkLine}
-                        className="font-mono-tabular"
-                      >
-                        {topNumerals[col]}
-                      </text>
-                      <text x={x} y={978} textAnchor="middle" fill={themeColors.inkLine}>
-                        {bottomNumerals[col]}
-                      </text>
-                    </React.Fragment>
-                  );
-                })}
-              </g>
-
-              {/* 外围双层重框 */}
-              <rect
-                x={OFFSET_X - 12}
-                y={OFFSET_Y - 12}
-                width={8 * STEP + 24}
-                height={9 * STEP + 24}
-                fill="none"
-                stroke={themeColors.inkLine}
-                strokeWidth="5"
-                strokeOpacity="0.9"
-              />
-              <rect
-                x={OFFSET_X}
-                y={OFFSET_Y}
-                width={8 * STEP}
-                height={9 * STEP}
-                fill="none"
-                stroke={themeColors.inkLine}
-                strokeWidth="2.4"
-                strokeOpacity="0.9"
-              />
-
-              {/* 十条横线 */}
-              {Array.from({ length: 10 }).map((_, r) => {
-                const y = OFFSET_Y + r * STEP;
-                return (
-                  <line
-                    key={`h-line-${r}`}
-                    x1={OFFSET_X}
-                    y1={y}
-                    x2={OFFSET_X + 8 * STEP}
-                    y2={y}
-                    stroke={themeColors.inkLine}
-                    strokeWidth={r === 0 || r === 4 || r === 5 || r === 9 ? '2.6' : '2'}
-                    strokeOpacity="0.86"
-                  />
-                );
-              })}
-
-              {/* 内部七条纵线 */}
-              {Array.from({ length: 7 }).map((_, idx) => {
-                const c = idx + 1;
-                const x = OFFSET_X + c * STEP;
-                return (
-                  <g key={`v-line-${c}`}>
-                    <line
-                      x1={x}
-                      y1={OFFSET_Y}
-                      x2={x}
-                      y2={OFFSET_Y + 4 * STEP}
-                      stroke={themeColors.inkLine}
-                      strokeWidth="2"
-                      strokeOpacity="0.85"
-                    />
-                    <line
-                      x1={x}
-                      y1={OFFSET_Y + 5 * STEP}
-                      x2={x}
-                      y2={OFFSET_Y + 9 * STEP}
-                      stroke={themeColors.inkLine}
-                      strokeWidth="2"
-                      strokeOpacity="0.85"
-                    />
-                  </g>
-                );
-              })}
-
-              {/* 南北九宫米字斜线 */}
-              <g
+        {/* 内部七条纵线 */}
+        {Array.from({ length: 7 }).map((_, idx) => {
+          const c = idx + 1;
+          const x = OFFSET_X + c * STEP;
+          return (
+            <g key={`v-line-${c}`}>
+              <line
+                x1={x}
+                y1={OFFSET_Y}
+                x2={x}
+                y2={OFFSET_Y + 4 * STEP}
                 stroke={themeColors.inkLine}
                 strokeWidth="2"
-                strokeOpacity="0.82"
-                strokeDasharray="6 3"
+                strokeOpacity="0.85"
+              />
+              <line
+                x1={x}
+                y1={OFFSET_Y + 5 * STEP}
+                x2={x}
+                y2={OFFSET_Y + 9 * STEP}
+                stroke={themeColors.inkLine}
+                strokeWidth="2"
+                strokeOpacity="0.85"
+              />
+            </g>
+          );
+        })}
+
+        {/* 南北九宫米字斜线 */}
+        <g
+          stroke={themeColors.inkLine}
+          strokeWidth="2"
+          strokeOpacity="0.82"
+          strokeDasharray="6 3"
+        >
+          <line
+            x1={OFFSET_X + 3 * STEP}
+            y1={OFFSET_Y}
+            x2={OFFSET_X + 5 * STEP}
+            y2={OFFSET_Y + 2 * STEP}
+          />
+          <line
+            x1={OFFSET_X + 5 * STEP}
+            y1={OFFSET_Y}
+            x2={OFFSET_X + 3 * STEP}
+            y2={OFFSET_Y + 2 * STEP}
+          />
+          <line
+            x1={OFFSET_X + 3 * STEP}
+            y1={OFFSET_Y + 7 * STEP}
+            x2={OFFSET_X + 5 * STEP}
+            y2={OFFSET_Y + 9 * STEP}
+          />
+          <line
+            x1={OFFSET_X + 5 * STEP}
+            y1={OFFSET_Y + 7 * STEP}
+            x2={OFFSET_X + 3 * STEP}
+            y2={OFFSET_Y + 9 * STEP}
+          />
+        </g>
+
+        {/* 九宫中心中军宝座菱形花饰 */}
+        {[1, 8].map((centerRow) => {
+          const cx = OFFSET_X + 4 * STEP;
+          const cy = OFFSET_Y + centerRow * STEP;
+          return (
+            <polygon
+              key={`palace-gem-${centerRow}`}
+              points={`${cx},${cy - 8} ${cx + 8},${cy} ${cx},${cy + 8} ${cx - 8},${cy}`}
+              fill={themeColors.inkLine}
+              fillOpacity="0.32"
+            />
+          );
+        })}
+
+        {/* 14个炮位与兵卒位传统直角折角标 */}
+        {FIDUCIAL_POSITIONS.map(([r, c]) => renderFiducialMark(r, c))}
+
+        {/* 楚河汉界书法榜书与闲章 */}
+        <g className="select-none pointer-events-none">
+          <text
+            x={OFFSET_X + 1.85 * STEP}
+            y={OFFSET_Y + 4.64 * STEP}
+            textAnchor="middle"
+            fill={themeColors.riverText}
+            fillOpacity="0.86"
+            className="font-calligraphy text-[52px] tracking-[0.28em]"
+          >
+            楚河
+          </text>
+          <g
+            transform={`translate(${OFFSET_X + 4 * STEP - 18}, ${
+              OFFSET_Y + 4.5 * STEP - 18
+            })`}
+          >
+            <rect
+              width="36"
+              height="36"
+              rx="3"
+              fill={themeColors.sealRed}
+              fillOpacity="0.82"
+            />
+            <rect
+              x="2.5"
+              y="2.5"
+              width="31"
+              height="31"
+              fill="none"
+              stroke="#F4EFE6"
+              strokeWidth="1"
+              strokeOpacity="0.7"
+            />
+            <text
+              x="18"
+              y="15"
+              textAnchor="middle"
+              fill="#F4EFE6"
+              className="font-serif-sc text-[10px] font-bold"
+            >
+              觀棋
+            </text>
+            <text
+              x="18"
+              y="28"
+              textAnchor="middle"
+              fill="#F4EFE6"
+              className="font-serif-sc text-[10px] font-bold"
+            >
+              不語
+            </text>
+          </g>
+          <text
+            x={OFFSET_X + 6.25 * STEP}
+            y={OFFSET_Y + 4.64 * STEP}
+            textAnchor="middle"
+            fill={themeColors.riverText}
+            fillOpacity="0.86"
+            className="font-calligraphy text-[52px] tracking-[0.28em]"
+          >
+            漢界
+          </text>
+        </g>
+      </svg>
+    );
+  }
+);
+
+/* ==================== 第 2 层：动态指示箭头层（悬停预览/主变/威胁变化时仅重绘本层） ==================== */
+const DynamicArrowLayer: React.FC<{
+  flipped: boolean;
+  lastMove: MoveRecord | null;
+  multiPvArrows: MultiPVArrow[];
+  secondaryPvArrow: MultiPVArrow | null;
+  threatArrow: MultiPVArrow | null;
+  hoveredArrow: MultiPVArrow | null;
+  hintArrow: MultiPVArrow | null;
+}> = React.memo(
+  ({
+    flipped,
+    lastMove,
+    multiPvArrows,
+    secondaryPvArrow,
+    threatArrow,
+    hoveredArrow,
+    hintArrow,
+  }) => {
+    const toVisualCoord = (row: number, col: number) => ({
+      vRow: flipped ? 9 - row : row,
+      vCol: flipped ? 8 - col : col,
+    });
+
+    const renderSvgArrow = (
+      arrow: MultiPVArrow,
+      key: string,
+      color: string,
+      markerId: string,
+      isDashed = false,
+      strokeW = '12',
+      labelRatio = 0.5
+    ) => {
+      const vf = toVisualCoord(arrow.from.row, arrow.from.col);
+      const vt = toVisualCoord(arrow.to.row, arrow.to.col);
+      const x1 = OFFSET_X + vf.vCol * STEP;
+      const y1 = OFFSET_Y + vf.vRow * STEP;
+      const x2 = OFFSET_X + vt.vCol * STEP;
+      const y2 = OFFSET_Y + vt.vRow * STEP;
+      const midX = x1 + (x2 - x1) * labelRatio;
+      const midY = y1 + (y2 - y1) * labelRatio;
+      const boxWidth = Math.max(76, arrow.scoreText.length * 10 + 18);
+
+      return (
+        <g key={key} className="pointer-events-none">
+          <line
+            x1={x1}
+            y1={y1}
+            x2={x2}
+            y2={y2}
+            stroke={color}
+            strokeWidth={strokeW}
+            strokeLinecap="round"
+            strokeDasharray={isDashed ? '12 8' : undefined}
+            strokeOpacity="0.88"
+            markerEnd={`url(#${markerId})`}
+          />
+          <g transform={`translate(${midX}, ${midY})`}>
+            <rect
+              x={-boxWidth / 2}
+              y="-13"
+              width={boxWidth}
+              height="26"
+              rx="6"
+              fill="#1A1412"
+              fillOpacity="0.92"
+              stroke={color}
+              strokeWidth="1.5"
+            />
+            <text
+              x="0"
+              y="5"
+              textAnchor="middle"
+              fill="#FAF5EB"
+              className="font-mono-tabular text-[13px] font-semibold"
+            >
+              {arrow.scoreText}
+            </text>
+          </g>
+        </g>
+      );
+    };
+
+    return (
+      <svg
+        viewBox="0 0 900 1000"
+        className="absolute inset-0 w-full h-full pointer-events-none"
+        aria-hidden="true"
+      >
+        <defs>
+          <marker
+            id="arrow-primary"
+            viewBox="0 0 10 10"
+            refX="7"
+            refY="5"
+            markerWidth="5.5"
+            markerHeight="5.5"
+            orient="auto-start-reverse"
+          >
+            <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#10B981" fillOpacity="0.95" />
+          </marker>
+          <marker
+            id="arrow-secondary"
+            viewBox="0 0 10 10"
+            refX="7"
+            refY="5"
+            markerWidth="5"
+            markerHeight="5"
+            orient="auto-start-reverse"
+          >
+            <path d="M 0 1.5 L 8.5 5 L 0 8.5 z" fill="#B87D1E" fillOpacity="0.82" />
+          </marker>
+          <marker
+            id="arrow-threat"
+            viewBox="0 0 10 10"
+            refX="7"
+            refY="5"
+            markerWidth="5.5"
+            markerHeight="5.5"
+            orient="auto-start-reverse"
+          >
+            <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#D93829" fillOpacity="0.95" />
+          </marker>
+          <marker
+            id="arrow-ghost"
+            viewBox="0 0 10 10"
+            refX="7"
+            refY="5"
+            markerWidth="5.5"
+            markerHeight="5.5"
+            orient="auto-start-reverse"
+          >
+            <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#D4AF37" fillOpacity="0.95" />
+          </marker>
+          <marker
+            id="arrow-compare-secondary"
+            viewBox="0 0 10 10"
+            refX="7"
+            refY="5"
+            markerWidth="5.5"
+            markerHeight="5.5"
+            orient="auto-start-reverse"
+          >
+            <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#3B82F6" fillOpacity="0.95" />
+          </marker>
+        </defs>
+
+        {/* 上一步起止轨迹虚线指示 */}
+        {lastMove &&
+          (() => {
+            const vf = toVisualCoord(lastMove.from.row, lastMove.from.col);
+            const vt = toVisualCoord(lastMove.to.row, lastMove.to.col);
+            return (
+              <g className="pointer-events-none">
+                <line
+                  x1={OFFSET_X + vf.vCol * STEP}
+                  y1={OFFSET_Y + vf.vRow * STEP}
+                  x2={OFFSET_X + vt.vCol * STEP}
+                  y2={OFFSET_Y + vt.vRow * STEP}
+                  stroke="#9E2A2B"
+                  strokeWidth="3"
+                  strokeDasharray="6 4"
+                  strokeOpacity="0.7"
+                />
+                <circle
+                  cx={OFFSET_X + vf.vCol * STEP}
+                  cy={OFFSET_Y + vf.vRow * STEP}
+                  r="7"
+                  fill="#9E2A2B"
+                  fillOpacity="0.75"
+                />
+              </g>
+            );
+          })()}
+
+        {/* MultiPV 引擎主变/次变箭头层 */}
+        {multiPvArrows.map((arrow) =>
+          renderSvgArrow(
+            arrow,
+            `pv-arrow-${arrow.rank}`,
+            arrow.rank === 1 ? '#10B981' : '#B87D1E',
+            arrow.rank === 1 ? 'arrow-primary' : 'arrow-secondary',
+            arrow.rank !== 1,
+            arrow.isConsensus ? '14' : arrow.rank === 1 ? '13' : '7.5',
+            arrow.rank === 1 ? 0.46 : arrow.rank === 2 ? 0.64 : 0.34
+          )
+        )}
+
+        {/* 双擎对比模式：副引擎首推着法天青蓝箭头 */}
+        {secondaryPvArrow &&
+          renderSvgArrow(
+            secondaryPvArrow,
+            'secondary-engine-arrow',
+            '#3B82F6',
+            'arrow-compare-secondary',
+            false,
+            '11.5',
+            0.64
+          )}
+
+        {/* 对手威胁雷达箭头 */}
+        {threatArrow &&
+          renderSvgArrow(threatArrow, 'threat-arrow', '#D93829', 'arrow-threat', true, '10')}
+
+        {/* 锦囊提示箭头 */}
+        {hintArrow &&
+          renderSvgArrow(hintArrow, 'hint-arrow', '#D4AF37', 'arrow-ghost', false, '14')}
+
+        {/* 悬停幽灵预览箭头 */}
+        {hoveredArrow &&
+          renderSvgArrow(hoveredArrow, 'hovered-arrow', '#D4AF37', 'arrow-ghost', false, '14')}
+      </svg>
+    );
+  }
+);
+
+/* ==================== 第 3 层：记忆化 90 交点与立体棋子单元格 ==================== */
+const IntersectionCell: React.FC<{
+  row: number;
+  col: number;
+  leftPct: number;
+  topPct: number;
+  piece: Piece | null;
+  isSelected: boolean;
+  isLegalTarget: boolean;
+  isLastMoveDest: boolean;
+  impactCamp: Camp | null;
+  impactIsCapture: boolean;
+  impactId: number | null;
+  isPieceInCheck: boolean;
+  craftStyle: PieceCraftStyle;
+  fontScheme: FontScheme;
+  useTraditionalChar: boolean;
+  onSelectIntersection: (row: number, col: number) => void;
+}> = React.memo(
+  ({
+    row,
+    col,
+    leftPct,
+    topPct,
+    piece,
+    isSelected,
+    isLegalTarget,
+    isLastMoveDest,
+    impactCamp,
+    impactIsCapture,
+    impactId,
+    isPieceInCheck,
+    craftStyle,
+    fontScheme,
+    useTraditionalChar,
+    onSelectIntersection,
+  }) => {
+    return (
+      <div
+        style={{
+          left: `${leftPct}%`,
+          top: `${topPct}%`,
+          width: '9.4%',
+          height: '8.46%',
+        }}
+        className="absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-center"
+      >
+        {impactId !== null && impactCamp && (
+          <ImpactDustBurst
+            camp={impactCamp}
+            isCapture={impactIsCapture}
+            effectId={impactId}
+          />
+        )}
+
+        {!piece && (
+          <button
+            type="button"
+            onClick={() => onSelectIntersection(row, col)}
+            aria-label={`交叉点 第${row + 1}横 第${col + 1}路`}
+            className="w-full h-full rounded-full flex items-center justify-center cursor-pointer group focus:outline-none"
+          >
+            {isLegalTarget ? (
+              <span className="relative flex items-center justify-center w-5 h-5">
+                <span className="w-3.5 h-3.5 rounded-full bg-[#3E6B52] border border-[#D4AF37] shadow-[0_0_8px_rgba(62,107,82,0.85)] transition-transform group-hover:scale-125" />
+              </span>
+            ) : (
+              <span className="w-2 h-2 rounded-full bg-transparent group-hover:bg-[#9E2A2B]/25 transition-colors" />
+            )}
+          </button>
+        )}
+
+        {piece && (
+          <div
+            key={impactId !== null ? `piece-land-${impactId}` : piece.id}
+            className={`relative w-full h-full flex items-center justify-center ${
+              impactId !== null ? 'animate-piece-land' : ''
+            }`}
+          >
+            <XiangqiPiece
+              piece={piece}
+              isSelected={isSelected}
+              isLastMove={isLastMoveDest}
+              isInCheck={isPieceInCheck}
+              craftStyle={craftStyle}
+              fontScheme={fontScheme}
+              useTraditionalChar={useTraditionalChar}
+              onSelectIntersection={onSelectIntersection}
+            />
+
+            {isLegalTarget && (
+              <button
+                type="button"
+                onClick={() => onSelectIntersection(row, col)}
+                aria-label={`吃掉${piece.camp === 'red' ? '红' : '黑'}子`}
+                className="absolute -inset-1 z-40 cursor-pointer pointer-events-auto flex items-center justify-center"
               >
-                <line
-                  x1={OFFSET_X + 3 * STEP}
-                  y1={OFFSET_Y}
-                  x2={OFFSET_X + 5 * STEP}
-                  y2={OFFSET_Y + 2 * STEP}
-                />
-                <line
-                  x1={OFFSET_X + 5 * STEP}
-                  y1={OFFSET_Y}
-                  x2={OFFSET_X + 3 * STEP}
-                  y2={OFFSET_Y + 2 * STEP}
-                />
-                <line
-                  x1={OFFSET_X + 3 * STEP}
-                  y1={OFFSET_Y + 7 * STEP}
-                  x2={OFFSET_X + 5 * STEP}
-                  y2={OFFSET_Y + 9 * STEP}
-                />
-                <line
-                  x1={OFFSET_X + 5 * STEP}
-                  y1={OFFSET_Y + 7 * STEP}
-                  x2={OFFSET_X + 3 * STEP}
-                  y2={OFFSET_Y + 9 * STEP}
-                />
-              </g>
+                <span className="w-full h-full rounded-full border-2 border-[#C8372D] shadow-[0_0_12px_rgba(200,55,45,0.85)]" />
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+);
 
-              {/* 九宫中心中军宝座菱形花饰 */}
-              {[1, 8].map((centerRow) => {
-                const cx = OFFSET_X + 4 * STEP;
-                const cy = OFFSET_Y + centerRow * STEP;
-                return (
-                  <polygon
-                    key={`palace-gem-${centerRow}`}
-                    points={`${cx},${cy - 8} ${cx + 8},${cy} ${cx},${cy + 8} ${cx - 8},${cy}`}
-                    fill={themeColors.inkLine}
-                    fillOpacity="0.32"
-                  />
-                );
-              })}
+export const Board: React.FC<BoardProps> = React.memo(
+  ({
+    pieces,
+    selectedPieceId,
+    legalMoves,
+    lastMove,
+    multiPvArrows = [],
+    secondaryPvArrow = null,
+    threatArrow = null,
+    hoveredArrow = null,
+    hintArrow = null,
+    impactEffect = null,
+    redCheckPos: propRedCheckPos,
+    blackCheckPos: propBlackCheckPos,
+    boardTheme,
+    craftStyle,
+    fontScheme,
+    useTraditionalChar,
+    flipped,
+    workspace,
+    isVariationActive = false,
+    onSelectIntersection,
+  }) => {
+    const themeColors = THEME_PALETTES[boardTheme];
 
-              {/* 14个炮位与兵卒位传统直角折角标 */}
-              {fiducialPositions.map(([r, c]) => renderFiducialMark(r, c))}
+    const boardGrid = useMemo(() => buildBoardGrid(pieces), [pieces]);
 
-              {/* 楚河汉界书法榜书与闲章 */}
-              <g className="select-none pointer-events-none">
-                <text
-                  x={OFFSET_X + 1.85 * STEP}
-                  y={OFFSET_Y + 4.64 * STEP}
-                  textAnchor="middle"
-                  fill={themeColors.riverText}
-                  fillOpacity="0.86"
-                  className="font-calligraphy text-[52px] tracking-[0.28em]"
-                >
-                  楚河
-                </text>
-                <g
-                  transform={`translate(${OFFSET_X + 4 * STEP - 18}, ${
-                    OFFSET_Y + 4.5 * STEP - 18
-                  })`}
-                >
-                  <rect
-                    width="36"
-                    height="36"
-                    rx="3"
-                    fill={themeColors.sealRed}
-                    fillOpacity="0.82"
-                  />
-                  <rect
-                    x="2.5"
-                    y="2.5"
-                    width="31"
-                    height="31"
-                    fill="none"
-                    stroke="#F4EFE6"
-                    strokeWidth="1"
-                    strokeOpacity="0.7"
-                  />
-                  <text
-                    x="18"
-                    y="15"
-                    textAnchor="middle"
-                    fill="#F4EFE6"
-                    className="font-serif-sc text-[10px] font-bold"
-                  >
-                    觀棋
-                  </text>
-                  <text
-                    x="18"
-                    y="28"
-                    textAnchor="middle"
-                    fill="#F4EFE6"
-                    className="font-serif-sc text-[10px] font-bold"
-                  >
-                    不語
-                  </text>
-                </g>
-                <text
-                  x={OFFSET_X + 6.25 * STEP}
-                  y={OFFSET_Y + 4.64 * STEP}
-                  textAnchor="middle"
-                  fill={themeColors.riverText}
-                  fillOpacity="0.86"
-                  className="font-calligraphy text-[52px] tracking-[0.28em]"
-                >
-                  漢界
-                </text>
-              </g>
+    const legalTargetSet = useMemo(() => {
+      const set = new Set<number>();
+      for (let i = 0; i < legalMoves.length; i++) {
+        set.add(legalMoves[i].row * 9 + legalMoves[i].col);
+      }
+      return set;
+    }, [legalMoves]);
 
-              {/* 上一步起止轨迹虚线指示 */}
-              {lastMove &&
-                (() => {
-                  const vf = toVisualCoord(lastMove.from.row, lastMove.from.col);
-                  const vt = toVisualCoord(lastMove.to.row, lastMove.to.col);
-                  return (
-                    <g className="pointer-events-none">
-                      <line
-                        x1={OFFSET_X + vf.vCol * STEP}
-                        y1={OFFSET_Y + vf.vRow * STEP}
-                        x2={OFFSET_X + vt.vCol * STEP}
-                        y2={OFFSET_Y + vt.vRow * STEP}
-                        stroke="#9E2A2B"
-                        strokeWidth="3"
-                        strokeDasharray="6 4"
-                        strokeOpacity="0.7"
+    const { redCheckPos, blackCheckPos } = useMemo(() => {
+      if (propRedCheckPos !== undefined || propBlackCheckPos !== undefined) {
+        return {
+          redCheckPos: propRedCheckPos ?? null,
+          blackCheckPos: propBlackCheckPos ?? null,
+        };
+      }
+      return {
+        redCheckPos: isCampInCheck(pieces, 'red', boardGrid),
+        blackCheckPos: isCampInCheck(pieces, 'black', boardGrid),
+      };
+    }, [propRedCheckPos, propBlackCheckPos, pieces, boardGrid]);
+
+    const anyCheckPos = redCheckPos || blackCheckPos;
+
+    const modeRimClass = isVariationActive
+      ? 'ring-2 ring-[#D4AF37] shadow-[0_0_24px_rgba(212,175,55,0.28)]'
+      : workspace === 'challenge'
+      ? 'ring-1 ring-[#C8372D]/60'
+      : workspace === 'setup'
+      ? 'ring-2 ring-[#C87D3B]'
+      : '';
+
+    return (
+      <div className="relative flex items-center justify-center gap-3 select-none">
+        {/* 棋盘主体容器：随视口高度自适应缩放，确保与上下棋手栏、操控栏在一屏内完整容纳不产生滚动条 */}
+        <div className="relative w-[clamp(280px,calc((100vh-226px)*0.86),590px)] transition-all">
+          <div
+            className={`relative rounded-xl p-2 sm:p-2.5 border-2 transition-all duration-200 ${themeColors.frameClass} ${modeRimClass}`}
+          >
+            {/* 四个传统黄铜回纹包角 */}
+            <span className="absolute top-1.5 left-1.5 w-4 h-4 border-t-2 border-l-2 border-[#D4AF37]/50 pointer-events-none" />
+            <span className="absolute top-1.5 right-1.5 w-4 h-4 border-t-2 border-r-2 border-[#D4AF37]/50 pointer-events-none" />
+            <span className="absolute bottom-1.5 left-1.5 w-4 h-4 border-b-2 border-l-2 border-[#D4AF37]/50 pointer-events-none" />
+            <span className="absolute bottom-1.5 right-1.5 w-4 h-4 border-b-2 border-r-2 border-[#D4AF37]/50 pointer-events-none" />
+
+            {/* 将军浮层徽章 */}
+            {anyCheckPos && (
+              <div className="absolute top-3 right-4 z-40 px-2.5 py-0.5 rounded bg-[#C8372D] text-[#FAF5EB] text-xs font-serif-sc font-bold tracking-widest shadow-lg border border-[#D4AF37]/60 pointer-events-none">
+                將軍
+              </div>
+            )}
+
+            {/* 内联推演支线激活提示角标 */}
+            {isVariationActive && (
+              <div className="absolute top-3 left-4 z-40 px-2 py-0.5 rounded bg-[#D4AF37] text-[#18120E] text-[11px] font-semibold shadow pointer-events-none">
+                推演分支中
+              </div>
+            )}
+
+            {/* 内部盘面画布 (宽高比 9:10) */}
+            <div className="relative w-full aspect-[9/10] rounded-lg overflow-hidden shadow-inner">
+              <StaticBoardSurface boardTheme={boardTheme} flipped={flipped} />
+
+              <DynamicArrowLayer
+                flipped={flipped}
+                lastMove={lastMove}
+                multiPvArrows={multiPvArrows}
+                secondaryPvArrow={secondaryPvArrow}
+                threatArrow={threatArrow}
+                hoveredArrow={hoveredArrow}
+                hintArrow={hintArrow}
+              />
+
+              {/* 第三层：90 个记忆化交叉点与立体棋子 */}
+              <div className="absolute inset-0">
+                {Array.from({ length: 10 }).map((_, row) =>
+                  Array.from({ length: 9 }).map((__, col) => {
+                    const vRow = flipped ? 9 - row : row;
+                    const vCol = flipped ? 8 - col : col;
+                    const leftPct = ((OFFSET_X + vCol * STEP) / 900) * 100;
+                    const topPct = ((OFFSET_Y + vRow * STEP) / 1000) * 100;
+
+                    const idx = row * 9 + col;
+                    const piece = boardGrid[idx];
+                    const isSelected = piece ? piece.id === selectedPieceId : false;
+                    const isLegalTarget = legalTargetSet.has(idx);
+                    const isLastMoveDest =
+                      lastMove?.to.row === row && lastMove?.to.col === col;
+                    const isImpactHere =
+                      impactEffect !== null &&
+                      impactEffect.row === row &&
+                      impactEffect.col === col;
+                    const isPieceInCheck =
+                      piece !== null &&
+                      piece.type === 'general' &&
+                      ((piece.camp === 'red' && redCheckPos !== null) ||
+                        (piece.camp === 'black' && blackCheckPos !== null));
+
+                    return (
+                      <IntersectionCell
+                        key={`intersection-${row}-${col}`}
+                        row={row}
+                        col={col}
+                        leftPct={leftPct}
+                        topPct={topPct}
+                        piece={piece}
+                        isSelected={isSelected}
+                        isLegalTarget={isLegalTarget}
+                        isLastMoveDest={isLastMoveDest}
+                        impactCamp={isImpactHere ? impactEffect.camp : null}
+                        impactIsCapture={isImpactHere ? impactEffect.isCapture : false}
+                        impactId={isImpactHere ? impactEffect.id : null}
+                        isPieceInCheck={isPieceInCheck}
+                        craftStyle={craftStyle}
+                        fontScheme={fontScheme}
+                        useTraditionalChar={useTraditionalChar}
+                        onSelectIntersection={onSelectIntersection}
                       />
-                      <circle
-                        cx={OFFSET_X + vf.vCol * STEP}
-                        cy={OFFSET_Y + vf.vRow * STEP}
-                        r="7"
-                        fill="#9E2A2B"
-                        fillOpacity="0.75"
-                      />
-                    </g>
-                  );
-                })()}
-
-              {/* MultiPV 引擎主变/次变箭头层 (错位排布标签比例以防同起点走法遮挡) */}
-              {multiPvArrows.map((arrow) =>
-                renderSvgArrow(
-                  arrow,
-                  `pv-arrow-${arrow.rank}`,
-                  arrow.rank === 1 ? '#10B981' : '#B87D1E',
-                  arrow.rank === 1 ? 'arrow-primary' : 'arrow-secondary',
-                  arrow.rank !== 1,
-                  arrow.isConsensus ? '14' : arrow.rank === 1 ? '13' : '7.5',
-                  arrow.rank === 1 ? 0.46 : arrow.rank === 2 ? 0.64 : 0.34
-                )
-              )}
-
-              {/* 双擎对比模式：副引擎首推着法天青蓝箭头 (当与主引擎分歧时独立显示，标签置于 0.64 处避免与主擎交叉重叠) */}
-              {secondaryPvArrow &&
-                renderSvgArrow(
-                  secondaryPvArrow,
-                  'secondary-engine-arrow',
-                  '#3B82F6',
-                  'arrow-compare-secondary',
-                  false,
-                  '11.5',
-                  0.64
+                    );
+                  })
                 )}
-
-              {/* 对手威胁雷达箭头 (Threat Radar) */}
-              {threatArrow &&
-                renderSvgArrow(
-                  threatArrow,
-                  'threat-arrow',
-                  '#D93829',
-                  'arrow-threat',
-                  true,
-                  '10'
-                )}
-
-              {/* 锦囊提示箭头 (Hint Move) */}
-              {hintArrow &&
-                renderSvgArrow(hintArrow, 'hint-arrow', '#D4AF37', 'arrow-ghost', false, '14')}
-
-              {/* 悬停幽灵预览箭头 (Hover Ghost Preview) */}
-              {hoveredArrow &&
-                renderSvgArrow(
-                  hoveredArrow,
-                  'hovered-arrow',
-                  '#D4AF37',
-                  'arrow-ghost',
-                  false,
-                  '14'
-                )}
-            </svg>
-
-            {/* 第二层：DOM + CSS 九路十线 90 个交叉点与立体棋子层 */}
-            <div className="absolute inset-0">
-              {Array.from({ length: 10 }).map((_, row) =>
-                Array.from({ length: 9 }).map((__, col) => {
-                  const { vRow, vCol } = toVisualCoord(row, col);
-                  const leftPct = ((OFFSET_X + vCol * STEP) / 900) * 100;
-                  const topPct = ((OFFSET_Y + vRow * STEP) / 1000) * 100;
-
-                  const piece = getPieceAt(pieces, row, col);
-                  const isSelected = piece ? piece.id === selectedPieceId : false;
-                  const isLegalTarget = legalMoves.some((m) => m.row === row && m.col === col);
-                  const isLastMoveDest =
-                    lastMove?.to.row === row && lastMove?.to.col === col;
-                  const isImpactHere =
-                    impactEffect && impactEffect.row === row && impactEffect.col === col;
-                  const isPieceInCheck =
-                    piece?.type === 'general' &&
-                    ((piece.camp === 'red' && !!redCheckPos) ||
-                      (piece.camp === 'black' && !!blackCheckPos));
-
-                  return (
-                    <div
-                      key={`intersection-${row}-${col}`}
-                      style={{
-                        left: `${leftPct}%`,
-                        top: `${topPct}%`,
-                        width: '9.4%',
-                        height: '8.46%',
-                      }}
-                      className="absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-center"
-                    >
-                      {isImpactHere && (
-                        <ImpactDustBurst
-                          camp={impactEffect.camp}
-                          isCapture={impactEffect.isCapture}
-                          effectId={impactEffect.id}
-                        />
-                      )}
-
-                      {!piece && (
-                        <button
-                          type="button"
-                          onClick={() => onSelectIntersection(row, col)}
-                          aria-label={`交叉点 第${row + 1}横 第${col + 1}路`}
-                          className="w-full h-full rounded-full flex items-center justify-center cursor-pointer group focus:outline-none"
-                        >
-                          {isLegalTarget ? (
-                            <span className="relative flex items-center justify-center w-5 h-5">
-                              <span className="w-3.5 h-3.5 rounded-full bg-[#3E6B52] border border-[#D4AF37] shadow-[0_0_8px_rgba(62,107,82,0.85)] transition-transform group-hover:scale-125" />
-                            </span>
-                          ) : (
-                            <span className="w-2 h-2 rounded-full bg-transparent group-hover:bg-[#9E2A2B]/25 transition-colors" />
-                          )}
-                        </button>
-                      )}
-
-                      {piece && (
-                        <div
-                          key={isImpactHere ? `piece-land-${impactEffect.id}` : piece.id}
-                          className={`relative w-full h-full flex items-center justify-center ${
-                            isImpactHere ? 'animate-piece-land' : ''
-                          }`}
-                        >
-                          <XiangqiPiece
-                            piece={piece}
-                            isSelected={isSelected}
-                            isLastMove={isLastMoveDest}
-                            isInCheck={isPieceInCheck}
-                            craftStyle={craftStyle}
-                            fontScheme={fontScheme}
-                            useTraditionalChar={useTraditionalChar}
-                            onClick={() => onSelectIntersection(row, col)}
-                          />
-
-                          {isLegalTarget && (
-                            <button
-                              type="button"
-                              onClick={() => onSelectIntersection(row, col)}
-                              aria-label={`吃掉${piece.camp === 'red' ? '红' : '黑'}子`}
-                              className="absolute -inset-1 z-40 cursor-pointer pointer-events-auto flex items-center justify-center"
-                            >
-                              <span className="w-full h-full rounded-full border-2 border-[#C8372D] shadow-[0_0_12px_rgba(200,55,45,0.85)]" />
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              )}
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  );
-};
+    );
+  }
+);

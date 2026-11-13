@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowRightCircle,
   Award,
@@ -49,6 +49,7 @@ import {
   WorkspaceMode,
 } from './types/xiangqi';
 import {
+  buildBoardGrid,
   calculateMaterialAndCaptures,
   createInitialPieces,
   createKingsOnlyPieces,
@@ -60,6 +61,7 @@ import {
   generateSimulatedMultiPV,
   getLegalMovesForPiece,
   getPieceAt,
+  getPieceAtGrid,
   isCampInCheck,
   parseFenToPieces,
   piecesToFen,
@@ -188,7 +190,13 @@ export default function App() {
   }, [appTheme, fontScale]);
 
   // ==================== 2. 核心工作空间、棋谱主线与无感内联分支 ====================
-  const sampleSession = useMemo(() => createSampleSessionMoves(), []);
+  const sampleSessionRef = useRef<ReturnType<typeof createSampleSessionMoves> | null>(null);
+  const getSampleSession = useCallback(() => {
+    if (!sampleSessionRef.current) {
+      sampleSessionRef.current = createSampleSessionMoves();
+    }
+    return sampleSessionRef.current;
+  }, []);
   const [workspace, setWorkspace] = useState<WorkspaceMode>('study');
   const [rightTab, setRightTab] = useState<'moves' | 'review'>('moves');
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
@@ -414,26 +422,55 @@ export default function App() {
   const [libraryGames, setLibraryGames] = useState<LibraryGameItem[]>(INITIAL_LIBRARY_GAMES);
   const [activeModal, setActiveModal] = useState<ActiveModalId>(null);
 
-  // 自动持久化「复盘分析」当前会话与偏好设置
-  useEffect(() => {
-    if (workspace !== 'study') return;
+  // 自动防抖持久化「复盘分析」当前会话，并在页面隐藏/卸载前立即落盘
+  const latestStudyPayloadRef = useRef<StoredStudySession | null>(null);
+  const studyPersistTimerRef = useRef<number | null>(null);
+
+  const flushStudyPersistence = useCallback(() => {
+    if (studyPersistTimerRef.current !== null) {
+      window.clearTimeout(studyPersistTimerRef.current);
+      studyPersistTimerRef.current = null;
+    }
+    if (!latestStudyPayloadRef.current) return;
     try {
-      const payload: StoredStudySession = {
-        pieces,
-        basePieces: studyBasePieces,
-        baseTurn: studyBaseTurn,
-        mainMoves,
-        variationMoves,
-        branchOriginPly,
-        currentPly,
-        turn,
-        metadata,
-        flipped,
-      };
-      window.localStorage.setItem(STUDY_SESSION_STORAGE_KEY, JSON.stringify(payload));
+      window.localStorage.setItem(
+        STUDY_SESSION_STORAGE_KEY,
+        JSON.stringify(latestStudyPayloadRef.current)
+      );
     } catch {
       // Ignore storage quota errors
     }
+  }, []);
+
+  useEffect(() => {
+    if (workspace !== 'study') return;
+    latestStudyPayloadRef.current = {
+      pieces,
+      basePieces: studyBasePieces,
+      baseTurn: studyBaseTurn,
+      mainMoves,
+      variationMoves,
+      branchOriginPly,
+      currentPly,
+      turn,
+      metadata,
+      flipped,
+    };
+    if (studyPersistTimerRef.current !== null) {
+      window.clearTimeout(studyPersistTimerRef.current);
+    }
+    studyPersistTimerRef.current = window.setTimeout(() => {
+      studyPersistTimerRef.current = null;
+      if (!latestStudyPayloadRef.current) return;
+      try {
+        window.localStorage.setItem(
+          STUDY_SESSION_STORAGE_KEY,
+          JSON.stringify(latestStudyPayloadRef.current)
+        );
+      } catch {
+        // Ignore storage quota errors
+      }
+    }, 350);
   }, [
     workspace,
     pieces,
@@ -447,6 +484,16 @@ export default function App() {
     metadata,
     flipped,
   ]);
+
+  useEffect(() => {
+    window.addEventListener('pagehide', flushStudyPersistence);
+    window.addEventListener('beforeunload', flushStudyPersistence);
+    return () => {
+      window.removeEventListener('pagehide', flushStudyPersistence);
+      window.removeEventListener('beforeunload', flushStudyPersistence);
+      flushStudyPersistence();
+    };
+  }, [flushStudyPersistence]);
 
   useEffect(() => {
     try {
@@ -485,22 +532,24 @@ export default function App() {
     engineHashMb,
   ]);
 
-  // ==================== 3. 派生计算：当前谱系、子力战利品、合法落点与威胁雷达 ====================
+  // ==================== 3. 派生计算：O(1) 棋盘索引、防抖异步引擎分析与单次将军校验 ====================
   const activeMovesList = variationMoves || mainMoves;
   const lastMove = useMemo(() => {
     if (currentPly <= 0) return null;
     return activeMovesList[currentPly - 1] || null;
   }, [activeMovesList, currentPly]);
 
+  const boardGrid = useMemo(() => buildBoardGrid(pieces), [pieces]);
+
   const selectedPiece = useMemo(
-    () => pieces.find((p) => p.id === selectedPieceId) || null,
+    () => (selectedPieceId ? pieces.find((p) => p.id === selectedPieceId) || null : null),
     [pieces, selectedPieceId]
   );
 
   const legalMoves = useMemo(() => {
     if (!selectedPiece || workspace === 'setup' || isBotThinking) return [];
-    return getLegalMovesForPiece(selectedPiece, pieces);
-  }, [selectedPiece, pieces, workspace, isBotThinking]);
+    return getLegalMovesForPiece(selectedPiece, pieces, boardGrid);
+  }, [selectedPiece, pieces, boardGrid, workspace, isBotThinking]);
 
   const primaryEngine = useMemo(
     () => engines.find((e) => e.id === primaryEngineId) || engines[0],
@@ -514,13 +563,34 @@ export default function App() {
     [engines, secondaryEngineId, primaryEngine.id]
   );
 
+  // 快速跳步或自动播放期间对引擎分析防抖（120ms）并交由低优先级过渡队列，确保棋盘响应 60fps
+  const [debouncedAnalysisTarget, setDebouncedAnalysisTarget] = useState<{
+    pieces: Piece[];
+    turn: Camp;
+  }>(() => ({ pieces, turn }));
+
+  useEffect(() => {
+    if (workspace !== 'study' || !isAnalyzing) return;
+    if (debouncedAnalysisTarget.pieces === pieces && debouncedAnalysisTarget.turn === turn) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setDebouncedAnalysisTarget({ pieces, turn });
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [workspace, isAnalyzing, pieces, turn, debouncedAnalysisTarget]);
+
+  const deferredAnalysisTarget = useDeferredValue(debouncedAnalysisTarget);
+  const analysisMatchesCurrent =
+    deferredAnalysisTarget.pieces === pieces && deferredAnalysisTarget.turn === turn;
+
   const multiPvData = useMemo(() => {
-    if (primaryEngine.status !== 'ready' || !isAnalyzing || workspace === 'setup') {
+    if (primaryEngine.status !== 'ready' || !isAnalyzing || workspace !== 'study') {
       return { lines: [], arrows: [] };
     }
     return generateSimulatedMultiPV(
-      pieces,
-      turn,
+      deferredAnalysisTarget.pieces,
+      deferredAnalysisTarget.turn,
       engineDepth,
       multiPvCount,
       primaryEngine.styleBias,
@@ -532,8 +602,7 @@ export default function App() {
     primaryEngine.styleBias,
     isAnalyzing,
     workspace,
-    pieces,
-    turn,
+    deferredAnalysisTarget,
     engineDepth,
     multiPvCount,
     engineThreads,
@@ -545,13 +614,13 @@ export default function App() {
       !compareMode ||
       secondaryEngine.status !== 'ready' ||
       !isAnalyzing ||
-      workspace === 'setup'
+      workspace !== 'study'
     ) {
       return { lines: [], arrows: [] };
     }
     return generateSimulatedMultiPV(
-      pieces,
-      turn,
+      deferredAnalysisTarget.pieces,
+      deferredAnalysisTarget.turn,
       engineDepth,
       2,
       secondaryEngine.styleBias,
@@ -564,15 +633,20 @@ export default function App() {
     secondaryEngine.styleBias,
     isAnalyzing,
     workspace,
-    pieces,
-    turn,
+    deferredAnalysisTarget,
     engineDepth,
     engineThreads,
     engineHashMb,
   ]);
 
-  // 棋盘箭头合成：单引擎显示主/次变；双擎对比下显示主擎首推(绿) + 副擎首推(蓝)，若一致则自动合并为 [双擎共识]
+  // 棋盘箭头合成：仅当引擎分析结果与当前盘面一致时才在棋盘绘制推荐箭头，避免快速跳步时闪现旧手箭头
   const boardArrows = useMemo(() => {
+    if (!analysisMatchesCurrent) {
+      return {
+        primaryArrows: [] as MultiPVArrow[],
+        secondaryArrow: null as MultiPVArrow | null,
+      };
+    }
     if (!compareMode) {
       return {
         primaryArrows: multiPvData.arrows,
@@ -630,6 +704,7 @@ export default function App() {
         : null,
     };
   }, [
+    analysisMatchesCurrent,
     compareMode,
     multiPvData,
     secondaryMultiPvData,
@@ -638,24 +713,43 @@ export default function App() {
   ]);
 
   const threatArrow = useMemo(() => {
-    if (primaryEngine.status !== 'ready' || !threatRadarEnabled || workspace === 'setup')
+    if (
+      primaryEngine.status !== 'ready' ||
+      !threatRadarEnabled ||
+      workspace !== 'study' ||
+      !analysisMatchesCurrent
+    ) {
       return null;
-    return generateOpponentThreatArrow(pieces, turn);
-  }, [primaryEngine.status, threatRadarEnabled, workspace, pieces, turn]);
+    }
+    return generateOpponentThreatArrow(
+      deferredAnalysisTarget.pieces,
+      deferredAnalysisTarget.turn
+    );
+  }, [
+    primaryEngine.status,
+    threatRadarEnabled,
+    workspace,
+    analysisMatchesCurrent,
+    deferredAnalysisTarget,
+  ]);
 
   const currentEvalScore = useMemo(() => {
-    if (multiPvData.lines[0]) return multiPvData.lines[0].scoreCp;
+    if (analysisMatchesCurrent && multiPvData.lines[0]) return multiPvData.lines[0].scoreCp;
     if (lastMove) return lastMove.evalScore;
     return evaluateBoardScore(pieces);
-  }, [multiPvData, lastMove, pieces]);
+  }, [analysisMatchesCurrent, multiPvData, lastMove, pieces]);
 
   const materialStats = useMemo(() => calculateMaterialAndCaptures(pieces), [pieces]);
 
-  const inCheckCamp = useMemo((): Camp | null => {
-    if (isCampInCheck(pieces, 'red')) return 'red';
-    if (isCampInCheck(pieces, 'black')) return 'black';
-    return null;
-  }, [pieces]);
+  const checkPositions = useMemo(() => {
+    const redPos = isCampInCheck(pieces, 'red', boardGrid);
+    const blackPos = isCampInCheck(pieces, 'black', boardGrid);
+    return {
+      redCheckPos: redPos,
+      blackCheckPos: blackPos,
+      inCheckCamp: (redPos ? 'red' : blackPos ? 'black' : null) as Camp | null,
+    };
+  }, [pieces, boardGrid]);
 
   const currentChallenge = useMemo(
     () =>
@@ -687,6 +781,7 @@ export default function App() {
   }, []);
 
   const handleLoadSampleMasterGame = useCallback(() => {
+    const sampleSession = getSampleSession();
     setWorkspace('study');
     setIsReplaying(false);
     setSelectedPieceId(null);
@@ -704,7 +799,7 @@ export default function App() {
     setTurn('red');
     setMetadata(SAMPLE_MASTER_METADATA);
     setIsAnalyzing(true);
-  }, [sampleSession]);
+  }, [getSampleSession]);
 
   const handleTransferToStudy = useCallback(
     (payload: {
@@ -748,6 +843,9 @@ export default function App() {
 
   const handleSwitchWorkspace = useCallback(
     (nextWs: WorkspaceMode) => {
+      if (workspace === 'study' && nextWs !== 'study') {
+        flushStudyPersistence();
+      }
       setWorkspace(nextWs);
       setIsReplaying(false);
       setSelectedPieceId(null);
@@ -805,10 +903,10 @@ export default function App() {
         setIsAnalyzing(false);
       }
     },
-    [handicap, turn]
+    [workspace, flushStudyPersistence, handicap, turn]
   );
 
-  const handleSelectChallenge = (chId: string) => {
+  const handleSelectChallenge = useCallback((chId: string) => {
     const ch = CLASSICAL_CHALLENGES.find((c) => c.id === chId);
     if (!ch) return;
     setSelectedChallengeId(ch.id);
@@ -819,19 +917,22 @@ export default function App() {
     setTurn(ch.initialTurn);
     setHintArrow(null);
     setChallengeStatusBanner(`破局目标：${ch.objective}`);
-  };
+  }, []);
 
-  const handleStartHandicapGame = (newHandicap: HandicapType, newTier: EngineSkillTier) => {
-    setHandicap(newHandicap);
-    setSkillTier(newTier);
-    const initP = createInitialPieces(newHandicap);
-    setPieces(initP);
-    setMainMoves([]);
-    setVariationMoves(null);
-    setCurrentPly(0);
-    setTurn(newHandicap === 'move-first' ? 'black' : 'red');
-    setHintArrow(null);
-  };
+  const handleStartHandicapGame = useCallback(
+    (newHandicap: HandicapType, newTier: EngineSkillTier) => {
+      setHandicap(newHandicap);
+      setSkillTier(newTier);
+      const initP = createInitialPieces(newHandicap);
+      setPieces(initP);
+      setMainMoves([]);
+      setVariationMoves(null);
+      setCurrentPly(0);
+      setTurn(newHandicap === 'move-first' ? 'black' : 'red');
+      setHintArrow(null);
+    },
+    []
+  );
 
   // ==================== 5. 跳手、无感内联分支走子与人机/古谱自动应手 ====================
   const handleJumpPly = useCallback(
@@ -875,9 +976,9 @@ export default function App() {
 
   const executeMoveOnBoard = useCallback(
     (from: Position, to: Position) => {
-      const moving = getPieceAt(pieces, from.row, from.col);
+      const moving = getPieceAtGrid(boardGrid, from.row, from.col);
       if (!moving) return;
-      const captured = getPieceAt(pieces, to.row, to.col);
+      const captured = getPieceAtGrid(boardGrid, to.row, to.col);
       const notation = formatChineseMoveNotation(moving, from, to);
 
       const nextPieces = pieces
@@ -1005,6 +1106,7 @@ export default function App() {
       }
     },
     [
+      boardGrid,
       pieces,
       currentPly,
       soundEnabled,
@@ -1018,60 +1120,75 @@ export default function App() {
     ]
   );
 
-  const handleSelectIntersection = (row: number, col: number) => {
-    if (isBotThinking) return;
+  const handleSelectIntersection = useCallback(
+    (row: number, col: number) => {
+      if (isBotThinking) return;
 
-    if (workspace === 'setup') {
-      const existing = getPieceAt(pieces, row, col);
-      if (existing) {
-        if (existing.type === 'general') return;
-        setPieces(pieces.filter((p) => p.id !== existing.id));
-      } else if (setupSelectedTemplate) {
-        const maxCountByType: Record<PieceType, number> = {
-          chariot: 2,
-          horse: 2,
-          cannon: 2,
-          advisor: 2,
-          elephant: 2,
-          soldier: 5,
-          general: 1,
-        };
-        const currentCount = pieces.filter(
-          (p) =>
-            p.camp === setupSelectedTemplate.camp &&
-            p.type === setupSelectedTemplate.type
-        ).length;
-        if (currentCount >= maxCountByType[setupSelectedTemplate.type]) {
-          return;
+      if (workspace === 'setup') {
+        const existing = getPieceAtGrid(boardGrid, row, col);
+        if (existing) {
+          if (existing.type === 'general') return;
+          setPieces((prev) => prev.filter((p) => p.id !== existing.id));
+        } else if (setupSelectedTemplate) {
+          const maxCountByType: Record<PieceType, number> = {
+            chariot: 2,
+            horse: 2,
+            cannon: 2,
+            advisor: 2,
+            elephant: 2,
+            soldier: 5,
+            general: 1,
+          };
+          const currentCount = pieces.filter(
+            (p) =>
+              p.camp === setupSelectedTemplate.camp &&
+              p.type === setupSelectedTemplate.type
+          ).length;
+          if (currentCount >= maxCountByType[setupSelectedTemplate.type]) {
+            return;
+          }
+          const newPiece: Piece = {
+            id: `setup-${setupSelectedTemplate.camp}-${setupSelectedTemplate.type}-${Date.now()}`,
+            camp: setupSelectedTemplate.camp,
+            type: setupSelectedTemplate.type,
+            row,
+            col,
+          };
+          playWoodClackSound(false, row, col, soundEnabled);
+          setPieces((prev) => [...prev, newPiece]);
         }
-        const newPiece: Piece = {
-          id: `setup-${setupSelectedTemplate.camp}-${setupSelectedTemplate.type}-${Date.now()}`,
-          camp: setupSelectedTemplate.camp,
-          type: setupSelectedTemplate.type,
-          row,
-          col,
-        };
-        playWoodClackSound(false, row, col, soundEnabled);
-        setPieces([...pieces, newPiece]);
+        return;
       }
-      return;
-    }
 
-    if (selectedPiece && legalMoves.some((m) => m.row === row && m.col === col)) {
-      executeMoveOnBoard(
-        { row: selectedPiece.row, col: selectedPiece.col },
-        { row, col }
-      );
-      return;
-    }
+      if (selectedPiece && legalMoves.some((m) => m.row === row && m.col === col)) {
+        executeMoveOnBoard(
+          { row: selectedPiece.row, col: selectedPiece.col },
+          { row, col }
+        );
+        return;
+      }
 
-    const clickedPiece = getPieceAt(pieces, row, col);
-    if (clickedPiece && clickedPiece.camp === turn) {
-      setSelectedPieceId(clickedPiece.id === selectedPieceId ? null : clickedPiece.id);
-    } else {
-      setSelectedPieceId(null);
-    }
-  };
+      const clickedPiece = getPieceAtGrid(boardGrid, row, col);
+      if (clickedPiece && clickedPiece.camp === turn) {
+        setSelectedPieceId(clickedPiece.id === selectedPieceId ? null : clickedPiece.id);
+      } else {
+        setSelectedPieceId(null);
+      }
+    },
+    [
+      isBotThinking,
+      workspace,
+      boardGrid,
+      setupSelectedTemplate,
+      pieces,
+      soundEnabled,
+      selectedPiece,
+      legalMoves,
+      executeMoveOnBoard,
+      turn,
+      selectedPieceId,
+    ]
+  );
 
   // ==================== 6. 锦囊支招 (Hint) 与 自动回放 ====================
   const handleTriggerHint = useCallback(() => {
@@ -1103,25 +1220,21 @@ export default function App() {
 
   useEffect(() => {
     if (!isReplaying) return;
-    const timer = setInterval(() => {
-      setCurrentPly((prev) => {
-        const list = variationMoves || mainMoves;
-        if (prev >= list.length) {
-          setIsReplaying(false);
-          return prev;
-        }
-        const next = prev + 1;
-        const rec = list[next - 1];
-        if (rec) {
-          setPieces(rec.piecesSnapshot.map((p) => ({ ...p })));
-          setTurn(rec.piece.camp === 'red' ? 'black' : 'red');
-          playWoodClackSound(!!rec.captured, rec.to.row, rec.to.col, soundEnabled);
-        }
-        return next;
-      });
+    const list = variationMoves || mainMoves;
+    if (currentPly >= list.length) {
+      setIsReplaying(false);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      const nextPly = currentPly + 1;
+      const rec = list[nextPly - 1];
+      if (rec) {
+        playWoodClackSound(!!rec.captured, rec.to.row, rec.to.col, soundEnabled);
+      }
+      handleJumpPly(nextPly, !!variationMoves);
     }, 850);
-    return () => clearInterval(timer);
-  }, [isReplaying, variationMoves, mainMoves, soundEnabled]);
+    return () => window.clearTimeout(timer);
+  }, [isReplaying, currentPly, variationMoves, mainMoves, soundEnabled, handleJumpPly]);
 
   // 全局快捷键支持 (⌘K 呼出命令面板，←/→ 前后跳手，Space 走出引擎最佳推荐着进入推演)
   useEffect(() => {
@@ -1155,7 +1268,17 @@ export default function App() {
         setFlipped((prev) => !prev);
       } else if (e.key === ' ' && workspace === 'study') {
         e.preventDefault();
-        const best = multiPvData.lines[0]?.firstMove;
+        const best = analysisMatchesCurrent
+          ? multiPvData.lines[0]?.firstMove
+          : generateSimulatedMultiPV(
+              pieces,
+              turn,
+              engineDepth,
+              1,
+              primaryEngine.styleBias,
+              engineThreads,
+              engineHashMb
+            ).lines[0]?.firstMove;
         if (best) {
           executeMoveOnBoard(best.from, best.to);
         }
@@ -1169,7 +1292,14 @@ export default function App() {
     currentPly,
     activeMovesList.length,
     workspace,
+    analysisMatchesCurrent,
     multiPvData,
+    pieces,
+    turn,
+    engineDepth,
+    primaryEngine.styleBias,
+    engineThreads,
+    engineHashMb,
     executeMoveOnBoard,
   ]);
 
@@ -1215,6 +1345,106 @@ export default function App() {
     }
   }, [pieces, turn, engineDepth, executeMoveOnBoard]);
 
+  // 稳定回调引用：配合 React.memo 子组件避免无效重渲染
+  const handleToggleSound = useCallback(() => setSoundEnabled((prev) => !prev), []);
+  const handleToggleTheme = useCallback(
+    () => setAppTheme((prev) => (prev === 'dark' ? 'light' : 'dark')),
+    []
+  );
+  const handleToggleCompareMode = useCallback(() => setCompareMode((prev) => !prev), []);
+  const handleToggleAnalysis = useCallback(() => setIsAnalyzing((prev) => !prev), []);
+  const handleToggleThreatRadar = useCallback(() => setThreatRadarEnabled((prev) => !prev), []);
+  const handleFlipBoard = useCallback(() => setFlipped((prev) => !prev), []);
+  const handleUndoMove = useCallback(
+    () => handleJumpPly(Math.max(0, currentPly - 1)),
+    [handleJumpPly, currentPly]
+  );
+  const handleToggleReplay = useCallback(() => {
+    if (isReplaying) {
+      setIsReplaying(false);
+      return;
+    }
+    if (currentPly >= activeMovesList.length && activeMovesList.length > 0) {
+      handleJumpPly(0, !!variationMoves);
+    }
+    setIsReplaying(true);
+  }, [isReplaying, currentPly, activeMovesList.length, variationMoves, handleJumpPly]);
+  const handleBoardNavNewGame = useCallback(() => {
+    if (workspace === 'play') {
+      handleStartHandicapGame(handicap, skillTier);
+    } else if (workspace === 'challenge') {
+      handleSelectChallenge(currentChallenge.id);
+    } else {
+      handleNewStudyGame();
+    }
+  }, [
+    workspace,
+    handicap,
+    skillTier,
+    currentChallenge.id,
+    handleStartHandicapGame,
+    handleSelectChallenge,
+    handleNewStudyGame,
+  ]);
+  const handleOpenGameInfo = useCallback(() => setActiveModal('game-info'), []);
+  const handleOpenEngineSettings = useCallback(() => setActiveModal('settings'), []);
+  const handleOpenImportModal = useCallback(() => setActiveModal('fen-pgn'), []);
+  const handleOpenLibraryModal = useCallback(() => setActiveModal('library'), []);
+  const handleCloseModal = useCallback(() => setActiveModal(null), []);
+
+  const handlePromoteVariationToMain = useCallback(() => {
+    if (variationMoves) {
+      setMainMoves(variationMoves);
+      setVariationMoves(null);
+      setBranchOriginPly(null);
+    }
+  }, [variationMoves]);
+
+  const handleDiscardVariation = useCallback(() => {
+    const backPly = branchOriginPly ?? 0;
+    setVariationMoves(null);
+    setBranchOriginPly(null);
+    handleJumpPly(backPly, false);
+  }, [branchOriginPly, handleJumpPly]);
+
+  const handleDisconnectExternal = useCallback(
+    () => setConnectState((prev) => ({ ...prev, connected: false })),
+    []
+  );
+
+  const handleClearSetupToKings = useCallback(() => setPieces(createKingsOnlyPieces()), []);
+  const handleResetSetupInitial = useCallback(() => setPieces(createInitialPieces()), []);
+  const handleFinishSetup = useCallback(() => {
+    handleTransferToStudy({
+      basePieces: pieces,
+      baseTurn: setupTurn,
+      currentPieces: pieces,
+      currentTurn: setupTurn,
+      moves: [],
+      ply: 0,
+      nextMetadata: {
+        redPlayer: '红方',
+        blackPlayer: '黑方',
+        event: '摆子推演',
+        opening: '自定义摆子局面',
+        result: '进行中',
+        isFavorite: false,
+      },
+    });
+  }, [handleTransferToStudy, pieces, setupTurn]);
+
+  const modalFen = useMemo(
+    () => (activeModal === 'fen-pgn' ? piecesToFen(pieces, turn) : ''),
+    [activeModal, pieces, turn]
+  );
+  const modalPgn = useMemo(
+    () =>
+      activeModal === 'fen-pgn'
+        ? formatGameToPgn(metadata, activeMovesList, modalFen)
+        : '',
+    [activeModal, metadata, activeMovesList, modalFen]
+  );
+
   const topCamp: Camp = flipped ? 'red' : 'black';
   const bottomCamp: Camp = flipped ? 'black' : 'red';
 
@@ -1228,8 +1458,8 @@ export default function App() {
         isConnected={connectState.connected}
         onChangeWorkspace={handleSwitchWorkspace}
         onOpenModal={setActiveModal}
-        onToggleSound={() => setSoundEnabled((prev) => !prev)}
-        onToggleTheme={() => setAppTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+        onToggleSound={handleToggleSound}
+        onToggleTheme={handleToggleTheme}
       />
 
       {/* ==================== 2. 主工作台：中央棋盘画布 + 右侧专业工作台 ==================== */}
@@ -1264,13 +1494,13 @@ export default function App() {
                     : metadata.event
                 }
                 isTurn={turn === topCamp}
-                isInCheck={inCheckCamp === topCamp}
+                isInCheck={checkPositions.inCheckCamp === topCamp}
                 materialDiff={
                   topCamp === 'black'
                     ? -materialStats.netAdvantageRed
                     : materialStats.netAdvantageRed
                 }
-                onEditGameInfo={() => setActiveModal('game-info')}
+                onEditGameInfo={handleOpenGameInfo}
               />
             )}
 
@@ -1280,7 +1510,9 @@ export default function App() {
                 <div className="py-0.5 flex items-stretch">
                   <EvalBar
                     scoreCp={currentEvalScore}
-                    secondaryScoreCp={secondaryMultiPvData.lines[0]?.scoreCp ?? null}
+                    secondaryScoreCp={
+                      analysisMatchesCurrent ? secondaryMultiPvData.lines[0]?.scoreCp ?? null : null
+                    }
                     compareMode={compareMode && isAnalyzing && secondaryEngine.status === 'ready'}
                     flipped={flipped}
                     heightClass="h-full"
@@ -1299,6 +1531,8 @@ export default function App() {
                 hoveredArrow={hoveredArrow}
                 hintArrow={hintArrow}
                 impactEffect={impactEffect}
+                redCheckPos={checkPositions.redCheckPos}
+                blackCheckPos={checkPositions.blackCheckPos}
                 boardTheme={boardTheme}
                 craftStyle={craftStyle}
                 fontScheme={fontScheme}
@@ -1325,13 +1559,13 @@ export default function App() {
                 }
                 subtitle={workspace === 'challenge' ? currentChallenge.title : undefined}
                 isTurn={turn === bottomCamp}
-                isInCheck={inCheckCamp === bottomCamp}
+                isInCheck={checkPositions.inCheckCamp === bottomCamp}
                 materialDiff={
                   bottomCamp === 'red'
                     ? materialStats.netAdvantageRed
                     : -materialStats.netAdvantageRed
                 }
-                onEditGameInfo={() => setActiveModal('game-info')}
+                onEditGameInfo={handleOpenGameInfo}
               />
             )}
 
@@ -1343,27 +1577,10 @@ export default function App() {
               isReplaying={isReplaying}
               disabled={workspace === 'setup'}
               onJumpPly={handleJumpPly}
-              onToggleReplay={() => {
-                if (isReplaying) {
-                  setIsReplaying(false);
-                  return;
-                }
-                if (currentPly >= activeMovesList.length && activeMovesList.length > 0) {
-                  handleJumpPly(0, !!variationMoves);
-                }
-                setIsReplaying(true);
-              }}
-              onNewGame={() => {
-                if (workspace === 'play') {
-                  handleStartHandicapGame(handicap, skillTier);
-                } else if (workspace === 'challenge') {
-                  handleSelectChallenge(currentChallenge.id);
-                } else {
-                  handleNewStudyGame();
-                }
-              }}
-              onFlipBoard={() => setFlipped((prev) => !prev)}
-              onUndoMove={() => handleJumpPly(Math.max(0, currentPly - 1))}
+              onToggleReplay={handleToggleReplay}
+              onNewGame={handleBoardNavNewGame}
+              onFlipBoard={handleFlipBoard}
+              onUndoMove={handleUndoMove}
               onTriggerHint={handleTriggerHint}
             />
           </div>
@@ -1411,12 +1628,12 @@ export default function App() {
                 onChangePrimaryEngine={handleChangePrimaryEngine}
                 onChangeSecondaryEngine={handleChangeSecondaryEngine}
                 onSwapEngines={handleSwapEngines}
-                onToggleCompareMode={() => setCompareMode((prev) => !prev)}
+                onToggleCompareMode={handleToggleCompareMode}
                 onInstallEngine={handleInstallEngine}
-                onOpenEngineSettings={() => setActiveModal('settings')}
-                onToggleAnalysis={() => setIsAnalyzing((prev) => !prev)}
-                onToggleThreatRadar={() => setThreatRadarEnabled((prev) => !prev)}
-                onSelectMultiPVMove={(from, to) => executeMoveOnBoard(from, to)}
+                onOpenEngineSettings={handleOpenEngineSettings}
+                onToggleAnalysis={handleToggleAnalysis}
+                onToggleThreatRadar={handleToggleThreatRadar}
+                onSelectMultiPVMove={executeMoveOnBoard}
                 onHoverMultiPVMove={setHoveredArrow}
               />
             )}
@@ -1671,26 +1888,9 @@ export default function App() {
                 setupTurn={setupTurn}
                 onSelectSetupTemplate={setSetupSelectedTemplate}
                 onChangeSetupTurn={setSetupTurn}
-                onClearSetupToKings={() => setPieces(createKingsOnlyPieces())}
-                onResetSetupInitial={() => setPieces(createInitialPieces())}
-                onFinishSetup={() => {
-                  handleTransferToStudy({
-                    basePieces: pieces,
-                    baseTurn: setupTurn,
-                    currentPieces: pieces,
-                    currentTurn: setupTurn,
-                    moves: [],
-                    ply: 0,
-                    nextMetadata: {
-                      redPlayer: '红方',
-                      blackPlayer: '黑方',
-                      event: '摆子推演',
-                      opening: '自定义摆子局面',
-                      result: '进行中',
-                      isFavorite: false,
-                    },
-                  });
-                }}
+                onClearSetupToKings={handleClearSetupToKings}
+                onResetSetupInitial={handleResetSetupInitial}
+                onFinishSetup={handleFinishSetup}
               />
             ) : (
               /* 默认「复盘分析」双页签：回合棋谱 ↔ 复盘报告 */
@@ -1734,29 +1934,16 @@ export default function App() {
                     currentPly={currentPly}
                     metadata={metadata}
                     connectState={connectState}
-                    onSelectPly={(ply, useVar) => handleJumpPly(ply, useVar)}
-                    onPromoteVariationToMain={() => {
-                      if (variationMoves) {
-                        setMainMoves(variationMoves);
-                        setVariationMoves(null);
-                        setBranchOriginPly(null);
-                      }
-                    }}
-                    onDiscardVariation={() => {
-                      const backPly = branchOriginPly ?? 0;
-                      setVariationMoves(null);
-                      setBranchOriginPly(null);
-                      handleJumpPly(backPly, false);
-                    }}
-                    onOpenGameInfo={() => setActiveModal('game-info')}
+                    onSelectPly={handleJumpPly}
+                    onPromoteVariationToMain={handlePromoteVariationToMain}
+                    onDiscardVariation={handleDiscardVariation}
+                    onOpenGameInfo={handleOpenGameInfo}
                     onToggleFavorite={handleToggleCurrentFavorite}
                     onLoadSampleGame={handleLoadSampleMasterGame}
-                    onOpenImportModal={() => setActiveModal('fen-pgn')}
-                    onOpenLibraryModal={() => setActiveModal('library')}
+                    onOpenImportModal={handleOpenImportModal}
+                    onOpenLibraryModal={handleOpenLibraryModal}
                     onSyncNextExternalMove={handleSyncNextExternalMove}
-                    onDisconnectExternal={() =>
-                      setConnectState((prev) => ({ ...prev, connected: false }))
-                    }
+                    onDisconnectExternal={handleDisconnectExternal}
                   />
                 ) : (
                   <GameReviewPanel
@@ -1764,7 +1951,7 @@ export default function App() {
                     currentPly={currentPly}
                     retryMistakePly={retryMistakePly}
                     retryFeedback={retryFeedback}
-                    onJumpPly={(ply) => handleJumpPly(ply, false)}
+                    onJumpPly={handleJumpPly}
                     onStartRetryMistake={(mistakeMove) => {
                       const prevPly = Math.max(0, mistakeMove.ply - 1);
                       setVariationMoves(null);
@@ -1786,9 +1973,9 @@ export default function App() {
                         );
                       }
                     }}
-                    onPlayBestAlternative={(from, to) => executeMoveOnBoard(from, to)}
+                    onPlayBestAlternative={executeMoveOnBoard}
                     onLoadSampleGame={handleLoadSampleMasterGame}
-                    onOpenImportModal={() => setActiveModal('fen-pgn')}
+                    onOpenImportModal={handleOpenImportModal}
                   />
                 )}
               </div>
@@ -1809,7 +1996,7 @@ export default function App() {
         turn={turn}
         currentPly={currentPly}
         totalPlies={activeMovesList.length}
-        inCheckCamp={inCheckCamp}
+        inCheckCamp={checkPositions.inCheckCamp}
         isVariationActive={!!variationMoves}
         advantageSummary={materialStats.advantageSummary}
       />
@@ -1832,11 +2019,11 @@ export default function App() {
         secondaryEngineId={secondaryEngine.id}
         compareMode={compareMode}
         connectState={connectState}
-        currentFen={piecesToFen(pieces, turn)}
-        currentPgn={formatGameToPgn(metadata, activeMovesList, piecesToFen(pieces, turn))}
+        currentFen={modalFen}
+        currentPgn={modalPgn}
         metadata={metadata}
         libraryGames={libraryGames}
-        onClose={() => setActiveModal(null)}
+        onClose={handleCloseModal}
         onSwitchWorkspace={handleSwitchWorkspace}
         onApplyFen={(fenStr) => {
           const parsed = parseFenToPieces(fenStr);
@@ -1880,6 +2067,7 @@ export default function App() {
               return;
             }
           }
+          const sampleSession = getSampleSession();
           handleTransferToStudy({
             basePieces: sampleSession.initialPieces,
             baseTurn: 'red',
@@ -1910,7 +2098,7 @@ export default function App() {
         onChangeEngineHashMb={setEngineHashMb}
         onChangePrimaryEngine={handleChangePrimaryEngine}
         onChangeSecondaryEngine={handleChangeSecondaryEngine}
-        onToggleCompareMode={() => setCompareMode((prev) => !prev)}
+        onToggleCompareMode={handleToggleCompareMode}
         onInstallEngine={handleInstallEngine}
         onResetEngineMissing={handleResetEngineMissing}
         onAddCustomEngine={handleAddCustomEngine}

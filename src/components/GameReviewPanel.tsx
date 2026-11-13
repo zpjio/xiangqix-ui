@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { FileCode2, RotateCcw, Sparkles, Target } from 'lucide-react';
 import { MoveQuality, MoveRecord, Position } from '../types/xiangqi';
 import { EvalGraph } from './EvalGraph';
@@ -32,7 +32,7 @@ function calcCampAccuracy(list: MoveRecord[]): string {
   return `${(total / list.length).toFixed(1)}%`;
 }
 
-export const GameReviewPanel: React.FC<GameReviewPanelProps> = ({
+export const GameReviewPanel: React.FC<GameReviewPanelProps> = React.memo(({
   moves,
   currentPly,
   retryMistakePly,
@@ -43,17 +43,24 @@ export const GameReviewPanel: React.FC<GameReviewPanelProps> = ({
   onLoadSampleGame,
   onOpenImportModal,
 }) => {
-  // 统计红黑精准度与各等级着法数
-  const redMoves = moves.filter((m) => m.piece.camp === 'red');
-  const blackMoves = moves.filter((m) => m.piece.camp === 'black');
-
   const countQuality = (list: MoveRecord[], q: MoveRecord['quality']) =>
     list.filter((m) => m.quality === q).length;
 
-  const criticalMistakes = moves.filter((m) => m.quality === '缓' || m.quality === '败');
-  const redAcc = calcCampAccuracy(redMoves);
-  const blackAcc = calcCampAccuracy(blackMoves);
-  const redErrors = countQuality(redMoves, '缓') + countQuality(redMoves, '败');
+  const { redMoves, blackMoves, criticalMistakes, redAcc, blackAcc, redErrors } = useMemo(() => {
+    const rMoves = moves.filter((m) => m.piece.camp === 'red');
+    const bMoves = moves.filter((m) => m.piece.camp === 'black');
+    const mistakes = moves.filter((m) => m.quality === '缓' || m.quality === '败');
+    const rErr =
+      rMoves.filter((m) => m.quality === '缓' || m.quality === '败').length;
+    return {
+      redMoves: rMoves,
+      blackMoves: bMoves,
+      criticalMistakes: mistakes,
+      redAcc: calcCampAccuracy(rMoves),
+      blackAcc: calcCampAccuracy(bMoves),
+      redErrors: rErr,
+    };
+  }, [moves]);
 
   if (moves.length === 0) {
     return (
@@ -238,4 +245,4 @@ export const GameReviewPanel: React.FC<GameReviewPanelProps> = ({
       </div>
     </div>
   );
-};
+});

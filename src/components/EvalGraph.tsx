@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { MoveRecord } from '../types/xiangqi';
 
 interface EvalGraphProps {
@@ -7,7 +7,7 @@ interface EvalGraphProps {
   onSelectPly: (ply: number) => void;
 }
 
-export const EvalGraph: React.FC<EvalGraphProps> = ({
+export const EvalGraph: React.FC<EvalGraphProps> = React.memo(({
   moves,
   currentPly,
   onSelectPly,
@@ -16,26 +16,31 @@ export const EvalGraph: React.FC<EvalGraphProps> = ({
   const height = 80;
   const midY = height / 2;
 
-  const points = [
-    { ply: 0, score: 0.25, quality: undefined },
-    ...moves.map((m) => ({
-      ply: m.ply,
-      score: m.evalScore,
-      quality: m.quality,
-    })),
-  ];
+  const { points, maxPlies, lineCoords, areaCoords } = useMemo(() => {
+    const pts = [
+      { ply: 0, score: 0.25, quality: undefined as MoveRecord['quality'] },
+      ...moves.map((m) => ({
+        ply: m.ply,
+        score: m.evalScore,
+        quality: m.quality,
+      })),
+    ];
+    const maxP = Math.max(12, pts.length - 1);
+    const calcX = (ply: number) => 28 + (ply / maxP) * (width - 40);
+    const calcY = (score: number) => {
+      const clamped = Math.max(-3.5, Math.min(3.5, score));
+      return midY - (clamped / 3.5) * (midY - 9);
+    };
+    const lCoords = pts.map((p) => `${calcX(p.ply)},${calcY(p.score)}`).join(' ');
+    const aCoords = `${calcX(0)},${midY} ${lCoords} ${calcX(pts[pts.length - 1].ply)},${midY}`;
+    return { points: pts, maxPlies: maxP, lineCoords: lCoords, areaCoords: aCoords };
+  }, [moves, midY]);
 
-  const maxPlies = Math.max(12, points.length - 1);
   const toX = (ply: number) => 28 + (ply / maxPlies) * (width - 40);
   const toY = (score: number) => {
     const clamped = Math.max(-3.5, Math.min(3.5, score));
     return midY - (clamped / 3.5) * (midY - 9);
   };
-
-  const lineCoords = points.map((p) => `${toX(p.ply)},${toY(p.score)}`).join(' ');
-  const areaCoords = `${toX(0)},${midY} ${lineCoords} ${toX(
-    points[points.length - 1].ply
-  )},${midY}`;
 
   return (
     <div className="w-full px-3 py-2 rounded-lg border xq-surface select-none">
@@ -137,4 +142,4 @@ export const EvalGraph: React.FC<EvalGraphProps> = ({
       </div>
     </div>
   );
-};
+});
