@@ -18,16 +18,19 @@
 ## 二、 核心功能与 2.0 交互架构
 
 ### 1. 四大工作空间（顶栏中区导航）
+> 完整交互流转与后端接口对接规范见 [`docs/PRODUCT_INTERACTION_SPEC.md`](./docs/PRODUCT_INTERACTION_SPEC.md)。
+
 - **复盘分析 (`study`)**
+  - **引擎分析枢纽**：仅本模式挂载多引擎分析舱与左侧胜率评估柱，支持单个 **「开始分析 / 暂停分析」** 开关，未安装引擎时展示一键下载进度引导。
   - **无感内联分支推演**：在任意历史手直接点击盘面走子或点击右侧候选主变，自动从该手分叉生成内联推演支线，支持一键「升为主线」或「回主谱」，无需切换模式。
-  - **连续双栏数据棋谱 (`MoveList`)**：固定表头（`回合 | 红方着法 / 评估 | 黑方着法 / 评估`），每步完整展示 14px 宋体加粗着法、`妙/优/良/缓/败` 质量角标与右对齐等宽分值。
-  - **整局复盘报告 (`GameReviewPanel`)**：红黑双方整局精准度对比、内嵌 SVG 局势演化曲线（`EvalGraph`）、关键失误诊断卡片及一键「**重练此手**」交互闭环。
+  - **连续双栏数据棋谱 (`MoveList`)**：固定表头（`回合 | 红方着法 / 评估 | 黑方着法 / 评估`），每步完整展示 14px 宋体加粗着法、`妙/优/良/缓/败` 质量角标与右对齐等宽分值；空局时提供示范名局、导入与棋谱库快捷引导。
+  - **整局复盘报告 (`GameReviewPanel`)**：基于着法质量动态统计红黑精准度、内嵌 SVG 局势演化曲线（`EvalGraph`）、关键失误诊断卡片及一键「**重练此手**」交互闭环。
 - **残局题库 (`challenge`)**
-  - 内置《七星聚会》《野马操田》《蚯蚓降龙》《千里独行》等经典古谱杀局，支持破局目标校验、正着锦囊提示与一键重摆。
+  - 隐藏引擎舱与评估柱保持纯净闯关，内置《七星聚会》《野马操田》《千里独行》《顺炮弃马局》等经典古谱；重摆与支招统一由棋盘底栏触发，底部提供「**转入复盘分析**」携带当前局面与试走着法进入深度分析。
 - **人机对弈 (`play`)**
-  - 支持传统让子规则（`分先` / `让先` / `让左马` / `让双马`）与四档电脑棋力切换（`初级` / `中级` / `高级` / `大师`），随时支持悔棋与引擎支招。
+  - 隐藏引擎舱与评估柱专注实战，支持传统让子规则（`分先` / `让先` / `让左马` / `让双马`）与四档电脑棋力切换（`初级` / `中级` / `高级` / `大师`），底部提供「**转入复盘分析**」携带让子开局与全部实战着法无缝复盘。
 - **摆子编辑 (`setup`)**
-  - 右侧配备红黑子力库（自动计算剩余可摆子力配额），支持切换红先/黑先、仅留将帅、重置初始棋盘，完成后一键转入复盘分析。
+  - 右侧专属 **「摆子编辑工坊」(`SetupWorkbench`)** 整合红黑双列子力配额限额、将帅完整性校验、先行方设定与实时 FEN 复制，点击「**完成摆子 · 转入复盘分析**」后直接以自定义局面启动分析。
 
 ### 2. 多引擎分析舱与双擎并行对比 (`EnginePanel`)
 - **多引擎库与主引擎快速切换 (`engines: EngineProfile[]`)**：
@@ -59,9 +62,11 @@ xiangqix-ui/
 ├── index.html                  # 页面入口与 Google Fonts (Noto Serif SC / JetBrains Mono)
 ├── package.json                # 依赖与构建脚本
 ├── vite.config.ts              # Vite 构建配置
+├── docs/
+│   └── PRODUCT_INTERACTION_SPEC.md # 产品整体交互逻辑、状态流转与前后端对接规范（随迭代同步更新）
 └── src/
     ├── main.tsx                # React 挂载入口
-    ├── App.tsx                 # 顶层状态协调器、键盘快捷键 (←/→/Home/End/Space/⌘K) 与主舞台布局
+    ├── App.tsx                 # 顶层状态协调器、跨模式交接 (handleTransferToStudy)、快捷键与持久化
     ├── index.css               # 全局设计 Token (--xq-*)、深浅双主题变量、5级统一按钮规范与棋盘/棋子考工样式
     ├── types/
     │   └── xiangqi.ts          # 全局 TypeScript 类型契约（棋子、着法、MultiPV、引擎状态、连线状态等）
@@ -72,13 +77,14 @@ xiangqix-ui/
     └── components/
         ├── Titlebar.tsx        # 顶栏（左：品牌印记 | 中：四大工作空间 | 右：工具栏与全局设置）
         ├── PlayerSeatBar.tsx   # 棋盘上下方棋手席位条（阵营、行棋呼吸灯、子力净优势差、将军告警）
-        ├── EvalBar.tsx         # 棋盘左侧纵向红黑胜率评估柱（自适应对比度数字显示）
-        ├── Board.tsx           # 9×10 传统 SVG 棋盘（视口高度自适应缩放、主变/威胁/支招箭头、摆子子力库）
+        ├── EvalBar.tsx         # 棋盘左侧纵向红黑胜率评估柱（仅复盘分析模式展示）
+        ├── Board.tsx           # 9×10 传统 SVG 棋盘（视口高度自适应缩放、主变/威胁/支招箭头）
         ├── XiangqiPiece.tsx    # 棋子组件（红方双弦海棠星 / 黑方外圆内八角阴刻 SVG + 简繁汉字）
-        ├── BoardNav.tsx        # 棋盘下方步进控制与翻转/悔棋/支招操作栏
-        ├── EnginePanel.tsx     # 右侧上半区常驻引擎分析舱（含未安装引导、下载进度与 MultiPV 列表）
-        ├── MoveList.tsx        # 右侧下半区连续斑马纹双栏回合棋谱表格（含连线同步条与内联推演支线盒）
-        ├── GameReviewPanel.tsx # 右侧下半区复盘报告（精准度统计、局势曲线、败着重练卡片）
+        ├── BoardNav.tsx        # 棋盘下方步进控制与新局/翻转/悔棋/支招操作栏（自动播放按需显示）
+        ├── EnginePanel.tsx     # 右侧引擎分析舱（仅复盘分析模式挂载，单按钮开始/暂停分析 + 对称双擎对比）
+        ├── SetupWorkbench.tsx  # 右侧摆子编辑工坊（红黑子力限额、将帅校验、先行方、FEN 预览与完成转入复盘）
+        ├── MoveList.tsx        # 右侧下半区连续斑马纹双栏回合棋谱表格（含连线同步条、空态引导与内联支线）
+        ├── GameReviewPanel.tsx # 右侧下半区复盘报告（动态精准度统计、局势曲线、败着重练卡片）
         ├── EvalGraph.tsx       # 整局局势演化折线图（支持点击任意手跳步）
         ├── DialogsModalSuite.tsx # 全局弹窗套件（命令面板、棋谱库、导入导出/识图、连线、对局信息、设置中心）
         └── StatusBar.tsx       # 底栏状态提示与手数/子力概览
@@ -105,20 +111,15 @@ xiangqix-ui/
 
 ## 五、 合入 `zpjio/xiangqix` 主工程对接指南（交接重点）
 
-将本仓库合入主客户端工程时，`src/components/` 与 `src/index.css` 可 **100% 原样保留**，仅需将 `src/App.tsx` 中的 4 处前端模拟逻辑替换为原项目的真实原生/后端接口：
+> 详细的 API 入参/出参结构、ICCS 坐标换算、红方视角分值约定及跨模式流转协议，请直接查阅 [`docs/PRODUCT_INTERACTION_SPEC.md`](./docs/PRODUCT_INTERACTION_SPEC.md)。
 
-1. **本地引擎检测与安装 (`engineStatus` & `handleInstallEngine`)**
-   - **位置**：`src/App.tsx` 第 106~136 行
-   - **对接方式**：启动时检查本地 `engines/pikafish` 与 `engines/pikafish.nnue` 是否存在；存在则初始化 `engineStatus = 'ready'`，不存在则保持 `'missing'`。点击「一键下载并安装引擎」或「选择本地引擎」时调用主工程的文件下载/路径绑定接口，并通过进度回调更新 `installProgress`。
-2. **UCI 引擎实时分析流 (`multiPvData` & `threatArrow`)**
-   - **位置**：`src/App.tsx` 第 178~189 行
-   - **对接方式**：将 `generateSimulatedMultiPV(pieces, turn, engineDepth, multiPvCount)` 替换为真实的 Pikafish UCI `position fen ...` + `go depth ...` 输出解析器，将解析出的 `MultiPVLine[]` 传入 `<EnginePanel lines={...} />` 与 `<Board multiPvArrows={...} />`。
-3. **图片识别导入 (`activeModal === 'fen-pgn' -> importMode === 'image'`)**
-   - **位置**：`src/components/DialogsModalSuite.tsx` 第 633~737 行
-   - **对接方式**：将文件上传 (`onChange`) 与剪贴板粘贴 (`onPaste`) 获取到的图片 `File / Blob` 传给原项目的本地棋盘识别模型接口，拿到识别出的 FEN 字符串后调用 `onApplyFen(fen)` 即可载入棋盘。
-4. **外部象棋平台连线同步 (`connectState` & `handleSyncNextExternalMove`)**
-   - **位置**：`src/App.tsx` 第 117~123 行、第 632~639 行
-   - **对接方式**：在 `onUpdateConnectState` 启动外部窗口抓图监听线程，每当检测到外部棋盘落子时调用 `executeMoveOnBoard(from, to)` 即可自动追加到「复盘分析」的棋谱表格中并触发引擎分析。
+将本仓库合入主客户端工程时，`src/components/` 与 `src/index.css` 可 **100% 原样保留**，仅需将 `src/App.tsx` 与弹窗识图回调中的前端模拟逻辑替换为真实原生/后端接口：
+
+1. **本地引擎检测与安装 (`engines` & `handleInstallEngine`)**：启动时检查本地引擎与 NNUE 权重，支持通过回调实时回传 `installProgress` 与 `status`。
+2. **UCI / UCCI 引擎实时分析流 (`multiPvData`、`secondaryMultiPvData` & `threatArrow`)**：将 `generateSimulatedMultiPV` 与 `generateOpponentThreatArrow` 替换为真实引擎分析流（支持单擎与双擎并行对比）。
+3. **人机对弈应手 (`executeMoveOnBoard` 中的 `play` 分支)**：按棋力档位调用真实引擎返回黑方应手坐标。
+4. **图片识别导入 (`DialogsModalSuite` 中的 `image` 页签)**：将上传或粘贴的图片 `File / Blob` 传给本地/后端识盘模型，获取 FEN 后调用 `onApplyFen(fen)`。
+5. **外部象棋平台连线同步 (`connectState` & `handleSyncNextExternalMove`)**：外部窗口抓图监听到新着法后调用 `executeMoveOnBoard(from, to)` 自动同步进复盘棋谱。
 
 ---
 

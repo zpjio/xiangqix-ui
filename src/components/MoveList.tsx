@@ -1,5 +1,15 @@
 import React, { useEffect, useRef } from 'react';
-import { Check, GitBranch, RefreshCw, Star, Unplug, X } from 'lucide-react';
+import {
+  BookOpen,
+  Check,
+  FileCode2,
+  GitBranch,
+  RefreshCw,
+  Sparkles,
+  Star,
+  Unplug,
+  X,
+} from 'lucide-react';
 import { ExternalConnectState, GameMetadata, MoveQuality, MoveRecord } from '../types/xiangqi';
 
 interface MoveListProps {
@@ -14,6 +24,9 @@ interface MoveListProps {
   onDiscardVariation: () => void;
   onOpenGameInfo: () => void;
   onToggleFavorite: () => void;
+  onLoadSampleGame: () => void;
+  onOpenImportModal: () => void;
+  onOpenLibraryModal: () => void;
   onSyncNextExternalMove?: () => void;
   onDisconnectExternal?: () => void;
 }
@@ -30,6 +43,9 @@ export const MoveList: React.FC<MoveListProps> = ({
   onDiscardVariation,
   onOpenGameInfo,
   onToggleFavorite,
+  onLoadSampleGame,
+  onOpenImportModal,
+  onOpenLibraryModal,
   onSyncNextExternalMove,
   onDisconnectExternal,
 }) => {
@@ -194,6 +210,52 @@ export const MoveList: React.FC<MoveListProps> = ({
           <span>0. 初始棋盘（32子标准开局）</span>
           <span className="font-mono-tabular text-xs xq-text-muted">+0.25</span>
         </button>
+
+        {/* 空棋谱快捷起点引导（首次进入标准开局或新局时显示） */}
+        {rounds.length === 0 && !variationMoves && (
+          <div className="p-3.5 space-y-2.5">
+            <div className="p-3 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] space-y-2">
+              <div className="font-medium xq-text-primary">
+                已就绪，可从以下任意方式开始拆棋复盘：
+              </div>
+              <p className="text-[11px] xq-text-muted leading-relaxed">
+                直接在左侧棋盘走子，或点击上方引擎推荐着法「试走」；进度将自动保存在本地。
+              </p>
+              <div className="grid grid-cols-1 gap-1.5 pt-0.5">
+                <button
+                  type="button"
+                  onClick={onLoadSampleGame}
+                  className="w-full px-2.5 py-1.5 rounded-md xq-btn-option-active text-xs flex items-center justify-between cursor-pointer"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>载入示范名局（王天一 vs 郑惟桐）</span>
+                  </span>
+                  <span className="text-[11px] opacity-80">12手含批注</span>
+                </button>
+
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={onOpenImportModal}
+                    className="px-2.5 py-1.5 rounded-md xq-btn-secondary text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <FileCode2 className="w-3.5 h-3.5 opacity-80" />
+                    <span>导入 FEN / 识盘</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onOpenLibraryModal}
+                    className="px-2.5 py-1.5 rounded-md xq-btn-secondary text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <BookOpen className="w-3.5 h-3.5 text-[var(--xq-accent-gold)]" />
+                    <span>打开棋谱库</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {rounds.map((r, idx) => {
           const isRedSelected =

@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   AlertTriangle,
-  ArrowUpDown,
+  ArrowLeftRight,
   CheckCircle2,
   Download,
   FolderOpen,
@@ -24,6 +24,7 @@ interface EnginePanelProps {
   secondaryLines: MultiPVLine[];
   onChangePrimaryEngine: (id: string) => void;
   onChangeSecondaryEngine: (id: string) => void;
+  onSwapEngines: () => void;
   onToggleCompareMode: () => void;
   onInstallEngine: (id: string) => void;
   onOpenEngineSettings: () => void;
@@ -44,6 +45,7 @@ export const EnginePanel: React.FC<EnginePanelProps> = ({
   secondaryLines,
   onChangePrimaryEngine,
   onChangeSecondaryEngine,
+  onSwapEngines,
   onToggleCompareMode,
   onInstallEngine,
   onOpenEngineSettings,
@@ -87,19 +89,19 @@ export const EnginePanel: React.FC<EnginePanelProps> = ({
             <button
               type="button"
               onClick={onToggleAnalysis}
-              className={`px-2.5 py-1 rounded-md text-xs flex items-center gap-1 whitespace-nowrap shrink-0 cursor-pointer ${
-                isAnalyzing ? 'xq-btn-engine-on shadow-2xs' : 'xq-btn-secondary'
+              className={`px-2.5 py-1 rounded-md text-xs flex items-center gap-1 whitespace-nowrap shrink-0 cursor-pointer shadow-2xs ${
+                isAnalyzing ? 'xq-btn-engine-on' : 'xq-btn-primary'
               }`}
             >
               {isAnalyzing ? (
                 <>
                   <Square className="w-2.5 h-2.5 fill-current" />
-                  <span>分析中</span>
+                  <span>暂停分析</span>
                 </>
               ) : (
                 <>
                   <Play className="w-2.5 h-2.5 fill-current" />
-                  <span>启动</span>
+                  <span>开始分析</span>
                 </>
               )}
             </button>
@@ -110,22 +112,28 @@ export const EnginePanel: React.FC<EnginePanelProps> = ({
             </span>
           )}
 
-          {/* 主引擎快速切换器 */}
-          <select
-            aria-label="选择主分析引擎"
-            value={primaryEngine.id}
-            onChange={(e) => onChangePrimaryEngine(e.target.value)}
-            className="px-2 py-1 rounded-md text-xs font-medium border xq-border bg-[var(--xq-bg-canvas)] xq-text-primary cursor-pointer focus:outline-none focus:border-[var(--xq-accent-gold)] min-w-0 max-w-[148px] truncate"
-          >
-            {engines.map((eng) => (
-              <option key={eng.id} value={eng.id}>
-                {eng.shortName} [{eng.protocol}]{eng.status !== 'ready' ? ' (未装)' : ''}
-              </option>
-            ))}
-          </select>
+          {/* 单引擎模式显示主引擎下拉；双擎模式在下方展示对称双引擎选择器 */}
+          {!compareMode ? (
+            <select
+              aria-label="选择主分析引擎"
+              value={primaryEngine.id}
+              onChange={(e) => onChangePrimaryEngine(e.target.value)}
+              className="px-2 py-1 rounded-md text-xs font-medium border xq-border bg-[var(--xq-bg-canvas)] xq-text-primary cursor-pointer focus:outline-none focus:border-[var(--xq-accent-gold)] min-w-0 max-w-[148px] truncate"
+            >
+              {engines.map((eng) => (
+                <option key={eng.id} value={eng.id}>
+                  {eng.shortName} [{eng.protocol}]{eng.status !== 'ready' ? ' (未装)' : ''}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="text-xs font-medium text-[var(--xq-accent-gold)] truncate">
+              双擎并行推演
+            </span>
+          )}
         </div>
 
-        {/* 右侧：双擎对比开关 + 威胁雷达开关（无重复设置按钮，彻底消除文字重叠） */}
+        {/* 右侧：双擎对比开关 + 威胁雷达开关 */}
         <div className="flex items-center gap-1.5 shrink-0">
           <button
             type="button"
@@ -152,6 +160,56 @@ export const EnginePanel: React.FC<EnginePanelProps> = ({
           </button>
         </div>
       </div>
+
+      {/* 双擎对称配对选择器（开启双擎对比时常驻显示，支持直接选择两个引擎及一键互换） */}
+      {compareMode && (
+        <div className="px-3.5 py-1.5 border-b xq-border bg-[var(--xq-bg-canvas)]/70 flex items-center gap-1.5">
+          <div className="flex-1 min-w-0 flex items-center gap-1">
+            <span className="px-1.5 py-0.5 rounded bg-[#10B981] text-white font-bold text-[10px] shrink-0">
+              主
+            </span>
+            <select
+              aria-label="选择对比主引擎"
+              value={primaryEngine.id}
+              onChange={(e) => onChangePrimaryEngine(e.target.value)}
+              className="w-full min-w-0 px-1.5 py-1 rounded border border-[#10B981]/45 bg-[var(--xq-bg-surface)] xq-text-primary text-xs font-medium cursor-pointer focus:outline-none focus:border-[#10B981] truncate"
+            >
+              {engines.map((eng) => (
+                <option key={`cmp-pri-${eng.id}`} value={eng.id}>
+                  {eng.shortName} [{eng.protocol}]{eng.status !== 'ready' ? ' (未装)' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            type="button"
+            onClick={onSwapEngines}
+            title="一键互换主引擎与副引擎"
+            className="p-1 rounded-md xq-btn-secondary shrink-0 cursor-pointer"
+          >
+            <ArrowLeftRight className="w-3.5 h-3.5" />
+          </button>
+
+          <div className="flex-1 min-w-0 flex items-center gap-1">
+            <span className="px-1.5 py-0.5 rounded bg-[#3B82F6] text-white font-bold text-[10px] shrink-0">
+              副
+            </span>
+            <select
+              aria-label="选择对比副引擎"
+              value={secondaryEngine.id}
+              onChange={(e) => onChangeSecondaryEngine(e.target.value)}
+              className="w-full min-w-0 px-1.5 py-1 rounded border border-[#3B82F6]/45 bg-[var(--xq-bg-surface)] xq-text-primary text-xs font-medium cursor-pointer focus:outline-none focus:border-[#3B82F6] truncate"
+            >
+              {engines.map((eng) => (
+                <option key={`cmp-sec-${eng.id}`} value={eng.id}>
+                  {eng.shortName} [{eng.protocol}]{eng.status !== 'ready' ? ' (未装)' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
 
       {/* 主体：若主引擎未安装或安装中，呈现一键下载引导 */}
       {primaryEngine.status === 'missing' ? (
@@ -219,17 +277,13 @@ export const EnginePanel: React.FC<EnginePanelProps> = ({
           </p>
         </div>
       ) : !isAnalyzing || primaryLines.length === 0 ? (
-        <div className="py-2.5 px-3.5 flex items-center justify-between gap-3 text-xs xq-text-muted">
+        <div className="py-2.5 px-3.5 flex items-center justify-between gap-2 text-xs xq-text-muted bg-[var(--xq-bg-canvas)]/40">
           <span className="truncate">
-            {primaryEngine.name} 已就绪（待命），点击启动实时计算
+            {primaryEngine.name} 已就绪 · 点击左上方「开始分析」推演当前局面
           </span>
-          <button
-            type="button"
-            onClick={onToggleAnalysis}
-            className="px-3 py-1 rounded-md xq-btn-primary text-xs cursor-pointer shrink-0"
-          >
-            立即分析
-          </button>
+          <span className="text-[11px] font-mono-tabular shrink-0 opacity-75">
+            待命中
+          </span>
         </div>
       ) : !compareMode ? (
         /* ==================== 单引擎标准模式 ==================== */
@@ -371,19 +425,6 @@ export const EnginePanel: React.FC<EnginePanelProps> = ({
                 </span>
               </div>
               <div className="flex items-center gap-2 font-mono-tabular shrink-0">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const prevPrimary = primaryEngine.id;
-                    onChangePrimaryEngine(secondaryEngine.id);
-                    onChangeSecondaryEngine(prevPrimary);
-                  }}
-                  title="一键互换主引擎与副引擎"
-                  className="px-1.5 py-0.2 rounded xq-btn-secondary text-[11px] flex items-center gap-0.5 cursor-pointer font-sans"
-                >
-                  <ArrowUpDown className="w-2.5 h-2.5" />
-                  <span>互换</span>
-                </button>
                 <span className="text-[11px] xq-text-muted">
                   d={primaryTop.depth}·{primaryTop.nps}k
                 </span>
@@ -439,21 +480,12 @@ export const EnginePanel: React.FC<EnginePanelProps> = ({
                 <span className="px-1.5 py-0.2 rounded bg-[#3B82F6] text-white font-bold text-[11px] shrink-0">
                   副擎
                 </span>
-                <select
-                  aria-label="选择对比副引擎"
-                  value={secondaryEngine.id}
-                  onChange={(e) => onChangeSecondaryEngine(e.target.value)}
-                  className="px-1.5 py-0.5 rounded border xq-border bg-[var(--xq-bg-surface)] xq-text-primary font-semibold text-xs cursor-pointer focus:outline-none"
-                >
-                  {engines
-                    .filter((e) => e.id !== primaryEngine.id)
-                    .map((eng) => (
-                      <option key={eng.id} value={eng.id}>
-                        {eng.name} [{eng.protocol}·{eng.styleLabel}]
-                        {eng.status !== 'ready' ? ' (未安装)' : ''}
-                      </option>
-                    ))}
-                </select>
+                <span className="font-semibold xq-text-primary truncate">
+                  {secondaryEngine.name}
+                </span>
+                <span className="text-[11px] xq-text-muted shrink-0">
+                  [{secondaryEngine.protocol}·{secondaryEngine.styleLabel}]
+                </span>
               </div>
 
               {secondaryEngine.status === 'ready' && secondaryTop && (

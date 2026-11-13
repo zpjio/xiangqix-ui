@@ -5,13 +5,12 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ArrowRightCircle,
   Award,
   BookOpen,
   ChevronLeft,
   ChevronRight,
   Compass,
-  Lightbulb,
-  RotateCcw,
   Swords,
 } from 'lucide-react';
 import { Board } from './components/Board';
@@ -22,6 +21,7 @@ import { EvalBar } from './components/EvalBar';
 import { GameReviewPanel } from './components/GameReviewPanel';
 import { MoveList } from './components/MoveList';
 import { PlayerSeatBar } from './components/PlayerSeatBar';
+import { SetupWorkbench } from './components/SetupWorkbench';
 import { StatusBar } from './components/StatusBar';
 import { Titlebar } from './components/Titlebar';
 import { CLASSICAL_CHALLENGES, INITIAL_LIBRARY_GAMES } from './data/catalogRegistry';
@@ -66,15 +66,115 @@ import {
   playWoodClackSound,
 } from './utils/xiangqiRules';
 
+const STUDY_SESSION_STORAGE_KEY = 'xiangqix_study_session_v1';
+const PREFS_STORAGE_KEY = 'xiangqix_prefs_v1';
+
+const DEFAULT_STUDY_METADATA: GameMetadata = {
+  redPlayer: '红方（先手）',
+  blackPlayer: '黑方（后手）',
+  event: '自由拆棋 · 复盘分析',
+  date: '2026-11-12',
+  result: '进行中',
+  site: '象棋X 分析工作台',
+  opening: '标准开局（待定式）',
+  isFavorite: false,
+};
+
+const SAMPLE_MASTER_METADATA: GameMetadata = {
+  redPlayer: '王天一',
+  blackPlayer: '郑惟桐',
+  event: '全国象棋个人锦标赛冠亚军决战',
+  date: '2026-11-11',
+  result: '红胜',
+  site: '杭州棋院',
+  opening: '中炮过河车对屏风马',
+  isFavorite: true,
+};
+
+interface StoredStudySession {
+  pieces: Piece[];
+  basePieces?: Piece[];
+  baseTurn?: Camp;
+  mainMoves: MoveRecord[];
+  variationMoves: MoveRecord[] | null;
+  branchOriginPly: number | null;
+  currentPly: number;
+  turn: Camp;
+  metadata: GameMetadata;
+  flipped?: boolean;
+}
+
+interface StoredPrefs {
+  appTheme?: AppTheme;
+  fontScale?: FontScale;
+  soundEnabled?: boolean;
+  boardTheme?: BoardTheme;
+  craftStyle?: PieceCraftStyle;
+  useTraditionalChar?: boolean;
+  primaryEngineId?: string;
+  secondaryEngineId?: string;
+  compareMode?: boolean;
+  multiPvCount?: 1 | 2 | 3;
+  engineDepth?: 18 | 24 | 30;
+  engineThreads?: 4 | 8 | 16;
+  engineHashMb?: 256 | 512 | 1024;
+}
+
+function readStoredStudySession(): StoredStudySession | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(STUDY_SESSION_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<StoredStudySession>;
+    if (!Array.isArray(parsed.pieces) || parsed.pieces.length === 0) return null;
+    if (!Array.isArray(parsed.mainMoves)) return null;
+    return {
+      pieces: parsed.pieces,
+      basePieces: Array.isArray(parsed.basePieces) && parsed.basePieces.length > 0 ? parsed.basePieces : undefined,
+      baseTurn: parsed.baseTurn === 'black' ? 'black' : 'red',
+      mainMoves: parsed.mainMoves,
+      variationMoves: Array.isArray(parsed.variationMoves) ? parsed.variationMoves : null,
+      branchOriginPly: typeof parsed.branchOriginPly === 'number' ? parsed.branchOriginPly : null,
+      currentPly: typeof parsed.currentPly === 'number' ? parsed.currentPly : 0,
+      turn: parsed.turn === 'black' ? 'black' : 'red',
+      metadata: parsed.metadata?.redPlayer ? parsed.metadata : DEFAULT_STUDY_METADATA,
+      flipped: !!parsed.flipped,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function readStoredPrefs(): StoredPrefs {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(PREFS_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as StoredPrefs) : {};
+  } catch {
+    return {};
+  }
+}
+
 export default function App() {
+  const initialPrefs = useMemo(() => readStoredPrefs(), []);
+  const initialStudy = useMemo(() => readStoredStudySession(), []);
+
   // ==================== 1. 全局外观与主题状态 ====================
-  const [appTheme, setAppTheme] = useState<AppTheme>('dark');
-  const [fontScale, setFontScale] = useState<FontScale>('standard');
-  const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
-  const [boardTheme, setBoardTheme] = useState<BoardTheme>('xuan-rosewood');
-  const [craftStyle, setCraftStyle] = useState<PieceCraftStyle>('boxwood-ebony');
+  const [appTheme, setAppTheme] = useState<AppTheme>(initialPrefs.appTheme || 'dark');
+  const [fontScale, setFontScale] = useState<FontScale>(initialPrefs.fontScale || 'standard');
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(
+    initialPrefs.soundEnabled ?? true
+  );
+  const [boardTheme, setBoardTheme] = useState<BoardTheme>(
+    initialPrefs.boardTheme || 'xuan-rosewood'
+  );
+  const [craftStyle, setCraftStyle] = useState<PieceCraftStyle>(
+    initialPrefs.craftStyle || 'boxwood-ebony'
+  );
   const [fontScheme] = useState<FontScheme>('kaiti-serif');
-  const [useTraditionalChar, setUseTraditionalChar] = useState<boolean>(false);
+  const [useTraditionalChar, setUseTraditionalChar] = useState<boolean>(
+    initialPrefs.useTraditionalChar ?? false
+  );
 
   useEffect(() => {
     const html = document.documentElement;
@@ -93,17 +193,31 @@ export default function App() {
   const [rightTab, setRightTab] = useState<'moves' | 'review'>('moves');
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
 
-  const [mainMoves, setMainMoves] = useState<MoveRecord[]>(sampleSession.moves);
-  const [variationMoves, setVariationMoves] = useState<MoveRecord[] | null>(null);
-  const [branchOriginPly, setBranchOriginPly] = useState<number | null>(null);
-  const [currentPly, setCurrentPly] = useState<number>(12);
-  const [pieces, setPieces] = useState<Piece[]>(
-    sampleSession.moves[11]?.piecesSnapshot || sampleSession.initialPieces
+  const [studyBasePieces, setStudyBasePieces] = useState<Piece[]>(
+    () => initialStudy?.basePieces || createInitialPieces('even')
   );
-  const [turn, setTurn] = useState<Camp>('red');
+  const [studyBaseTurn, setStudyBaseTurn] = useState<Camp>(
+    () => initialStudy?.baseTurn || 'red'
+  );
+  const [mainMoves, setMainMoves] = useState<MoveRecord[]>(
+    () => initialStudy?.mainMoves || []
+  );
+  const [variationMoves, setVariationMoves] = useState<MoveRecord[] | null>(
+    () => initialStudy?.variationMoves || null
+  );
+  const [branchOriginPly, setBranchOriginPly] = useState<number | null>(
+    () => initialStudy?.branchOriginPly ?? null
+  );
+  const [currentPly, setCurrentPly] = useState<number>(
+    () => initialStudy?.currentPly ?? 0
+  );
+  const [pieces, setPieces] = useState<Piece[]>(
+    () => initialStudy?.pieces || createInitialPieces('even')
+  );
+  const [turn, setTurn] = useState<Camp>(() => initialStudy?.turn || 'red');
   const [selectedPieceId, setSelectedPieceId] = useState<string | null>(null);
   const [impactEffect, setImpactEffect] = useState<ImpactEffect | null>(null);
-  const [flipped, setFlipped] = useState<boolean>(false);
+  const [flipped, setFlipped] = useState<boolean>(() => initialStudy?.flipped ?? false);
 
   // 多引擎注册表与双擎并行对比状态（预置皮卡鱼 UCI、旋风 UCI、天机 UCCI 三大引擎）
   const [engines, setEngines] = useState<EngineProfile[]>([
@@ -147,14 +261,28 @@ export default function App() {
       installProgress: 0,
     },
   ]);
-  const [primaryEngineId, setPrimaryEngineId] = useState<string>('pikafish');
-  const [secondaryEngineId, setSecondaryEngineId] = useState<string>('cyclone');
-  const [compareMode, setCompareMode] = useState<boolean>(false);
+  const [primaryEngineId, setPrimaryEngineId] = useState<string>(
+    initialPrefs.primaryEngineId || 'pikafish'
+  );
+  const [secondaryEngineId, setSecondaryEngineId] = useState<string>(
+    initialPrefs.secondaryEngineId || 'cyclone'
+  );
+  const [compareMode, setCompareMode] = useState<boolean>(
+    initialPrefs.compareMode ?? false
+  );
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(true);
-  const [multiPvCount, setMultiPvCount] = useState<1 | 2 | 3>(3);
-  const [engineDepth, setEngineDepth] = useState<18 | 24 | 30>(24);
-  const [engineThreads, setEngineThreads] = useState<4 | 8 | 16>(8);
-  const [engineHashMb, setEngineHashMb] = useState<256 | 512 | 1024>(512);
+  const [multiPvCount, setMultiPvCount] = useState<1 | 2 | 3>(
+    initialPrefs.multiPvCount || 3
+  );
+  const [engineDepth, setEngineDepth] = useState<18 | 24 | 30>(
+    initialPrefs.engineDepth || 24
+  );
+  const [engineThreads, setEngineThreads] = useState<4 | 8 | 16>(
+    initialPrefs.engineThreads || 8
+  );
+  const [engineHashMb, setEngineHashMb] = useState<256 | 512 | 1024>(
+    initialPrefs.engineHashMb || 512
+  );
   const [threatRadarEnabled, setThreatRadarEnabled] = useState<boolean>(false);
   const [hoveredArrow, setHoveredArrow] = useState<MultiPVArrow | null>(null);
   const [hintArrow, setHintArrow] = useState<MultiPVArrow | null>(null);
@@ -221,14 +349,28 @@ export default function App() {
 
   const handleChangePrimaryEngine = useCallback(
     (nextPrimaryId: string) => {
-      setPrimaryEngineId(nextPrimaryId);
       if (nextPrimaryId === secondaryEngineId) {
-        const fallback = engines.find((e) => e.id !== nextPrimaryId);
-        if (fallback) setSecondaryEngineId(fallback.id);
+        setSecondaryEngineId(primaryEngineId);
       }
+      setPrimaryEngineId(nextPrimaryId);
     },
-    [secondaryEngineId, engines]
+    [primaryEngineId, secondaryEngineId]
   );
+
+  const handleChangeSecondaryEngine = useCallback(
+    (nextSecondaryId: string) => {
+      if (nextSecondaryId === primaryEngineId) {
+        setPrimaryEngineId(secondaryEngineId);
+      }
+      setSecondaryEngineId(nextSecondaryId);
+    },
+    [primaryEngineId, secondaryEngineId]
+  );
+
+  const handleSwapEngines = useCallback(() => {
+    setPrimaryEngineId(secondaryEngineId);
+    setSecondaryEngineId(primaryEngineId);
+  }, [primaryEngineId, secondaryEngineId]);
 
   // 外部平台连线状态（复用复盘分析）
   const [connectState, setConnectState] = useState<ExternalConnectState>({
@@ -266,18 +408,82 @@ export default function App() {
   const [setupTurn, setSetupTurn] = useState<Camp>('red');
 
   // 对局名录与弹窗状态
-  const [metadata, setMetadata] = useState<GameMetadata>({
-    redPlayer: '王天一',
-    blackPlayer: '郑惟桐',
-    event: '全国象棋个人锦标赛冠亚军决战',
-    date: '2026-11-11',
-    result: '红胜',
-    site: '杭州棋院',
-    opening: '中炮过河车对屏风马',
-    isFavorite: true,
-  });
+  const [metadata, setMetadata] = useState<GameMetadata>(
+    () => initialStudy?.metadata || DEFAULT_STUDY_METADATA
+  );
   const [libraryGames, setLibraryGames] = useState<LibraryGameItem[]>(INITIAL_LIBRARY_GAMES);
   const [activeModal, setActiveModal] = useState<ActiveModalId>(null);
+
+  // 自动持久化「复盘分析」当前会话与偏好设置
+  useEffect(() => {
+    if (workspace !== 'study') return;
+    try {
+      const payload: StoredStudySession = {
+        pieces,
+        basePieces: studyBasePieces,
+        baseTurn: studyBaseTurn,
+        mainMoves,
+        variationMoves,
+        branchOriginPly,
+        currentPly,
+        turn,
+        metadata,
+        flipped,
+      };
+      window.localStorage.setItem(STUDY_SESSION_STORAGE_KEY, JSON.stringify(payload));
+    } catch {
+      // Ignore storage quota errors
+    }
+  }, [
+    workspace,
+    pieces,
+    studyBasePieces,
+    studyBaseTurn,
+    mainMoves,
+    variationMoves,
+    branchOriginPly,
+    currentPly,
+    turn,
+    metadata,
+    flipped,
+  ]);
+
+  useEffect(() => {
+    try {
+      const prefs: StoredPrefs = {
+        appTheme,
+        fontScale,
+        soundEnabled,
+        boardTheme,
+        craftStyle,
+        useTraditionalChar,
+        primaryEngineId,
+        secondaryEngineId,
+        compareMode,
+        multiPvCount,
+        engineDepth,
+        engineThreads,
+        engineHashMb,
+      };
+      window.localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(prefs));
+    } catch {
+      // Ignore storage quota errors
+    }
+  }, [
+    appTheme,
+    fontScale,
+    soundEnabled,
+    boardTheme,
+    craftStyle,
+    useTraditionalChar,
+    primaryEngineId,
+    secondaryEngineId,
+    compareMode,
+    multiPvCount,
+    engineDepth,
+    engineThreads,
+    engineHashMb,
+  ]);
 
   // ==================== 3. 派生计算：当前谱系、子力战利品、合法落点与威胁雷达 ====================
   const activeMovesList = variationMoves || mainMoves;
@@ -458,7 +664,88 @@ export default function App() {
     [selectedChallengeId]
   );
 
-  // ==================== 4. 切换工作空间与载入古谱/让子对局 ====================
+  // ==================== 4. 切换工作空间、新局重置与载入古谱/示范名局 ====================
+  const handleNewStudyGame = useCallback(() => {
+    const freshPieces = createInitialPieces('even');
+    setWorkspace('study');
+    setIsReplaying(false);
+    setSelectedPieceId(null);
+    setHintArrow(null);
+    setHoveredArrow(null);
+    setRetryMistakePly(null);
+    setRetryFeedback(null);
+    setStudyBasePieces(freshPieces);
+    setStudyBaseTurn('red');
+    setPieces(freshPieces);
+    setMainMoves([]);
+    setVariationMoves(null);
+    setBranchOriginPly(null);
+    setCurrentPly(0);
+    setTurn('red');
+    setMetadata(DEFAULT_STUDY_METADATA);
+    setIsAnalyzing(true);
+  }, []);
+
+  const handleLoadSampleMasterGame = useCallback(() => {
+    setWorkspace('study');
+    setIsReplaying(false);
+    setSelectedPieceId(null);
+    setHintArrow(null);
+    setHoveredArrow(null);
+    setRetryMistakePly(null);
+    setRetryFeedback(null);
+    setStudyBasePieces(sampleSession.initialPieces);
+    setStudyBaseTurn('red');
+    setPieces(sampleSession.moves[11]?.piecesSnapshot || sampleSession.initialPieces);
+    setMainMoves(sampleSession.moves);
+    setVariationMoves(null);
+    setBranchOriginPly(null);
+    setCurrentPly(12);
+    setTurn('red');
+    setMetadata(SAMPLE_MASTER_METADATA);
+    setIsAnalyzing(true);
+  }, [sampleSession]);
+
+  const handleTransferToStudy = useCallback(
+    (payload: {
+      basePieces: Piece[];
+      baseTurn: Camp;
+      currentPieces: Piece[];
+      currentTurn: Camp;
+      moves: MoveRecord[];
+      ply: number;
+      nextMetadata: Partial<GameMetadata>;
+    }) => {
+      setWorkspace('study');
+      setRightTab('moves');
+      setIsReplaying(false);
+      setSelectedPieceId(null);
+      setHintArrow(null);
+      setHoveredArrow(null);
+      setRetryMistakePly(null);
+      setRetryFeedback(null);
+      setStudyBasePieces(payload.basePieces.map((p) => ({ ...p })));
+      setStudyBaseTurn(payload.baseTurn);
+      setPieces(payload.currentPieces.map((p) => ({ ...p })));
+      setTurn(payload.currentTurn);
+      setMainMoves(
+        payload.moves.map((m) => ({
+          ...m,
+          piecesSnapshot: m.piecesSnapshot.map((p) => ({ ...p })),
+        }))
+      );
+      setVariationMoves(null);
+      setBranchOriginPly(null);
+      setCurrentPly(payload.ply);
+      setMetadata((prev) => ({
+        ...prev,
+        ...payload.nextMetadata,
+      }));
+      setIsAnalyzing(true);
+    },
+    []
+  );
+
   const handleSwitchWorkspace = useCallback(
     (nextWs: WorkspaceMode) => {
       setWorkspace(nextWs);
@@ -470,12 +757,29 @@ export default function App() {
       setRetryFeedback(null);
 
       if (nextWs === 'study') {
-        setPieces(sampleSession.moves[11]?.piecesSnapshot || sampleSession.initialPieces);
-        setMainMoves(sampleSession.moves);
-        setVariationMoves(null);
-        setBranchOriginPly(null);
-        setCurrentPly(12);
-        setTurn('red');
+        const stored = readStoredStudySession();
+        if (stored) {
+          setStudyBasePieces(stored.basePieces || createInitialPieces('even'));
+          setStudyBaseTurn(stored.baseTurn || 'red');
+          setPieces(stored.pieces);
+          setMainMoves(stored.mainMoves);
+          setVariationMoves(stored.variationMoves);
+          setBranchOriginPly(stored.branchOriginPly);
+          setCurrentPly(stored.currentPly);
+          setTurn(stored.turn);
+          setMetadata(stored.metadata);
+        } else {
+          const freshPieces = createInitialPieces('even');
+          setStudyBasePieces(freshPieces);
+          setStudyBaseTurn('red');
+          setPieces(freshPieces);
+          setMainMoves([]);
+          setVariationMoves(null);
+          setBranchOriginPly(null);
+          setCurrentPly(0);
+          setTurn('red');
+          setMetadata(DEFAULT_STUDY_METADATA);
+        }
         setIsAnalyzing(true);
       } else if (nextWs === 'challenge') {
         const ch = CLASSICAL_CHALLENGES[0];
@@ -493,13 +797,15 @@ export default function App() {
         setMainMoves([]);
         setVariationMoves(null);
         setCurrentPly(0);
-        setTurn('red');
+        setTurn(handicap === 'move-first' ? 'black' : 'red');
         setIsAnalyzing(false);
       } else if (nextWs === 'setup') {
+        setSetupTurn(turn);
+        setSidebarCollapsed(false);
         setIsAnalyzing(false);
       }
     },
-    [sampleSession, handicap]
+    [handicap, turn]
   );
 
   const handleSelectChallenge = (chId: string) => {
@@ -543,9 +849,19 @@ export default function App() {
         const baseInit =
           workspace === 'challenge'
             ? currentChallenge.pieces()
-            : createInitialPieces(workspace === 'play' ? handicap : 'even');
+            : workspace === 'play'
+            ? createInitialPieces(handicap)
+            : studyBasePieces.map((p) => ({ ...p }));
         setPieces(baseInit);
-        setTurn('red');
+        setTurn(
+          workspace === 'challenge'
+            ? currentChallenge.initialTurn
+            : workspace === 'play'
+            ? handicap === 'move-first'
+              ? 'black'
+              : 'red'
+            : studyBaseTurn
+        );
       } else {
         const rec = list[clamped - 1];
         if (rec) {
@@ -554,7 +870,7 @@ export default function App() {
         }
       }
     },
-    [variationMoves, mainMoves, workspace, currentChallenge, handicap]
+    [variationMoves, mainMoves, workspace, currentChallenge, handicap, studyBasePieces, studyBaseTurn]
   );
 
   const executeMoveOnBoard = useCallback(
@@ -711,6 +1027,23 @@ export default function App() {
         if (existing.type === 'general') return;
         setPieces(pieces.filter((p) => p.id !== existing.id));
       } else if (setupSelectedTemplate) {
+        const maxCountByType: Record<PieceType, number> = {
+          chariot: 2,
+          horse: 2,
+          cannon: 2,
+          advisor: 2,
+          elephant: 2,
+          soldier: 5,
+          general: 1,
+        };
+        const currentCount = pieces.filter(
+          (p) =>
+            p.camp === setupSelectedTemplate.camp &&
+            p.type === setupSelectedTemplate.type
+        ).length;
+        if (currentCount >= maxCountByType[setupSelectedTemplate.type]) {
+          return;
+        }
         const newPiece: Piece = {
           id: `setup-${setupSelectedTemplate.camp}-${setupSelectedTemplate.type}-${Date.now()}`,
           camp: setupSelectedTemplate.camp,
@@ -814,7 +1147,7 @@ export default function App() {
       } else if (e.key === 'End') {
         e.preventDefault();
         handleJumpPly(activeMovesList.length);
-      } else if (!e.metaKey && !e.ctrlKey && e.key.toLowerCase() === 'c') {
+      } else if (!e.metaKey && !e.ctrlKey && e.key.toLowerCase() === 'c' && workspace === 'study') {
         e.preventDefault();
         setCompareMode((prev) => !prev);
       } else if (!e.metaKey && !e.ctrlKey && e.key.toLowerCase() === 'f') {
@@ -943,7 +1276,7 @@ export default function App() {
 
             {/* 棋盘与左侧评估条组合 */}
             <div className="flex items-stretch justify-center gap-2.5">
-              {workspace !== 'setup' && (
+              {workspace === 'study' && (
                 <div className="py-0.5 flex items-stretch">
                   <EvalBar
                     scoreCp={currentEvalScore}
@@ -974,17 +1307,6 @@ export default function App() {
                 workspace={workspace}
                 isVariationActive={!!variationMoves}
                 onSelectIntersection={handleSelectIntersection}
-                setupSelectedTemplate={setupSelectedTemplate}
-                onSelectSetupTemplate={setSetupSelectedTemplate}
-                setupTurn={setupTurn}
-                onChangeSetupTurn={setSetupTurn}
-                onClearSetupToKings={() => setPieces(createKingsOnlyPieces())}
-                onResetSetupInitial={() => setPieces(createInitialPieces())}
-                onFinishSetup={() => {
-                  setTurn(setupTurn);
-                  setWorkspace('study');
-                  setIsAnalyzing(true);
-                }}
               />
             </div>
 
@@ -1015,12 +1337,31 @@ export default function App() {
 
             {/* 棋盘下方极简步进与操控栏 */}
             <BoardNav
+              workspace={workspace}
               currentPly={currentPly}
               totalPlies={activeMovesList.length}
               isReplaying={isReplaying}
               disabled={workspace === 'setup'}
               onJumpPly={handleJumpPly}
-              onToggleReplay={() => setIsReplaying((prev) => !prev)}
+              onToggleReplay={() => {
+                if (isReplaying) {
+                  setIsReplaying(false);
+                  return;
+                }
+                if (currentPly >= activeMovesList.length && activeMovesList.length > 0) {
+                  handleJumpPly(0, !!variationMoves);
+                }
+                setIsReplaying(true);
+              }}
+              onNewGame={() => {
+                if (workspace === 'play') {
+                  handleStartHandicapGame(handicap, skillTier);
+                } else if (workspace === 'challenge') {
+                  handleSelectChallenge(currentChallenge.id);
+                } else {
+                  handleNewStudyGame();
+                }
+              }}
               onFlipBoard={() => setFlipped((prev) => !prev)}
               onUndoMove={() => handleJumpPly(Math.max(0, currentPly - 1))}
               onTriggerHint={handleTriggerHint}
@@ -1056,97 +1397,122 @@ export default function App() {
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
 
-            {/* 上半区：常驻多引擎分析与双擎对比舱 (EnginePanel) */}
-            <EnginePanel
-              engines={engines}
-              primaryEngineId={primaryEngine.id}
-              secondaryEngineId={secondaryEngine.id}
-              compareMode={compareMode}
-              isAnalyzing={isAnalyzing}
-              threatRadarEnabled={threatRadarEnabled}
-              primaryLines={multiPvData.lines}
-              secondaryLines={secondaryMultiPvData.lines}
-              onChangePrimaryEngine={handleChangePrimaryEngine}
-              onChangeSecondaryEngine={setSecondaryEngineId}
-              onToggleCompareMode={() => setCompareMode((prev) => !prev)}
-              onInstallEngine={handleInstallEngine}
-              onOpenEngineSettings={() => setActiveModal('settings')}
-              onToggleAnalysis={() => setIsAnalyzing((prev) => !prev)}
-              onToggleThreatRadar={() => setThreatRadarEnabled((prev) => !prev)}
-              onSelectMultiPVMove={(from, to) => executeMoveOnBoard(from, to)}
-              onHoverMultiPVMove={setHoveredArrow}
-            />
+            {/* 上半区：仅「复盘分析」模式挂载多引擎分析与双擎对比舱 (EnginePanel) */}
+            {workspace === 'study' && (
+              <EnginePanel
+                engines={engines}
+                primaryEngineId={primaryEngine.id}
+                secondaryEngineId={secondaryEngine.id}
+                compareMode={compareMode}
+                isAnalyzing={isAnalyzing}
+                threatRadarEnabled={threatRadarEnabled}
+                primaryLines={multiPvData.lines}
+                secondaryLines={secondaryMultiPvData.lines}
+                onChangePrimaryEngine={handleChangePrimaryEngine}
+                onChangeSecondaryEngine={handleChangeSecondaryEngine}
+                onSwapEngines={handleSwapEngines}
+                onToggleCompareMode={() => setCompareMode((prev) => !prev)}
+                onInstallEngine={handleInstallEngine}
+                onOpenEngineSettings={() => setActiveModal('settings')}
+                onToggleAnalysis={() => setIsAnalyzing((prev) => !prev)}
+                onToggleThreatRadar={() => setThreatRadarEnabled((prev) => !prev)}
+                onSelectMultiPVMove={(from, to) => executeMoveOnBoard(from, to)}
+                onHoverMultiPVMove={setHoveredArrow}
+              />
+            )}
 
-            {/* 下半区：根据当前工作空间自适应呈现 */}
+            {/* 主工作区：根据当前工作空间自适应呈现 */}
             {workspace === 'challenge' ? (
               /* 残局题库工作台 */
-              <div className="flex-1 overflow-y-auto no-scrollbar p-3.5 space-y-3 text-xs">
-                <div className="flex items-center justify-between border-b xq-border pb-2">
+              <div className="flex-1 flex flex-col min-h-0 overflow-hidden text-xs">
+                <div className="px-3.5 py-2.5 border-b xq-border flex items-center justify-between gap-2 shrink-0">
                   <div className="flex items-center gap-2">
                     <Compass className="w-4 h-4 text-[var(--xq-accent-gold)]" />
                     <span className="font-semibold text-sm">经典残局题库</span>
                   </div>
+                  <span className="text-xs xq-text-muted">
+                    共 {CLASSICAL_CHALLENGES.length} 关 · 支招/重摆见棋盘底栏
+                  </span>
+                </div>
+
+                <div className="flex-1 overflow-y-auto no-scrollbar p-3.5 space-y-3">
+                  {/* 关卡选择列表 */}
+                  <div className="space-y-2">
+                    {CLASSICAL_CHALLENGES.map((ch) => {
+                      const isSelected = ch.id === currentChallenge.id;
+                      return (
+                        <button
+                          key={ch.id}
+                          type="button"
+                          onClick={() => handleSelectChallenge(ch.id)}
+                          className={`w-full p-2.5 rounded-lg text-left cursor-pointer space-y-1 ${
+                            isSelected ? 'xq-btn-option-active' : 'xq-btn-option'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-serif-sc font-bold text-sm">{ch.title}</span>
+                            <span className="text-xs px-1.5 py-0.5 rounded border xq-border xq-text-secondary font-normal">
+                              {ch.difficulty}
+                            </span>
+                          </div>
+                          <div className="text-xs text-[var(--xq-accent-gold)] font-medium">
+                            {ch.objective}
+                          </div>
+                          <p className="text-xs xq-text-muted leading-relaxed font-normal">{ch.lore}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* 破局实时反馈与提示卡（仅展示破局指引，操作统一由棋盘底栏「支招」「重摆」触发） */}
+                  {challengeStatusBanner && (
+                    <div className="p-2.5 rounded-lg border border-[var(--xq-accent-gold)]/50 bg-[var(--xq-accent-gold)]/10 space-y-1">
+                      <div className="flex items-center gap-1.5 font-semibold text-[var(--xq-accent-gold)]">
+                        <Award className="w-4 h-4" />
+                        <span>破局提示</span>
+                      </div>
+                      <p className="text-xs leading-relaxed">{challengeStatusBanner}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* 底部主行动区：携残局局面与试走着法转入复盘分析 */}
+                <div className="p-3.5 border-t xq-border shrink-0 bg-[var(--xq-bg-surface)]">
                   <button
                     type="button"
-                    onClick={() => handleSelectChallenge(currentChallenge.id)}
-                    className="px-2.5 py-1 rounded-md xq-btn-secondary flex items-center gap-1 text-xs cursor-pointer"
+                    onClick={() =>
+                      handleTransferToStudy({
+                        basePieces: currentChallenge.pieces(),
+                        baseTurn: currentChallenge.initialTurn,
+                        currentPieces: pieces,
+                        currentTurn: turn,
+                        moves: mainMoves,
+                        ply: currentPly,
+                        nextMetadata: {
+                          redPlayer: '挑战者（红方）',
+                          blackPlayer: currentChallenge.sourceBook,
+                          event: `残局研习 · ${currentChallenge.difficulty}`,
+                          opening: currentChallenge.title,
+                          result: '进行中',
+                          isFavorite: false,
+                        },
+                      })
+                    }
+                    className="w-full py-2.5 px-4 rounded-lg xq-btn-primary text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer shadow-sm"
                   >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>重摆</span>
+                    <ArrowRightCircle className="w-4 h-4" />
+                    <span>
+                      {mainMoves.length > 0
+                        ? `携带 ${mainMoves.length} 手试走转入复盘分析`
+                        : '转入复盘分析'}
+                    </span>
                   </button>
                 </div>
-
-                {/* 关卡选择列表 */}
-                <div className="space-y-2">
-                  {CLASSICAL_CHALLENGES.map((ch) => {
-                    const isSelected = ch.id === currentChallenge.id;
-                    return (
-                      <button
-                        key={ch.id}
-                        type="button"
-                        onClick={() => handleSelectChallenge(ch.id)}
-                        className={`w-full p-2.5 rounded-lg text-left cursor-pointer space-y-1 ${
-                          isSelected ? 'xq-btn-option-active' : 'xq-btn-option'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-serif-sc font-bold text-sm">{ch.title}</span>
-                          <span className="text-xs px-1.5 py-0.5 rounded border xq-border xq-text-secondary font-normal">
-                            {ch.difficulty}
-                          </span>
-                        </div>
-                        <div className="text-xs text-[var(--xq-accent-gold)] font-medium">
-                          {ch.objective}
-                        </div>
-                        <p className="text-xs xq-text-muted leading-relaxed font-normal">{ch.lore}</p>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* 破局实时反馈与提示卡 */}
-                {challengeStatusBanner && (
-                  <div className="p-2.5 rounded-lg border border-[var(--xq-accent-gold)]/50 bg-[var(--xq-accent-gold)]/10 space-y-1.5">
-                    <div className="flex items-center gap-1.5 font-semibold text-[var(--xq-accent-gold)]">
-                      <Award className="w-4 h-4" />
-                      <span>破局提示</span>
-                    </div>
-                    <p className="text-xs leading-relaxed">{challengeStatusBanner}</p>
-                    <button
-                      type="button"
-                      onClick={handleTriggerHint}
-                      className="px-3 py-1 rounded-md xq-btn-primary text-xs flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Lightbulb className="w-3.5 h-3.5" />
-                      <span>查看正着提示</span>
-                    </button>
-                  </div>
-                )}
               </div>
             ) : workspace === 'play' ? (
               /* 人机对弈工作台 */
-              <div className="flex-1 overflow-y-auto no-scrollbar p-3.5 space-y-3 text-xs">
-                <div className="flex items-center justify-between border-b xq-border pb-2">
+              <div className="flex-1 flex flex-col min-h-0 overflow-hidden text-xs">
+                <div className="px-3.5 py-2.5 border-b xq-border flex items-center justify-between gap-2 shrink-0">
                   <div className="flex items-center gap-2">
                     <Swords className="w-4 h-4 text-[var(--xq-accent-gold)]" />
                     <span className="font-semibold text-sm">人机对弈设置</span>
@@ -1154,97 +1520,178 @@ export default function App() {
                   <span className="text-xs xq-text-muted">支持悔棋与支招</span>
                 </div>
 
-                {/* 让子设置 */}
-                <div className="space-y-1.5">
-                  <label className="block xq-text-secondary font-medium">
-                    1. 开局让子（点击立即重开）
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {(
-                      [
-                        { id: 'even', title: '分先', desc: '双方满子，红方先行' },
-                        { id: 'move-first', title: '让先', desc: '双方满子，黑方先行' },
-                        {
-                          id: 'left-horse',
-                          title: '让左马',
-                          desc: '黑方撤去左马',
-                        },
-                        {
-                          id: 'two-horses',
-                          title: '让双马',
-                          desc: '黑方撤去双马',
-                        },
-                      ] as const
-                    ).map((h) => (
-                      <button
-                        key={h.id}
-                        type="button"
-                        onClick={() => handleStartHandicapGame(h.id, skillTier)}
-                        className={`p-2 rounded-lg text-left cursor-pointer ${
-                          handicap === h.id ? 'xq-btn-option-active' : 'xq-btn-option'
-                        }`}
-                      >
-                        <div className="font-semibold">{h.title}</div>
-                        <div className="text-xs xq-text-muted mt-0.5 font-normal">{h.desc}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 棋力档位选择 */}
-                <div className="space-y-1.5">
-                  <label className="block xq-text-secondary font-medium">2. 电脑棋力难度</label>
-                  <div className="grid grid-cols-4 gap-1.5">
-                    {(
-                      [
-                        { id: 'scholar', label: '初级' },
-                        { id: 'strategist', label: '中级' },
-                        { id: 'grandmaster', label: '高级' },
-                        { id: 'deity', label: '大师' },
-                      ] as const
-                    ).map((t) => (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() => setSkillTier(t.id)}
-                        className={`py-1.5 rounded-md text-center cursor-pointer ${
-                          skillTier === t.id ? 'xq-btn-option-active' : 'xq-btn-option'
-                        }`}
-                      >
-                        {t.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 当前人机实战着法记录 */}
-                <div className="p-2.5 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] space-y-2">
-                  <div className="flex items-center justify-between text-xs xq-text-secondary">
-                    <span>已走手数：{mainMoves.length} 手</span>
-                    {isBotThinking && (
-                      <span className="text-[var(--xq-accent-gold)] font-medium">
-                        电脑思考中…
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto no-scrollbar">
-                    {mainMoves.length === 0 ? (
-                      <span className="text-xs xq-text-muted">
-                        请在左侧棋盘点击红方棋子走棋
-                      </span>
-                    ) : (
-                      mainMoves.map((m) => (
-                        <span
-                          key={m.ply}
-                          className="px-2 py-0.5 rounded border xq-border font-serif-sc text-xs"
+                <div className="flex-1 overflow-y-auto no-scrollbar p-3.5 space-y-3">
+                  {/* 让子设置 */}
+                  <div className="space-y-1.5">
+                    <label className="block xq-text-secondary font-medium">
+                      1. 开局让子（点击立即重开）
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(
+                        [
+                          { id: 'even', title: '分先', desc: '双方满子，红方先行' },
+                          { id: 'move-first', title: '让先', desc: '双方满子，黑方先行' },
+                          {
+                            id: 'left-horse',
+                            title: '让左马',
+                            desc: '黑方撤去左马',
+                          },
+                          {
+                            id: 'two-horses',
+                            title: '让双马',
+                            desc: '黑方撤去双马',
+                          },
+                        ] as const
+                      ).map((h) => (
+                        <button
+                          key={h.id}
+                          type="button"
+                          onClick={() => handleStartHandicapGame(h.id, skillTier)}
+                          className={`p-2 rounded-lg text-left cursor-pointer ${
+                            handicap === h.id ? 'xq-btn-option-active' : 'xq-btn-option'
+                          }`}
                         >
-                          {m.ply}.{m.notation}
-                        </span>
-                      ))
-                    )}
+                          <div className="font-semibold">{h.title}</div>
+                          <div className="text-xs xq-text-muted mt-0.5 font-normal">{h.desc}</div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
+
+                  {/* 棋力档位选择 */}
+                  <div className="space-y-1.5">
+                    <label className="block xq-text-secondary font-medium">2. 电脑棋力难度</label>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {(
+                        [
+                          { id: 'scholar', label: '初级' },
+                          { id: 'strategist', label: '中级' },
+                          { id: 'grandmaster', label: '高级' },
+                          { id: 'deity', label: '大师' },
+                        ] as const
+                      ).map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => setSkillTier(t.id)}
+                          className={`py-1.5 rounded-md text-center cursor-pointer ${
+                            skillTier === t.id ? 'xq-btn-option-active' : 'xq-btn-option'
+                          }`}
+                        >
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 当前人机实战着法记录 */}
+                  <div className="p-2.5 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] space-y-2">
+                    <div className="flex items-center justify-between text-xs xq-text-secondary">
+                      <span>已走手数：{mainMoves.length} 手</span>
+                      {isBotThinking && (
+                        <span className="text-[var(--xq-accent-gold)] font-medium">
+                          电脑思考中…
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto no-scrollbar">
+                      {mainMoves.length === 0 ? (
+                        <span className="text-xs xq-text-muted">
+                          请在左侧棋盘点击红方棋子走棋
+                        </span>
+                      ) : (
+                        mainMoves.map((m) => (
+                          <span
+                            key={m.ply}
+                            className="px-2 py-0.5 rounded border xq-border font-serif-sc text-xs"
+                          >
+                            {m.ply}.{m.notation}
+                          </span>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 底部主行动区：随时携带实战局面与着法转入复盘分析 */}
+                <div className="p-3.5 border-t xq-border shrink-0 bg-[var(--xq-bg-surface)]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const handicapLabel =
+                        handicap === 'even'
+                          ? '分先'
+                          : handicap === 'move-first'
+                          ? '让先'
+                          : handicap === 'left-horse'
+                          ? '让左马'
+                          : '让双马';
+                      const tierLabel =
+                        skillTier === 'scholar'
+                          ? '初级'
+                          : skillTier === 'strategist'
+                          ? '中级'
+                          : skillTier === 'grandmaster'
+                          ? '高级'
+                          : '大师';
+                      handleTransferToStudy({
+                        basePieces: createInitialPieces(handicap),
+                        baseTurn: handicap === 'move-first' ? 'black' : 'red',
+                        currentPieces: pieces,
+                        currentTurn: turn,
+                        moves: mainMoves,
+                        ply: currentPly,
+                        nextMetadata: {
+                          redPlayer: '玩家（红方）',
+                          blackPlayer: `电脑引擎（${tierLabel}）`,
+                          event: `人机对弈 · ${handicapLabel}`,
+                          opening: `人机实战 (${handicapLabel})`,
+                          result: '进行中',
+                          isFavorite: false,
+                        },
+                      });
+                    }}
+                    className="w-full py-2.5 px-4 rounded-lg xq-btn-primary text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                  >
+                    <ArrowRightCircle className="w-4 h-4" />
+                    <span>
+                      {mainMoves.length > 0
+                        ? `携带 ${mainMoves.length} 手实战转入复盘分析`
+                        : '转入复盘分析'}
+                    </span>
+                  </button>
                 </div>
               </div>
+            ) : workspace === 'setup' ? (
+              /* 摆子编辑工作台 */
+              <SetupWorkbench
+                pieces={pieces}
+                useTraditionalChar={useTraditionalChar}
+                setupSelectedTemplate={setupSelectedTemplate}
+                setupTurn={setupTurn}
+                onSelectSetupTemplate={setSetupSelectedTemplate}
+                onChangeSetupTurn={setSetupTurn}
+                onClearSetupToKings={() => setPieces(createKingsOnlyPieces())}
+                onResetSetupInitial={() => setPieces(createInitialPieces())}
+                onFinishSetup={() => {
+                  handleTransferToStudy({
+                    basePieces: pieces,
+                    baseTurn: setupTurn,
+                    currentPieces: pieces,
+                    currentTurn: setupTurn,
+                    moves: [],
+                    ply: 0,
+                    nextMetadata: {
+                      redPlayer: '红方',
+                      blackPlayer: '黑方',
+                      event: '摆子推演',
+                      opening: '自定义摆子局面',
+                      result: '进行中',
+                      isFavorite: false,
+                    },
+                  });
+                }}
+              />
             ) : (
               /* 默认「复盘分析」双页签：回合棋谱 ↔ 复盘报告 */
               <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -1303,6 +1750,9 @@ export default function App() {
                     }}
                     onOpenGameInfo={() => setActiveModal('game-info')}
                     onToggleFavorite={handleToggleCurrentFavorite}
+                    onLoadSampleGame={handleLoadSampleMasterGame}
+                    onOpenImportModal={() => setActiveModal('fen-pgn')}
+                    onOpenLibraryModal={() => setActiveModal('library')}
                     onSyncNextExternalMove={handleSyncNextExternalMove}
                     onDisconnectExternal={() =>
                       setConnectState((prev) => ({ ...prev, connected: false }))
@@ -1337,6 +1787,8 @@ export default function App() {
                       }
                     }}
                     onPlayBestAlternative={(from, to) => executeMoveOnBoard(from, to)}
+                    onLoadSampleGame={handleLoadSampleMasterGame}
+                    onOpenImportModal={() => setActiveModal('fen-pgn')}
                   />
                 )}
               </div>
@@ -1389,18 +1841,22 @@ export default function App() {
         onApplyFen={(fenStr) => {
           const parsed = parseFenToPieces(fenStr);
           if (!parsed) return false;
-          setPieces(parsed.pieces);
-          setTurn(parsed.turn);
-          setCurrentPly(0);
-          setMainMoves([]);
-          setVariationMoves(null);
-          setBranchOriginPly(null);
+          handleTransferToStudy({
+            basePieces: parsed.pieces,
+            baseTurn: parsed.turn,
+            currentPieces: parsed.pieces,
+            currentTurn: parsed.turn,
+            moves: [],
+            ply: 0,
+            nextMetadata: {
+              opening: '导入 FEN 局面',
+            },
+          });
           return true;
         }}
         onSaveMetadata={setMetadata}
         onLoadLibraryGame={(game) => {
-          setMetadata((prev) => ({
-            ...prev,
+          const baseMeta: Partial<GameMetadata> = {
             redPlayer: game.redPlayer,
             blackPlayer: game.blackPlayer,
             event: game.event,
@@ -1408,23 +1864,31 @@ export default function App() {
             result: game.result,
             opening: game.opening,
             isFavorite: game.isFavorite,
-          }));
-          setWorkspace('study');
-          setVariationMoves(null);
-          setBranchOriginPly(null);
+          };
           if (game.fen) {
             const parsed = parseFenToPieces(game.fen);
             if (parsed) {
-              setPieces(parsed.pieces);
-              setTurn(parsed.turn);
-              setCurrentPly(0);
-              setMainMoves([]);
+              handleTransferToStudy({
+                basePieces: parsed.pieces,
+                baseTurn: parsed.turn,
+                currentPieces: parsed.pieces,
+                currentTurn: parsed.turn,
+                moves: [],
+                ply: 0,
+                nextMetadata: baseMeta,
+              });
               return;
             }
           }
-          setPieces(sampleSession.moves[11]?.piecesSnapshot || createInitialPieces());
-          setMainMoves(sampleSession.moves);
-          setCurrentPly(12);
+          handleTransferToStudy({
+            basePieces: sampleSession.initialPieces,
+            baseTurn: 'red',
+            currentPieces: sampleSession.moves[11]?.piecesSnapshot || createInitialPieces(),
+            currentTurn: 'red',
+            moves: sampleSession.moves,
+            ply: 12,
+            nextMetadata: baseMeta,
+          });
         }}
         onToggleLibraryFavorite={(id) =>
           setLibraryGames((prev) =>
@@ -1445,7 +1909,7 @@ export default function App() {
         onChangeEngineThreads={setEngineThreads}
         onChangeEngineHashMb={setEngineHashMb}
         onChangePrimaryEngine={handleChangePrimaryEngine}
-        onChangeSecondaryEngine={setSecondaryEngineId}
+        onChangeSecondaryEngine={handleChangeSecondaryEngine}
         onToggleCompareMode={() => setCompareMode((prev) => !prev)}
         onInstallEngine={handleInstallEngine}
         onResetEngineMissing={handleResetEngineMissing}

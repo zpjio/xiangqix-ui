@@ -34,13 +34,13 @@ export const StatusBar: React.FC<StatusBarProps> = ({
 }) => {
   const getWorkspaceLabel = () => {
     if (workspace === 'challenge') {
-      return '残局题库 · 执红先行破局';
+      return '残局题库 · 执红先行破局（可随时转入复盘分析）';
     }
     if (workspace === 'play') {
-      return '人机对弈 · 支持让子与悔棋支招';
+      return '人机对弈 · 支持让子与悔棋支招（可随时转入复盘分析）';
     }
     if (workspace === 'setup') {
-      return '摆子编辑 · 点选右侧棋子即可在任意交点布子';
+      return '摆子编辑 · 点选右侧子力库布子，点击盘面已有棋子可移除';
     }
     if (isVariationActive) {
       return '分支推演中 · 可在右侧棋谱「升为主线」或返回主谱';
@@ -51,7 +51,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
       }
       return `${primaryEngineName} 实时分析中 (${engineThreads}核/${engineHashMb}M) · 悬停变例可预览走法`;
     }
-    return '复盘分析 · 点击任意历史手直接落子即可生成分支';
+    return '复盘分析 · 点击「开始分析」或直接落子推演分支';
   };
 
   return (

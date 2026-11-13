@@ -8,13 +8,11 @@ import {
   MultiPVArrow,
   Piece,
   PieceCraftStyle,
-  PieceType,
   Position,
   WorkspaceMode,
 } from '../types/xiangqi';
 import {
   BLACK_ROAD_NUMERALS,
-  PIECE_LABELS,
   RED_ROAD_NUMERALS,
   getPieceAt,
   isCampInCheck,
@@ -40,14 +38,6 @@ interface BoardProps {
   workspace: WorkspaceMode;
   isVariationActive?: boolean;
   onSelectIntersection: (row: number, col: number) => void;
-  // 摆子工坊专属 props
-  setupSelectedTemplate?: { camp: Camp; type: PieceType } | null;
-  onSelectSetupTemplate?: (template: { camp: Camp; type: PieceType } | null) => void;
-  setupTurn?: Camp;
-  onChangeSetupTurn?: (camp: Camp) => void;
-  onClearSetupToKings?: () => void;
-  onResetSetupInitial?: () => void;
-  onFinishSetup?: () => void;
 }
 
 const STEP = 95;
@@ -143,13 +133,6 @@ export const Board: React.FC<BoardProps> = ({
   workspace,
   isVariationActive = false,
   onSelectIntersection,
-  setupSelectedTemplate = null,
-  onSelectSetupTemplate,
-  setupTurn = 'red',
-  onChangeSetupTurn,
-  onClearSetupToKings,
-  onResetSetupInitial,
-  onFinishSetup,
 }) => {
   const themeColors = {
     'xuan-rosewood': {
@@ -255,21 +238,6 @@ export const Board: React.FC<BoardProps> = ({
     : workspace === 'setup'
     ? 'ring-2 ring-[#C87D3B]'
     : '';
-
-  const maxPieceQuota: { type: PieceType; max: number }[] = [
-    { type: 'chariot', max: 2 },
-    { type: 'horse', max: 2 },
-    { type: 'cannon', max: 2 },
-    { type: 'advisor', max: 2 },
-    { type: 'elephant', max: 2 },
-    { type: 'soldier', max: 5 },
-    { type: 'general', max: 1 },
-  ];
-
-  const getRemainingCount = (camp: Camp, type: PieceType, max: number) => {
-    const onBoard = pieces.filter((p) => p.camp === camp && p.type === type).length;
-    return Math.max(0, max - onBoard);
-  };
 
   const topNumerals = flipped ? [...RED_ROAD_NUMERALS].reverse() : BLACK_ROAD_NUMERALS;
   const bottomNumerals = flipped ? [...BLACK_ROAD_NUMERALS].reverse() : RED_ROAD_NUMERALS;
@@ -836,143 +804,6 @@ export const Board: React.FC<BoardProps> = ({
           </div>
         </div>
       </div>
-
-      {/* 摆子编辑右侧子力库 */}
-      {workspace === 'setup' && (
-        <aside className="w-56 rounded-xl border xq-elevated p-3.5 flex flex-col gap-3 shadow-lg">
-          <div className="flex items-center justify-between border-b xq-border pb-2">
-            <span className="text-xs font-semibold">摆子子力库</span>
-            <span className="text-[11px] xq-text-muted">选子后点交点</span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            {/* 黑方列 */}
-            <div className="flex flex-col gap-1.5">
-              <div className="text-[11px] font-medium xq-text-secondary text-center pb-0.5 border-b xq-border">
-                黑方棋子
-              </div>
-              {maxPieceQuota.map(({ type, max }) => {
-                const remain = getRemainingCount('black', type, max);
-                const isSelected =
-                  setupSelectedTemplate?.camp === 'black' &&
-                  setupSelectedTemplate?.type === type;
-                return (
-                  <button
-                    key={`setup-b-${type}`}
-                    type="button"
-                    onClick={() =>
-                      onSelectSetupTemplate?.(
-                        isSelected ? null : { camp: 'black', type }
-                      )
-                    }
-                    className={`flex items-center justify-between px-2 py-1 rounded border text-xs transition-colors cursor-pointer ${
-                      isSelected
-                        ? 'border-[#D4AF37] bg-[#D4AF37]/15'
-                        : 'xq-border hover:bg-[var(--xq-bg-hover)]'
-                    }`}
-                  >
-                    <span className="font-serif-sc font-bold text-[#DFB654] bg-[#241E1B] w-6 h-6 rounded-full flex items-center justify-center border border-[#D4AF37]/40">
-                      {useTraditionalChar
-                        ? PIECE_LABELS.black[type].traditional
-                        : PIECE_LABELS.black[type].simplified}
-                    </span>
-                    <span className="font-mono-tabular text-[11px] xq-text-secondary">
-                      ×{remain}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* 红方列 */}
-            <div className="flex flex-col gap-1.5">
-              <div className="text-[11px] font-medium xq-text-secondary text-center pb-0.5 border-b xq-border">
-                红方棋子
-              </div>
-              {maxPieceQuota.map(({ type, max }) => {
-                const remain = getRemainingCount('red', type, max);
-                const isSelected =
-                  setupSelectedTemplate?.camp === 'red' &&
-                  setupSelectedTemplate?.type === type;
-                return (
-                  <button
-                    key={`setup-r-${type}`}
-                    type="button"
-                    onClick={() =>
-                      onSelectSetupTemplate?.(
-                        isSelected ? null : { camp: 'red', type }
-                      )
-                    }
-                    className={`flex items-center justify-between px-2 py-1 rounded border text-xs transition-colors cursor-pointer ${
-                      isSelected
-                        ? 'border-[#C8372D] bg-[#C8372D]/15'
-                        : 'xq-border hover:bg-[var(--xq-bg-hover)]'
-                    }`}
-                  >
-                    <span className="font-serif-sc font-bold text-[#A62222] bg-[#EAD2B0] w-6 h-6 rounded-full flex items-center justify-center border border-[#9E2A2B]/50">
-                      {useTraditionalChar
-                        ? PIECE_LABELS.red[type].traditional
-                        : PIECE_LABELS.red[type].simplified}
-                    </span>
-                    <span className="font-mono-tabular text-[11px] xq-text-secondary">
-                      ×{remain}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="pt-1 border-t xq-border flex flex-col gap-1.5">
-            <span className="text-xs xq-text-secondary">先行方</span>
-            <div className="grid grid-cols-2 gap-1.5">
-              <button
-                type="button"
-                onClick={() => onChangeSetupTurn?.('red')}
-                className={`py-1 text-xs rounded-md cursor-pointer ${
-                  setupTurn === 'red' ? 'xq-btn-option-active' : 'xq-btn-option'
-                }`}
-              >
-                红先
-              </button>
-              <button
-                type="button"
-                onClick={() => onChangeSetupTurn?.('black')}
-                className={`py-1 text-xs rounded-md cursor-pointer ${
-                  setupTurn === 'black' ? 'xq-btn-option-active' : 'xq-btn-option'
-                }`}
-              >
-                黑先
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-1.5 pt-1">
-            <button
-              type="button"
-              onClick={onClearSetupToKings}
-              className="px-2 py-1.5 rounded-md xq-btn-secondary text-xs whitespace-nowrap cursor-pointer"
-            >
-              仅留将帅
-            </button>
-            <button
-              type="button"
-              onClick={onResetSetupInitial}
-              className="px-2 py-1.5 rounded-md xq-btn-secondary text-xs whitespace-nowrap cursor-pointer"
-            >
-              初始棋盘
-            </button>
-          </div>
-
-          <button
-            type="button"
-            onClick={onFinishSetup}
-            className="w-full py-2 rounded-md xq-btn-primary text-xs whitespace-nowrap cursor-pointer"
-          >
-            完成摆子
-          </button>
-        </aside>
-      )}
     </div>
   );
 };
