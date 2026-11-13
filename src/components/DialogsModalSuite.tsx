@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
+  BookmarkPlus,
   Check,
   CheckCircle2,
   Copy,
@@ -60,6 +61,7 @@ interface DialogsModalSuiteProps {
   onApplyFen: (fen: string) => boolean;
   onSaveMetadata: (meta: GameMetadata) => void;
   onLoadLibraryGame: (game: LibraryGameItem) => void;
+  onSaveCurrentGameToLibrary?: () => void;
   onToggleLibraryFavorite: (id: string) => void;
   onDeleteLibraryGame: (id: string) => void;
   onChangeAppTheme: (theme: AppTheme) => void;
@@ -138,6 +140,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
   onApplyFen,
   onSaveMetadata,
   onLoadLibraryGame,
+  onSaveCurrentGameToLibrary,
   onToggleLibraryFavorite,
   onDeleteLibraryGame,
   onChangeAppTheme,
@@ -176,8 +179,11 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
 
   // 棋谱库与元数据编辑状态
   const [metaDraft, setMetaDraft] = useState<GameMetadata>(metadata);
-  const [libCategory, setLibCategory] = useState<'all' | 'favorite' | 'master' | 'ancient'>('all');
+  const [libCategory, setLibCategory] = useState<'all' | 'favorite' | 'master' | 'ancient' | 'user'>('all');
+  const [libResultFilter, setLibResultFilter] = useState<'all' | '红胜' | '黑胜' | '和棋'>('all');
+  const [libSortBy, setLibSortBy] = useState<'default' | 'date-desc' | 'plies-desc' | 'accuracy-desc'>('default');
   const [libSearch, setLibSearch] = useState('');
+  const [libSaveToast, setLibSaveToast] = useState(false);
 
   // 连线配置草稿
   const [connectPlatform, setConnectPlatform] = useState<ExternalPlatformId>(
@@ -195,8 +201,6 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
     setPgnInput(currentPgn);
     setMetaDraft(metadata);
   }, [currentFen, currentPgn, metadata, activeModal]);
-
-  if (!activeModal) return null;
 
   const commands = [
     {
@@ -294,21 +298,68 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
     c.label.toLowerCase().includes(cmdQuery.trim().toLowerCase())
   );
 
-  const filteredLibrary = libraryGames.filter((g) => {
-    if (libCategory === 'favorite' && !g.isFavorite) return false;
-    if (libCategory === 'master' && g.category !== 'master') return false;
-    if (libCategory === 'ancient' && g.category !== 'ancient') return false;
-    if (libSearch.trim()) {
-      const q = libSearch.trim().toLowerCase();
-      return (
-        g.redPlayer.toLowerCase().includes(q) ||
-        g.blackPlayer.toLowerCase().includes(q) ||
-        g.event.toLowerCase().includes(q) ||
-        g.opening.toLowerCase().includes(q)
+  const libraryStats = useMemo(() => {
+    let fav = 0;
+    let master = 0;
+    let ancient = 0;
+    let user = 0;
+    for (const g of libraryGames) {
+      if (g.isFavorite) fav++;
+      if (g.category === 'master') master++;
+      else if (g.category === 'ancient') ancient++;
+      else if (g.category === 'user') user++;
+    }
+    return { total: libraryGames.length, fav, master, ancient, user };
+  }, [libraryGames]);
+
+  const filteredLibrary = useMemo(() => {
+    if (activeModal !== 'library') return [];
+    const q = libSearch.trim().toLowerCase();
+    const list = libraryGames.filter((g) => {
+      if (libCategory === 'favorite' && !g.isFavorite) return false;
+      if (libCategory === 'master' && g.category !== 'master') return false;
+      if (libCategory === 'ancient' && g.category !== 'ancient') return false;
+      if (libCategory === 'user' && g.category !== 'user') return false;
+      if (libResultFilter !== 'all' && g.result !== libResultFilter) return false;
+      if (q) {
+        return (
+          g.redPlayer.toLowerCase().includes(q) ||
+          g.blackPlayer.toLowerCase().includes(q) ||
+          g.event.toLowerCase().includes(q) ||
+          g.opening.toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+
+    if (libSortBy === 'date-desc') {
+      return [...list].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    }
+    if (libSortBy === 'plies-desc') {
+      return [...list].sort((a, b) => b.pliesCount - a.pliesCount);
+    }
+    if (libSortBy === 'accuracy-desc') {
+      return [...list].sort(
+        (a, b) =>
+          (b.accuracyRed + b.accuracyBlack) / 2 - (a.accuracyRed + a.accuracyBlack) / 2
       );
     }
-    return true;
-  });
+    return list;
+  }, [activeModal, libraryGames, libCategory, libResultFilter, libSearch, libSortBy]);
+
+  const filteredOutcomeCounts = useMemo(() => {
+    let red = 0;
+    let black = 0;
+    let draw = 0;
+    for (const g of filteredLibrary) {
+      if (g.result === '红胜') red++;
+      else if (g.result === '黑胜') black++;
+      else if (g.result === '和棋') draw++;
+    }
+    return { red, black, draw };
+  }, [filteredLibrary]);
+
+  if (!activeModal) return null;
 
   const activeSampleRecognition =
     SAMPLE_IMAGE_RECOGNITIONS.find((s) => s.id === selectedSampleImgId) ||
@@ -391,61 +442,142 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
           </div>
         )}
 
-        {/* ==================== 2. 棋谱库（含我的收藏闭环） ==================== */}
+        {/* ==================== 2. 棋谱库（分类计数 + 筛选排序 + 存局入库） ==================== */}
         {activeModal === 'library' && (
-          <div className="p-5 space-y-4">
-            <div className="flex items-center justify-between border-b xq-border pb-3">
-              <div className="flex items-center gap-3">
-                <h3 className="text-[15px] font-semibold">棋谱库</h3>
-                <div className="flex items-center gap-1.5 text-xs">
-                  {(
-                    [
-                      { id: 'all', label: '全部棋谱' },
-                      {
-                        id: 'favorite',
-                        label: `★ 我的收藏 (${libraryGames.filter((g) => g.isFavorite).length})`,
-                      },
-                      { id: 'master', label: '现代名局' },
-                      { id: 'ancient', label: '古谱名局' },
-                    ] as const
-                  ).map((tab) => (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => setLibCategory(tab.id)}
-                      className={`px-2.5 py-1 rounded-md cursor-pointer whitespace-nowrap ${
-                        libCategory === tab.id ? 'xq-btn-option-active' : 'xq-btn-option'
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
+          <div className="p-5 space-y-3.5">
+            <div className="flex items-center justify-between border-b xq-border pb-3 gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <h3 className="text-[15px] font-semibold whitespace-nowrap">
+                  棋谱库
+                  <span className="ml-1.5 text-xs font-mono-tabular font-normal xq-text-muted">
+                    共 {libraryStats.total} 局
+                  </span>
+                </h3>
               </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="p-1 rounded hover:bg-[var(--xq-bg-hover)] cursor-pointer"
+
+              <div className="flex items-center gap-2 shrink-0">
+                {onSaveCurrentGameToLibrary && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSaveCurrentGameToLibrary();
+                      setLibSaveToast(true);
+                      window.setTimeout(() => setLibSaveToast(false), 1800);
+                    }}
+                    className="px-3 py-1 rounded-md xq-btn-primary text-xs flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                  >
+                    {libSaveToast ? (
+                      <Check className="w-3.5 h-3.5" />
+                    ) : (
+                      <BookmarkPlus className="w-3.5 h-3.5" />
+                    )}
+                    <span>{libSaveToast ? '已保存到棋谱库' : '保存当前对局入库'}</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="p-1 rounded hover:bg-[var(--xq-bg-hover)] cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* 分类计数 Tabs */}
+            <div className="flex items-center gap-1.5 text-xs overflow-x-auto no-scrollbar">
+              {(
+                [
+                  { id: 'all', label: `全部 (${libraryStats.total})` },
+                  { id: 'favorite', label: `★ 我的收藏 (${libraryStats.fav})` },
+                  { id: 'master', label: `现代名局 (${libraryStats.master})` },
+                  { id: 'ancient', label: `古谱名局 (${libraryStats.ancient})` },
+                  { id: 'user', label: `自存对局 (${libraryStats.user})` },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setLibCategory(tab.id)}
+                  className={`px-2.5 py-1 rounded-md cursor-pointer whitespace-nowrap font-mono-tabular ${
+                    libCategory === tab.id ? 'xq-btn-option-active' : 'xq-btn-option'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* 搜索 + 赛果筛选 + 排序 */}
+            <div className="flex items-center gap-2 text-xs">
+              <div className="relative flex-1 min-w-0">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 xq-text-muted" />
+                <input
+                  type="text"
+                  value={libSearch}
+                  onChange={(e) => setLibSearch(e.target.value)}
+                  placeholder="搜索棋手、赛事、开局体系…"
+                  className="w-full pl-8 pr-3 py-1.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)]"
+                />
+              </div>
+
+              <select
+                value={libResultFilter}
+                onChange={(e) =>
+                  setLibResultFilter(e.target.value as 'all' | '红胜' | '黑胜' | '和棋')
+                }
+                aria-label="按赛果筛选"
+                className="px-2.5 py-1.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)] cursor-pointer"
               >
-                <X className="w-4 h-4" />
-              </button>
+                <option value="all">全部赛果</option>
+                <option value="红胜">红胜</option>
+                <option value="黑胜">黑胜</option>
+                <option value="和棋">和棋</option>
+              </select>
+
+              <select
+                value={libSortBy}
+                onChange={(e) =>
+                  setLibSortBy(
+                    e.target.value as 'default' | 'date-desc' | 'plies-desc' | 'accuracy-desc'
+                  )
+                }
+                aria-label="排序方式"
+                className="px-2.5 py-1.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)] cursor-pointer"
+              >
+                <option value="default">默认排序</option>
+                <option value="date-desc">最新日期</option>
+                <option value="plies-desc">手数最多</option>
+                <option value="accuracy-desc">精准度最高</option>
+              </select>
             </div>
 
-            <div className="relative text-xs">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 xq-text-muted" />
-              <input
-                type="text"
-                value={libSearch}
-                onChange={(e) => setLibSearch(e.target.value)}
-                placeholder="搜索棋手、赛事、开局体系…"
-                className="w-full pl-8 pr-3 py-1.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)]"
-              />
+            {/* 当前筛选数量与胜负分布汇总条 */}
+            <div className="flex items-center justify-between text-[11px] xq-text-muted px-0.5 font-mono-tabular">
+              <span>
+                命中 {filteredLibrary.length} 局 · 红胜 {filteredOutcomeCounts.red} · 黑胜{' '}
+                {filteredOutcomeCounts.black} · 和棋 {filteredOutcomeCounts.draw}
+              </span>
+              {(libSearch || libCategory !== 'all' || libResultFilter !== 'all') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLibSearch('');
+                    setLibCategory('all');
+                    setLibResultFilter('all');
+                    setLibSortBy('default');
+                  }}
+                  className="text-[var(--xq-accent-gold)] hover:underline cursor-pointer"
+                >
+                  重置筛选
+                </button>
+              )}
             </div>
 
-            <div className="space-y-2 max-h-68 overflow-y-auto">
+            <div className="space-y-2 max-h-64 overflow-y-auto no-scrollbar">
               {filteredLibrary.length === 0 ? (
                 <div className="py-8 text-center text-xs xq-text-muted">
-                  暂无匹配棋谱（可在右侧棋谱栏点击「★ 收藏」将当前对局加入收藏夹）
+                  暂无匹配棋谱（可点击右上角「保存当前对局入库」或在棋谱栏点击「★ 收藏」）
                 </div>
               ) : (
                 filteredLibrary.map((game) => (
@@ -455,14 +587,22 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                   >
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 text-xs">
-                        <span className="font-semibold text-[#C8372D]">{game.redPlayer}</span>
+                        <span className="font-semibold text-[#C8372D] truncate">
+                          {game.redPlayer}
+                        </span>
                         <span className="xq-text-muted">vs</span>
-                        <span className="font-semibold">{game.blackPlayer}</span>
+                        <span className="font-semibold truncate">{game.blackPlayer}</span>
                         <span className="xq-text-muted">·</span>
-                        <span className="text-xs xq-text-secondary">{game.result}</span>
+                        <span className="text-xs xq-text-secondary whitespace-nowrap">
+                          {game.result}
+                        </span>
                         <span className="xq-text-muted">·</span>
-                        <span className="font-mono-tabular text-xs text-[#10B981]">
-                          精准度 {game.accuracyRed}% / {game.accuracyBlack}%
+                        <span className="font-mono-tabular text-xs xq-text-secondary whitespace-nowrap">
+                          {game.pliesCount}手
+                        </span>
+                        <span className="xq-text-muted">·</span>
+                        <span className="font-mono-tabular text-xs text-[#10B981] whitespace-nowrap">
+                          {game.accuracyRed}% / {game.accuracyBlack}%
                         </span>
                       </div>
                       <div className="text-xs xq-text-muted mt-0.5 truncate">
@@ -491,7 +631,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                           onLoadLibraryGame(game);
                           onClose();
                         }}
-                        className="px-3 py-1 rounded-md xq-btn-primary text-xs cursor-pointer"
+                        className="px-3 py-1 rounded-md xq-btn-primary text-xs cursor-pointer whitespace-nowrap"
                       >
                         载入棋谱
                       </button>

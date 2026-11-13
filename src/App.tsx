@@ -7,29 +7,33 @@ import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useSt
 import {
   ArrowRightCircle,
   Award,
+  BookMarked,
   BookOpen,
   ChevronLeft,
   ChevronRight,
-  Compass,
   Swords,
 } from 'lucide-react';
 import { Board } from './components/Board';
 import { BoardNav } from './components/BoardNav';
+import { ChallengeWorkbench } from './components/ChallengeWorkbench';
 import { DialogsModalSuite } from './components/DialogsModalSuite';
 import { EnginePanel } from './components/EnginePanel';
 import { EvalBar } from './components/EvalBar';
 import { GameReviewPanel } from './components/GameReviewPanel';
 import { MoveList } from './components/MoveList';
+import { OpeningBookPanel } from './components/OpeningBookPanel';
 import { PlayerSeatBar } from './components/PlayerSeatBar';
 import { SetupWorkbench } from './components/SetupWorkbench';
 import { StatusBar } from './components/StatusBar';
 import { Titlebar } from './components/Titlebar';
 import { CLASSICAL_CHALLENGES, INITIAL_LIBRARY_GAMES } from './data/catalogRegistry';
+import { lookupOpeningBookNode } from './data/openingBook';
 import {
   ActiveModalId,
   AppTheme,
   BoardTheme,
   Camp,
+  CompactLibraryMove,
   EngineProfile,
   EngineProtocol,
   EngineSkillTier,
@@ -40,8 +44,10 @@ import {
   HandicapType,
   ImpactEffect,
   LibraryGameItem,
+  MoveQuality,
   MoveRecord,
   MultiPVArrow,
+  OpeningPresetLine,
   Piece,
   PieceCraftStyle,
   PieceType,
@@ -62,14 +68,18 @@ import {
   getLegalMovesForPiece,
   getPieceAt,
   getPieceAtGrid,
+  INITIAL_FEN,
   isCampInCheck,
   parseFenToPieces,
   piecesToFen,
   playWoodClackSound,
+  replayCompactMoves,
 } from './utils/xiangqiRules';
 
 const STUDY_SESSION_STORAGE_KEY = 'xiangqix_study_session_v1';
 const PREFS_STORAGE_KEY = 'xiangqix_prefs_v1';
+const LIBRARY_STORAGE_KEY = 'xiangqix_library_v1';
+const SOLVED_CHALLENGES_STORAGE_KEY = 'xiangqix_challenges_solved_v1';
 
 const DEFAULT_STUDY_METADATA: GameMetadata = {
   redPlayer: '红方（先手）',
@@ -157,6 +167,30 @@ function readStoredPrefs(): StoredPrefs {
   }
 }
 
+function readStoredLibraryGames(): LibraryGameItem[] {
+  if (typeof window === 'undefined') return INITIAL_LIBRARY_GAMES;
+  try {
+    const raw = window.localStorage.getItem(LIBRARY_STORAGE_KEY);
+    if (!raw) return INITIAL_LIBRARY_GAMES;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? (parsed as LibraryGameItem[]) : INITIAL_LIBRARY_GAMES;
+  } catch {
+    return INITIAL_LIBRARY_GAMES;
+  }
+}
+
+function readStoredSolvedChallenges(): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(SOLVED_CHALLENGES_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
 export default function App() {
   const initialPrefs = useMemo(() => readStoredPrefs(), []);
   const initialStudy = useMemo(() => readStoredStudySession(), []);
@@ -198,7 +232,7 @@ export default function App() {
     return sampleSessionRef.current;
   }, []);
   const [workspace, setWorkspace] = useState<WorkspaceMode>('study');
-  const [rightTab, setRightTab] = useState<'moves' | 'review'>('moves');
+  const [rightTab, setRightTab] = useState<'moves' | 'review' | 'opening'>('moves');
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
 
   const [studyBasePieces, setStudyBasePieces] = useState<Piece[]>(
@@ -401,6 +435,9 @@ export default function App() {
   const [selectedChallengeId, setSelectedChallengeId] = useState<string>(
     CLASSICAL_CHALLENGES[0].id
   );
+  const [solvedChallengeIds, setSolvedChallengeIds] = useState<string[]>(() =>
+    readStoredSolvedChallenges()
+  );
   const [challengeStatusBanner, setChallengeStatusBanner] = useState<string | null>(null);
 
   // 人机对弈（含传统让子）状态
@@ -419,7 +456,9 @@ export default function App() {
   const [metadata, setMetadata] = useState<GameMetadata>(
     () => initialStudy?.metadata || DEFAULT_STUDY_METADATA
   );
-  const [libraryGames, setLibraryGames] = useState<LibraryGameItem[]>(INITIAL_LIBRARY_GAMES);
+  const [libraryGames, setLibraryGames] = useState<LibraryGameItem[]>(() =>
+    readStoredLibraryGames()
+  );
   const [activeModal, setActiveModal] = useState<ActiveModalId>(null);
 
   // 自动防抖持久化「复盘分析」当前会话，并在页面隐藏/卸载前立即落盘
@@ -531,6 +570,28 @@ export default function App() {
     engineThreads,
     engineHashMb,
   ]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(libraryGames));
+      } catch {
+        // Ignore storage quota errors
+      }
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [libraryGames]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        SOLVED_CHALLENGES_STORAGE_KEY,
+        JSON.stringify(solvedChallengeIds)
+      );
+    } catch {
+      // Ignore storage quota errors
+    }
+  }, [solvedChallengeIds]);
 
   // ==================== 3. 派生计算：O(1) 棋盘索引、防抖异步引擎分析与单次将军校验 ====================
   const activeMovesList = variationMoves || mainMoves;
@@ -758,6 +819,36 @@ export default function App() {
     [selectedChallengeId]
   );
 
+  // 开局库盘面指纹 O(1) 实时匹配与回溯最近定式节点
+  const matchedOpeningNode = useMemo(
+    () => (workspace === 'study' ? lookupOpeningBookNode(pieces, turn) : null),
+    [workspace, pieces, turn]
+  );
+
+  const lastMatchedOpeningInfo = useMemo(() => {
+    if (workspace !== 'study' || matchedOpeningNode || currentPly <= 0) return null;
+    for (let ply = currentPly - 1; ply >= 0; ply--) {
+      const snapPieces =
+        ply === 0 ? studyBasePieces : activeMovesList[ply - 1]?.piecesSnapshot;
+      if (!snapPieces) continue;
+      const snapTurn: Camp =
+        ply === 0
+          ? studyBaseTurn
+          : activeMovesList[ply - 1].piece.camp === 'red'
+          ? 'black'
+          : 'red';
+      const node = lookupOpeningBookNode(snapPieces, snapTurn);
+      if (node) {
+        return {
+          ply,
+          openingName: node.openingName,
+          category: node.category,
+        };
+      }
+    }
+    return null;
+  }, [workspace, matchedOpeningNode, currentPly, studyBasePieces, studyBaseTurn, activeMovesList]);
+
   // ==================== 4. 切换工作空间、新局重置与载入古谱/示范名局 ====================
   const handleNewStudyGame = useCallback(() => {
     const freshPieces = createInitialPieces('even');
@@ -810,9 +901,10 @@ export default function App() {
       moves: MoveRecord[];
       ply: number;
       nextMetadata: Partial<GameMetadata>;
+      targetRightTab?: 'moves' | 'review' | 'opening';
     }) => {
       setWorkspace('study');
-      setRightTab('moves');
+      setRightTab(payload.targetRightTab || 'moves');
       setIsReplaying(false);
       setSelectedPieceId(null);
       setHintArrow(null);
@@ -1064,10 +1156,18 @@ export default function App() {
         if (workspace === 'challenge' && nextPly === 1) {
           const hm = currentChallenge.hintMove;
           if (from.row === hm.from.row && from.col === hm.from.col && to.row === hm.to.row && to.col === hm.to.col) {
-            setChallengeStatusBanner(`好棋！走出《${currentChallenge.sourceBook}》正着「${notation}」！`);
+            setSolvedChallengeIds((prev) =>
+              prev.includes(currentChallenge.id) ? prev : [...prev, currentChallenge.id]
+            );
+            setChallengeStatusBanner(`好棋！走出《${currentChallenge.sourceBook}》正着「${notation}」，已记录破关！`);
           } else {
             setChallengeStatusBanner(`已走出「${notation}」，黑方应对中（可点「支招」查看正着）`);
           }
+        } else if (workspace === 'challenge' && nextPly >= 3 && nextEval >= 5.0) {
+          setSolvedChallengeIds((prev) =>
+            prev.includes(currentChallenge.id) ? prev : [...prev, currentChallenge.id]
+          );
+          setChallengeStatusBanner(`红方已取得胜势（${nextEval >= 0 ? '+' : ''}${nextEval.toFixed(2)}），自动标记为已破关！`);
         }
 
         setIsBotThinking(true);
@@ -1309,32 +1409,135 @@ export default function App() {
     setMetadata((prev) => ({ ...prev, isFavorite: nextFav }));
     setLibraryGames((prev) => {
       const existingIdx = prev.findIndex(
-        (g) => g.redPlayer === metadata.redPlayer && g.blackPlayer === metadata.blackPlayer && g.event === metadata.event
+        (g) =>
+          g.redPlayer === metadata.redPlayer &&
+          g.blackPlayer === metadata.blackPlayer &&
+          g.event === metadata.event
       );
       if (existingIdx >= 0) {
         return prev.map((g, idx) => (idx === existingIdx ? { ...g, isFavorite: nextFav } : g));
       }
       if (nextFav) {
+        const compactMoves: CompactLibraryMove[] = activeMovesList.map((m) => ({
+          from: { ...m.from },
+          to: { ...m.to },
+          evalScore: m.evalScore,
+          quality: m.quality,
+        }));
         const newLibItem: LibraryGameItem = {
           id: `fav-${Date.now()}`,
           redPlayer: metadata.redPlayer,
           blackPlayer: metadata.blackPlayer,
           event: metadata.event,
           date: metadata.date,
-          result: metadata.result === '进行中' ? '红胜' : metadata.result,
+          result: metadata.result,
           opening: metadata.opening,
           pliesCount: activeMovesList.length,
           accuracyRed: 93.5,
           accuracyBlack: 86.2,
           isFavorite: true,
-          category: 'master',
+          category: 'user',
+          baseFen:
+            workspace === 'study'
+              ? piecesToFen(studyBasePieces, studyBaseTurn)
+              : piecesToFen(pieces, turn),
           fen: piecesToFen(pieces, turn),
+          movesData: compactMoves,
         };
         return [newLibItem, ...prev];
       }
       return prev;
     });
-  }, [metadata, activeMovesList.length, pieces, turn]);
+  }, [metadata, activeMovesList, workspace, studyBasePieces, studyBaseTurn, pieces, turn]);
+
+  // 一键将当前对局/拆棋全着法存入「自存对局」棋谱库
+  const handleSaveCurrentGameToLibrary = useCallback(() => {
+    const compactMoves: CompactLibraryMove[] = activeMovesList.map((m) => ({
+      from: { ...m.from },
+      to: { ...m.to },
+      evalScore: m.evalScore,
+      quality: m.quality,
+    }));
+    const qualityScore = (q?: MoveQuality) =>
+      q === '妙' ? 99 : q === '优' ? 95 : q === '良' ? 88 : q === '缓' ? 74 : q === '败' ? 48 : 90;
+    const redMoves = activeMovesList.filter((m) => m.piece.camp === 'red');
+    const blackMoves = activeMovesList.filter((m) => m.piece.camp === 'black');
+    const accuracyRed =
+      redMoves.length > 0
+        ? Number((redMoves.reduce((s, m) => s + qualityScore(m.quality), 0) / redMoves.length).toFixed(1))
+        : 92.0;
+    const accuracyBlack =
+      blackMoves.length > 0
+        ? Number((blackMoves.reduce((s, m) => s + qualityScore(m.quality), 0) / blackMoves.length).toFixed(1))
+        : 90.0;
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const baseFenStr =
+      workspace === 'study'
+        ? piecesToFen(studyBasePieces, studyBaseTurn)
+        : piecesToFen(pieces, turn);
+    const currentFenStr = piecesToFen(pieces, turn);
+    const inferredOpening =
+      matchedOpeningNode?.openingName ||
+      lastMatchedOpeningInfo?.openingName ||
+      metadata.opening ||
+      '自定义对局';
+
+    setLibraryGames((prev) => {
+      const existingIdx = prev.findIndex(
+        (g) =>
+          g.category === 'user' &&
+          g.redPlayer === metadata.redPlayer &&
+          g.blackPlayer === metadata.blackPlayer &&
+          g.opening === inferredOpening
+      );
+      if (existingIdx >= 0) {
+        return prev.map((g, idx) =>
+          idx === existingIdx
+            ? {
+                ...g,
+                date: todayStr,
+                result: metadata.result,
+                pliesCount: compactMoves.length,
+                accuracyRed,
+                accuracyBlack,
+                baseFen: baseFenStr,
+                fen: currentFenStr,
+                movesData: compactMoves,
+              }
+            : g
+        );
+      }
+      const newEntry: LibraryGameItem = {
+        id: `user-${Date.now()}`,
+        redPlayer: metadata.redPlayer,
+        blackPlayer: metadata.blackPlayer,
+        event: metadata.event || '本地存局 · 复盘研习',
+        date: metadata.date || todayStr,
+        result: metadata.result,
+        opening: inferredOpening,
+        pliesCount: compactMoves.length,
+        accuracyRed,
+        accuracyBlack,
+        isFavorite: metadata.isFavorite,
+        category: 'user',
+        baseFen: baseFenStr,
+        fen: currentFenStr,
+        movesData: compactMoves,
+      };
+      return [newEntry, ...prev];
+    });
+  }, [
+    activeMovesList,
+    workspace,
+    studyBasePieces,
+    studyBaseTurn,
+    pieces,
+    turn,
+    matchedOpeningNode,
+    lastMatchedOpeningInfo,
+    metadata,
+  ]);
 
   // 连线模式下模拟同步外部棋盘的下一手
   const handleSyncNextExternalMove = useCallback(() => {
@@ -1391,6 +1594,65 @@ export default function App() {
   const handleOpenImportModal = useCallback(() => setActiveModal('fen-pgn'), []);
   const handleOpenLibraryModal = useCallback(() => setActiveModal('library'), []);
   const handleCloseModal = useCallback(() => setActiveModal(null), []);
+  const handleOpenOpeningTab = useCallback(() => setRightTab('opening'), []);
+  const handleJumpToOpeningPly = useCallback(
+    (ply: number) => handleJumpPly(ply, !!variationMoves),
+    [handleJumpPly, variationMoves]
+  );
+
+  const handleApplyOpeningPreset = useCallback(
+    (preset: OpeningPresetLine) => {
+      const base = createInitialPieces('even');
+      const replayed = replayCompactMoves(
+        base,
+        preset.moves.map((m) => ({ from: m.from, to: m.to })),
+        'red'
+      );
+      handleTransferToStudy({
+        basePieces: base,
+        baseTurn: 'red',
+        currentPieces: replayed.finalPieces,
+        currentTurn: replayed.finalTurn,
+        moves: replayed.moves,
+        ply: replayed.moves.length,
+        targetRightTab: 'opening',
+        nextMetadata: {
+          redPlayer: '红方（定式研习）',
+          blackPlayer: '黑方（定式应对）',
+          event: `开局定式演练 · ${preset.category}`,
+          opening: preset.title,
+          result: '进行中',
+          isFavorite: false,
+        },
+      });
+    },
+    [handleTransferToStudy]
+  );
+
+  const handleToggleChallengeSolved = useCallback((chId: string) => {
+    setSolvedChallengeIds((prev) =>
+      prev.includes(chId) ? prev.filter((id) => id !== chId) : [...prev, chId]
+    );
+  }, []);
+
+  const handleTransferChallengeToStudy = useCallback(() => {
+    handleTransferToStudy({
+      basePieces: currentChallenge.pieces(),
+      baseTurn: currentChallenge.initialTurn,
+      currentPieces: pieces,
+      currentTurn: turn,
+      moves: mainMoves,
+      ply: currentPly,
+      nextMetadata: {
+        redPlayer: '挑战者（红方）',
+        blackPlayer: currentChallenge.sourceBook,
+        event: `残局研习 · ${currentChallenge.difficulty}`,
+        opening: currentChallenge.title,
+        result: '进行中',
+        isFavorite: false,
+      },
+    });
+  }, [handleTransferToStudy, currentChallenge, pieces, turn, mainMoves, currentPly]);
 
   const handlePromoteVariationToMain = useCallback(() => {
     if (variationMoves) {
@@ -1456,6 +1718,7 @@ export default function App() {
         appTheme={appTheme}
         soundEnabled={soundEnabled}
         isConnected={connectState.connected}
+        libraryCount={libraryGames.length}
         onChangeWorkspace={handleSwitchWorkspace}
         onOpenModal={setActiveModal}
         onToggleSound={handleToggleSound}
@@ -1640,92 +1903,17 @@ export default function App() {
 
             {/* 主工作区：根据当前工作空间自适应呈现 */}
             {workspace === 'challenge' ? (
-              /* 残局题库工作台 */
-              <div className="flex-1 flex flex-col min-h-0 overflow-hidden text-xs">
-                <div className="px-3.5 py-2.5 border-b xq-border flex items-center justify-between gap-2 shrink-0">
-                  <div className="flex items-center gap-2">
-                    <Compass className="w-4 h-4 text-[var(--xq-accent-gold)]" />
-                    <span className="font-semibold text-sm">经典残局题库</span>
-                  </div>
-                  <span className="text-xs xq-text-muted">
-                    共 {CLASSICAL_CHALLENGES.length} 关 · 支招/重摆见棋盘底栏
-                  </span>
-                </div>
-
-                <div className="flex-1 overflow-y-auto no-scrollbar p-3.5 space-y-3">
-                  {/* 关卡选择列表 */}
-                  <div className="space-y-2">
-                    {CLASSICAL_CHALLENGES.map((ch) => {
-                      const isSelected = ch.id === currentChallenge.id;
-                      return (
-                        <button
-                          key={ch.id}
-                          type="button"
-                          onClick={() => handleSelectChallenge(ch.id)}
-                          className={`w-full p-2.5 rounded-lg text-left cursor-pointer space-y-1 ${
-                            isSelected ? 'xq-btn-option-active' : 'xq-btn-option'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="font-serif-sc font-bold text-sm">{ch.title}</span>
-                            <span className="text-xs px-1.5 py-0.5 rounded border xq-border xq-text-secondary font-normal">
-                              {ch.difficulty}
-                            </span>
-                          </div>
-                          <div className="text-xs text-[var(--xq-accent-gold)] font-medium">
-                            {ch.objective}
-                          </div>
-                          <p className="text-xs xq-text-muted leading-relaxed font-normal">{ch.lore}</p>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* 破局实时反馈与提示卡（仅展示破局指引，操作统一由棋盘底栏「支招」「重摆」触发） */}
-                  {challengeStatusBanner && (
-                    <div className="p-2.5 rounded-lg border border-[var(--xq-accent-gold)]/50 bg-[var(--xq-accent-gold)]/10 space-y-1">
-                      <div className="flex items-center gap-1.5 font-semibold text-[var(--xq-accent-gold)]">
-                        <Award className="w-4 h-4" />
-                        <span>破局提示</span>
-                      </div>
-                      <p className="text-xs leading-relaxed">{challengeStatusBanner}</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* 底部主行动区：携残局局面与试走着法转入复盘分析 */}
-                <div className="p-3.5 border-t xq-border shrink-0 bg-[var(--xq-bg-surface)]">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleTransferToStudy({
-                        basePieces: currentChallenge.pieces(),
-                        baseTurn: currentChallenge.initialTurn,
-                        currentPieces: pieces,
-                        currentTurn: turn,
-                        moves: mainMoves,
-                        ply: currentPly,
-                        nextMetadata: {
-                          redPlayer: '挑战者（红方）',
-                          blackPlayer: currentChallenge.sourceBook,
-                          event: `残局研习 · ${currentChallenge.difficulty}`,
-                          opening: currentChallenge.title,
-                          result: '进行中',
-                          isFavorite: false,
-                        },
-                      })
-                    }
-                    className="w-full py-2.5 px-4 rounded-lg xq-btn-primary text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer shadow-sm"
-                  >
-                    <ArrowRightCircle className="w-4 h-4" />
-                    <span>
-                      {mainMoves.length > 0
-                        ? `携带 ${mainMoves.length} 手试走转入复盘分析`
-                        : '转入复盘分析'}
-                    </span>
-                  </button>
-                </div>
-              </div>
+              /* 残局题库工作台（支持检索、典籍与难度筛选、破关进度统计） */
+              <ChallengeWorkbench
+                challenges={CLASSICAL_CHALLENGES}
+                selectedChallengeId={currentChallenge.id}
+                solvedChallengeIds={solvedChallengeIds}
+                challengeStatusBanner={challengeStatusBanner}
+                movesCount={mainMoves.length}
+                onSelectChallenge={handleSelectChallenge}
+                onToggleChallengeSolved={handleToggleChallengeSolved}
+                onTransferChallengeToStudy={handleTransferChallengeToStudy}
+              />
             ) : workspace === 'play' ? (
               /* 人机对弈工作台 */
               <div className="flex-1 flex flex-col min-h-0 overflow-hidden text-xs">
@@ -1893,11 +2081,11 @@ export default function App() {
                 onFinishSetup={handleFinishSetup}
               />
             ) : (
-              /* 默认「复盘分析」双页签：回合棋谱 ↔ 复盘报告 */
+              /* 默认「复盘分析」三页签：回合棋谱 ↔ 复盘报告 ↔ 开局库 */
               <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-                {/* 双页签切换栏 */}
+                {/* 三页签切换栏 */}
                 <div className="px-3.5 pt-1.5 border-b xq-border flex items-center justify-between gap-2 shrink-0">
-                  <div className="flex items-center gap-5 text-xs font-medium">
+                  <div className="flex items-center gap-4 text-xs font-medium">
                     <button
                       type="button"
                       onClick={() => setRightTab('moves')}
@@ -1923,6 +2111,19 @@ export default function App() {
                       <Award className="w-3.5 h-3.5" />
                       <span>复盘报告</span>
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setRightTab('opening')}
+                      className={`pb-1.5 border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                        rightTab === 'opening'
+                          ? 'border-[var(--xq-accent-gold)] text-[var(--xq-accent-gold)] font-semibold'
+                          : 'border-transparent xq-text-secondary hover:text-[var(--xq-text-primary)]'
+                      }`}
+                    >
+                      <BookMarked className="w-3.5 h-3.5" />
+                      <span>开局库</span>
+                    </button>
                   </div>
                 </div>
 
@@ -1939,13 +2140,15 @@ export default function App() {
                     onDiscardVariation={handleDiscardVariation}
                     onOpenGameInfo={handleOpenGameInfo}
                     onToggleFavorite={handleToggleCurrentFavorite}
+                    onSaveToLibrary={handleSaveCurrentGameToLibrary}
+                    onOpenOpeningTab={handleOpenOpeningTab}
                     onLoadSampleGame={handleLoadSampleMasterGame}
                     onOpenImportModal={handleOpenImportModal}
                     onOpenLibraryModal={handleOpenLibraryModal}
                     onSyncNextExternalMove={handleSyncNextExternalMove}
                     onDisconnectExternal={handleDisconnectExternal}
                   />
-                ) : (
+                ) : rightTab === 'review' ? (
                   <GameReviewPanel
                     moves={mainMoves}
                     currentPly={currentPly}
@@ -1976,6 +2179,17 @@ export default function App() {
                     onPlayBestAlternative={executeMoveOnBoard}
                     onLoadSampleGame={handleLoadSampleMasterGame}
                     onOpenImportModal={handleOpenImportModal}
+                  />
+                ) : (
+                  <OpeningBookPanel
+                    turn={turn}
+                    currentPly={currentPly}
+                    matchedNode={matchedOpeningNode}
+                    lastMatchedInfo={lastMatchedOpeningInfo}
+                    onSelectOpeningMove={executeMoveOnBoard}
+                    onHoverOpeningMove={setHoveredArrow}
+                    onJumpToPly={handleJumpToOpeningPly}
+                    onApplyOpeningPreset={handleApplyOpeningPreset}
                   />
                 )}
               </div>
@@ -2042,6 +2256,7 @@ export default function App() {
           return true;
         }}
         onSaveMetadata={setMetadata}
+        onSaveCurrentGameToLibrary={handleSaveCurrentGameToLibrary}
         onLoadLibraryGame={(game) => {
           const baseMeta: Partial<GameMetadata> = {
             redPlayer: game.redPlayer,
@@ -2052,6 +2267,22 @@ export default function App() {
             opening: game.opening,
             isFavorite: game.isFavorite,
           };
+          if (game.movesData && game.movesData.length > 0) {
+            const parsedBase = parseFenToPieces(game.baseFen || INITIAL_FEN);
+            const basePieces = parsedBase ? parsedBase.pieces : createInitialPieces('even');
+            const baseTurn = parsedBase ? parsedBase.turn : 'red';
+            const replayed = replayCompactMoves(basePieces, game.movesData, baseTurn);
+            handleTransferToStudy({
+              basePieces,
+              baseTurn,
+              currentPieces: replayed.finalPieces,
+              currentTurn: replayed.finalTurn,
+              moves: replayed.moves,
+              ply: replayed.moves.length,
+              nextMetadata: baseMeta,
+            });
+            return;
+          }
           if (game.fen) {
             const parsed = parseFenToPieces(game.fen);
             if (parsed) {

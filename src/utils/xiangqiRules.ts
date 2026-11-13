@@ -1,5 +1,6 @@
 import {
   Camp,
+  CompactLibraryMove,
   HandicapType,
   MoveQuality,
   MoveRecord,
@@ -574,6 +575,55 @@ export function piecesToFen(pieces: Piece[], turn: Camp = 'red'): string {
     rows.push(rowStr);
   }
   return `${rows.join('/')} ${turn === 'red' ? 'w' : 'b'} - - 0 1`;
+}
+
+export function getPositionKeyFromPieces(pieces: Piece[], turn: Camp = 'red'): string {
+  const fullFen = piecesToFen(pieces, turn);
+  const parts = fullFen.split(' ');
+  return `${parts[0]} ${parts[1] || 'w'}`;
+}
+
+export function replayCompactMoves(
+  basePieces: Piece[],
+  compactMoves: CompactLibraryMove[],
+  baseTurn: Camp = 'red'
+): { moves: MoveRecord[]; finalPieces: Piece[]; finalTurn: Camp } {
+  let current = basePieces.map((p) => ({ ...p }));
+  let currentTurn: Camp = baseTurn;
+  const records: MoveRecord[] = [];
+
+  for (let i = 0; i < compactMoves.length; i++) {
+    const step = compactMoves[i];
+    const moving = getPieceAt(current, step.from.row, step.from.col);
+    if (!moving) break;
+    const captured = getPieceAt(current, step.to.row, step.to.col);
+    const notation = formatChineseMoveNotation(moving, step.from, step.to);
+
+    current = current
+      .filter((p) => !(p.row === step.to.row && p.col === step.to.col))
+      .map((p) =>
+        p.id === moving.id ? { ...p, row: step.to.row, col: step.to.col } : p
+      );
+
+    const evalScore =
+      typeof step.evalScore === 'number' ? step.evalScore : evaluateBoardScore(current);
+    const quality: MoveQuality = step.quality || (evalScore > 1.2 ? '优' : '良');
+
+    records.push({
+      ply: i + 1,
+      piece: { ...moving },
+      from: { ...step.from },
+      to: { ...step.to },
+      captured: captured ? { ...captured } : undefined,
+      notation,
+      evalScore,
+      quality,
+      piecesSnapshot: current.map((p) => ({ ...p })),
+    });
+    currentTurn = moving.camp === 'red' ? 'black' : 'red';
+  }
+
+  return { moves: records, finalPieces: current, finalTurn: currentTurn };
 }
 
 export function parseFenToPieces(fen: string): { pieces: Piece[]; turn: Camp } | null {

@@ -1,5 +1,7 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  BookmarkPlus,
+  BookMarked,
   BookOpen,
   Check,
   FileCode2,
@@ -24,6 +26,8 @@ interface MoveListProps {
   onDiscardVariation: () => void;
   onOpenGameInfo: () => void;
   onToggleFavorite: () => void;
+  onSaveToLibrary?: () => void;
+  onOpenOpeningTab?: () => void;
   onLoadSampleGame: () => void;
   onOpenImportModal: () => void;
   onOpenLibraryModal: () => void;
@@ -43,12 +47,15 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
   onDiscardVariation,
   onOpenGameInfo,
   onToggleFavorite,
+  onSaveToLibrary,
+  onOpenOpeningTab,
   onLoadSampleGame,
   onOpenImportModal,
   onOpenLibraryModal,
   onSyncNextExternalMove,
   onDisconnectExternal,
 }) => {
+  const [savedNotice, setSavedNotice] = useState(false);
   const getQualityBadgeStyle = (q?: MoveQuality) => {
     switch (q) {
       case '妙':
@@ -107,21 +114,43 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
           <span className="text-xs xq-text-secondary">{metadata.opening}</span>
         </button>
 
-        <button
-          type="button"
-          onClick={onToggleFavorite}
-          title={metadata.isFavorite ? '已收藏至棋谱库（点击取消）' : '收藏本局至棋谱库'}
-          className={`px-2 py-0.5 rounded-md cursor-pointer flex items-center gap-1 text-xs shrink-0 ${
-            metadata.isFavorite ? 'xq-btn-option-active' : 'xq-btn-secondary'
-          }`}
-        >
-          <Star
-            className={`w-3 h-3 ${
-              metadata.isFavorite ? 'fill-current' : 'xq-text-muted'
+        <div className="flex items-center gap-1.5 shrink-0">
+          {onSaveToLibrary && (
+            <button
+              type="button"
+              onClick={() => {
+                onSaveToLibrary();
+                setSavedNotice(true);
+                window.setTimeout(() => setSavedNotice(false), 1600);
+              }}
+              title="将当前对局与着法保存至棋谱库"
+              className="px-2 py-0.5 rounded-md xq-btn-secondary cursor-pointer flex items-center gap-1 text-xs shrink-0"
+            >
+              {savedNotice ? (
+                <Check className="w-3 h-3 text-[#10B981]" />
+              ) : (
+                <BookmarkPlus className="w-3 h-3 text-[var(--xq-accent-gold)]" />
+              )}
+              <span>{savedNotice ? '已入库' : '存局'}</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={onToggleFavorite}
+            title={metadata.isFavorite ? '已收藏至棋谱库（点击取消）' : '收藏本局至棋谱库'}
+            className={`px-2 py-0.5 rounded-md cursor-pointer flex items-center gap-1 text-xs shrink-0 ${
+              metadata.isFavorite ? 'xq-btn-option-active' : 'xq-btn-secondary'
             }`}
-          />
-          <span>{metadata.isFavorite ? '已收藏' : '收藏'}</span>
-        </button>
+          >
+            <Star
+              className={`w-3 h-3 ${
+                metadata.isFavorite ? 'fill-current' : 'xq-text-muted'
+              }`}
+            />
+            <span>{metadata.isFavorite ? '已收藏' : '收藏'}</span>
+          </button>
+        </div>
       </div>
 
       {/* 若处于外部平台连线观棋中，在棋谱顶部显示轻量连线同步条 */}
@@ -236,22 +265,30 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
                   <span className="text-[11px] opacity-80">12手含批注</span>
                 </button>
 
-                <div className="grid grid-cols-2 gap-1.5">
+                <div className="grid grid-cols-3 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={onOpenOpeningTab}
+                    className="px-2 py-1.5 rounded-md xq-btn-secondary text-xs flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap"
+                  >
+                    <BookMarked className="w-3.5 h-3.5 text-[var(--xq-accent-gold)]" />
+                    <span>开局定式</span>
+                  </button>
                   <button
                     type="button"
                     onClick={onOpenImportModal}
-                    className="px-2.5 py-1.5 rounded-md xq-btn-secondary text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="px-2 py-1.5 rounded-md xq-btn-secondary text-xs flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap"
                   >
                     <FileCode2 className="w-3.5 h-3.5 opacity-80" />
-                    <span>导入 FEN / 识盘</span>
+                    <span>导入 FEN</span>
                   </button>
                   <button
                     type="button"
                     onClick={onOpenLibraryModal}
-                    className="px-2.5 py-1.5 rounded-md xq-btn-secondary text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="px-2 py-1.5 rounded-md xq-btn-secondary text-xs flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap"
                   >
                     <BookOpen className="w-3.5 h-3.5 text-[var(--xq-accent-gold)]" />
-                    <span>打开棋谱库</span>
+                    <span>棋谱库</span>
                   </button>
                 </div>
               </div>

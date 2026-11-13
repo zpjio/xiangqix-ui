@@ -17,6 +17,7 @@ interface TitlebarProps {
   appTheme: AppTheme;
   soundEnabled: boolean;
   isConnected?: boolean;
+  libraryCount?: number;
   onChangeWorkspace: (ws: WorkspaceMode) => void;
   onOpenModal: (modal: ActiveModalId) => void;
   onToggleSound: () => void;
@@ -28,6 +29,7 @@ export const Titlebar: React.FC<TitlebarProps> = React.memo(({
   appTheme,
   soundEnabled,
   isConnected = false,
+  libraryCount = 0,
   onChangeWorkspace,
   onOpenModal,
   onToggleSound,
@@ -87,6 +89,7 @@ export const Titlebar: React.FC<TitlebarProps> = React.memo(({
         >
           <BookOpen className="w-3.5 h-3.5 text-[var(--xq-accent-gold)]" />
           <span>棋谱库</span>
+          <span className="font-mono-tabular text-xs xq-text-muted">({libraryCount})</span>
         </button>
 
         <button

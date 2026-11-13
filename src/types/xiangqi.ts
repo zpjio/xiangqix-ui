@@ -143,7 +143,9 @@ export interface ClassicalChallengeItem {
   id: string;
   title: string;
   sourceBook: string;
+  bookSeries: string;
   difficulty: '★★☆ · 进阶' | '★★★ · 高难' | '★★★★ · 绝杀';
+  expectedPlies: number;
   objective: string;
   lore: string;
   initialTurn: Camp;
@@ -156,18 +158,65 @@ export interface ClassicalChallengeItem {
   };
 }
 
+export interface CompactLibraryMove {
+  from: Position;
+  to: Position;
+  evalScore?: number;
+  quality?: MoveQuality;
+}
+
 export interface LibraryGameItem {
   id: string;
   redPlayer: string;
   blackPlayer: string;
   event: string;
   date: string;
-  result: '红胜' | '黑胜' | '和棋';
+  result: '红胜' | '黑胜' | '和棋' | '进行中';
   opening: string;
   pliesCount: number;
   accuracyRed: number;
   accuracyBlack: number;
   isFavorite: boolean;
-  category: 'master' | 'ancient' | 'recent';
+  category: 'master' | 'ancient' | 'user' | 'recent';
   fen?: string;
+  baseFen?: string;
+  movesData?: CompactLibraryMove[];
 }
+
+export type OpeningBookCategory =
+  | '初始布局'
+  | '中炮体系'
+  | '仙人指路'
+  | '飞相局'
+  | '起马局';
+
+export interface OpeningMoveStat {
+  from: Position;
+  to: Position;
+  notation: string;
+  frequencyPct: number;
+  redWinPct: number;
+  drawPct: number;
+  blackWinPct: number;
+  targetOpeningName: string;
+  badge?: '主流' | '稳健' | '激烈' | '古谱';
+}
+
+export interface OpeningBookNode {
+  positionKey: string;
+  openingName: string;
+  category: OpeningBookCategory;
+  plyDepth: number;
+  totalGames: number;
+  comment: string;
+  nextMoves: OpeningMoveStat[];
+}
+
+export interface OpeningPresetLine {
+  id: string;
+  title: string;
+  category: OpeningBookCategory;
+  summary: string;
+  moves: { from: Position; to: Position }[];
+}
+
