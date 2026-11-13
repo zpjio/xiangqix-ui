@@ -142,33 +142,33 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
   const effectiveSubMode: OpeningPanelSubMode = mode === 'compact' ? 'explorer' : subMode;
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-hidden text-xs">
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden text-[0.8125rem]">
       {/* 顶部栏：独立工作台显示「定式树 / 变例对练」双态切换；复盘轻查询仅显示精简头部 */}
       {mode === 'full' ? (
-        <div className="px-3.5 py-2 border-b xq-border bg-[var(--xq-bg-surface)] flex items-center justify-between gap-2 shrink-0">
+        <div className="px-3.5 py-2 border-b xq-border bg-[var(--xq-bg-surface)] flex flex-wrap items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-1 p-0.5 rounded-lg border xq-border bg-[var(--xq-bg-canvas)]">
             <button
               type="button"
               onClick={() => onChangeSubMode('explorer')}
-              className={`px-2.5 py-1 rounded-md text-[11px] flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0 transition-colors ${
+              className={`px-2.5 py-1 rounded-md text-[0.8125rem] flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0 transition-colors ${
                 effectiveSubMode === 'explorer'
                   ? 'xq-btn-option-active font-semibold'
                   : 'xq-text-secondary hover:text-[var(--xq-text-primary)]'
               }`}
             >
-              <BookMarked className="w-3 h-3" />
+              <BookMarked className="w-3.5 h-3.5" />
               <span>定式树</span>
             </button>
             <button
               type="button"
               onClick={() => onChangeSubMode('drill')}
-              className={`px-2.5 py-1 rounded-md text-[11px] flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0 transition-colors ${
+              className={`px-2.5 py-1 rounded-md text-[0.8125rem] flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0 transition-colors ${
                 effectiveSubMode === 'drill'
                   ? 'xq-btn-option-active font-semibold'
                   : 'xq-text-secondary hover:text-[var(--xq-text-primary)]'
               }`}
             >
-              <GraduationCap className="w-3 h-3" />
+              <GraduationCap className="w-3.5 h-3.5" />
               <span>变例对练</span>
             </button>
           </div>
@@ -177,14 +177,14 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
             <button
               type="button"
               onClick={() => onOpenMatchingLibrary(activeMatchKeyword)}
-              className="text-[11px] text-[var(--xq-accent-gold)] hover:underline flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0 font-mono-tabular"
+              className="text-xs text-[var(--xq-accent-gold)] hover:underline flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0 font-mono-tabular"
               title="前往棋谱库查阅同开局整局名局"
             >
-              <BookOpen className="w-3 h-3" />
+              <BookOpen className="w-3.5 h-3.5" />
               <span>同开局名局 ({matchedLibraryCount})</span>
             </button>
           ) : (
-            <span className="text-[11px] font-mono-tabular xq-text-muted whitespace-nowrap shrink-0">
+            <span className="text-xs font-mono-tabular xq-text-muted whitespace-nowrap shrink-0">
               已练通 {completedPresetCount} / {OPENING_PRESETS.length} 套
             </span>
           )}
@@ -195,7 +195,7 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
         <>
           {/* 着法路径面包屑（支持点击任意历史节点瞬间跳转） */}
           {visibleBreadcrumbs.length > 0 && (
-            <div className="px-3.5 py-1.5 border-b xq-border bg-[var(--xq-bg-canvas)] flex items-center gap-1 overflow-x-auto no-scrollbar text-[11px] shrink-0">
+            <div className="px-3.5 py-1.5 border-b xq-border bg-[var(--xq-bg-canvas)] flex items-center gap-1 overflow-x-auto no-scrollbar text-xs shrink-0">
               <button
                 type="button"
                 onClick={() => onJumpToPly(0)}
@@ -231,15 +231,15 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
             {matchedNode ? (
               <>
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-serif-sc font-bold text-sm xq-text-primary truncate">
+                  <span className="font-serif-sc font-bold text-[0.9375rem] xq-text-primary truncate">
                     {matchedNode.openingName}
                   </span>
-                  <span className="text-[11px] font-mono-tabular xq-text-muted shrink-0">
+                  <span className="text-xs font-mono-tabular xq-text-muted shrink-0">
                     第 {matchedNode.plyDepth} 手定式
                   </span>
                 </div>
 
-                <div className="flex items-center gap-1.5 text-[11px] xq-text-secondary flex-wrap">
+                <div className="flex items-center gap-1.5 text-xs xq-text-secondary flex-wrap">
                   <span>{matchedNode.category}</span>
                   <span aria-hidden="true">·</span>
                   <span className="font-mono-tabular">
@@ -257,22 +257,22 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
                   </button>
                 </div>
 
-                <p className="text-[11px] xq-text-muted leading-relaxed">
+                <p className="text-[0.8125rem] xq-text-muted leading-relaxed">
                   {matchedNode.comment}
                 </p>
               </>
             ) : (
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5 xq-text-secondary font-semibold">
+                  <div className="flex items-center gap-1.5 text-sm xq-text-secondary font-semibold">
                     <Compass className="w-3.5 h-3.5 text-[var(--xq-accent-gold)] shrink-0" />
                     <span>当前局面已脱离标准开局定式</span>
                   </div>
-                  <span className="text-[11px] font-mono-tabular xq-text-muted">
+                  <span className="text-xs font-mono-tabular xq-text-muted shrink-0">
                     第 {currentPly} 手
                   </span>
                 </div>
-                <p className="text-[11px] xq-text-muted leading-relaxed">
+                <p className="text-[0.8125rem] xq-text-muted leading-relaxed">
                   {lastMatchedInfo
                     ? `已步入自由中盘较量（本谱最后命中定式：${lastMatchedInfo.openingName} · 第 ${lastMatchedInfo.ply} 手）。`
                     : '当前盘面非标准开局或已超出预设开局深度，可回退定式节点或点选下方开局体系重新研习。'}
@@ -282,7 +282,7 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
                     <button
                       type="button"
                       onClick={() => onJumpToPly(lastMatchedInfo.ply)}
-                      className="px-2.5 py-1 rounded-md xq-btn-secondary text-[11px] inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                      className="px-2.5 py-1 rounded-md xq-btn-secondary text-xs inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
                     >
                       <CornerDownLeft className="w-3 h-3 text-[var(--xq-accent-gold)]" />
                       <span>
@@ -292,7 +292,7 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
                     <button
                       type="button"
                       onClick={() => onOpenMatchingLibrary(lastMatchedInfo.matchKeyword)}
-                      className="text-[11px] text-[var(--xq-accent-gold)] hover:underline cursor-pointer whitespace-nowrap"
+                      className="text-xs text-[var(--xq-accent-gold)] hover:underline cursor-pointer whitespace-nowrap"
                     >
                       查棋谱库同体系 ({matchedLibraryCount}) →
                     </button>
@@ -306,7 +306,7 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
           <div className="flex-1 overflow-y-auto no-scrollbar divide-y divide-[var(--xq-border-subtle)]">
             {matchedNode && matchedNode.nextMoves.length > 0 ? (
               <>
-                <div className="px-3.5 py-1.5 bg-[var(--xq-bg-surface)] flex items-center justify-between text-[11px] xq-text-muted">
+                <div className="px-3.5 py-1.5 bg-[var(--xq-bg-surface)] flex items-center justify-between text-xs xq-text-muted">
                   <span>流行后续着法（悬停预览 · 点击走入）</span>
                   <span className="font-mono-tabular">红胜 / 和 / 黑胜</span>
                 </div>
@@ -335,29 +335,29 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
                         <span
-                          className={`font-serif-sc font-bold text-sm ${
+                          className={`font-serif-sc font-bold text-sm shrink-0 ${
                             turn === 'red' ? 'text-[#EF4444]' : 'xq-text-primary'
                           }`}
                         >
                           {mv.notation}
                         </span>
-                        <span className="text-[11px] xq-text-secondary truncate">
+                        <span className="text-[0.8125rem] xq-text-secondary truncate">
                           {mv.targetOpeningName}
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0 text-[11px]">
+                      <div className="flex items-center gap-2 shrink-0 text-xs">
                         {mv.badge && (
                           <span className={getBadgeTextStyle(mv.badge)}>{mv.badge}</span>
                         )}
-                        <span className="font-mono-tabular font-semibold xq-text-primary w-9 text-right">
+                        <span className="font-mono-tabular font-semibold xq-text-primary min-w-[2.4rem] text-right">
                           {mv.frequencyPct}%
                         </span>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1.5 rounded-full overflow-hidden flex bg-[var(--xq-bg-canvas)] border border-[var(--xq-border-subtle)]">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex-1 min-w-[6rem] h-1.5 rounded-full overflow-hidden flex bg-[var(--xq-bg-canvas)] border border-[var(--xq-border-subtle)]">
                         <div
                           style={{ width: `${mv.redWinPct}%` }}
                           className="h-full bg-[#C8372D]"
@@ -371,7 +371,7 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
                           className="h-full bg-[#27272A]"
                         />
                       </div>
-                      <span className="text-[10px] font-mono-tabular xq-text-muted shrink-0">
+                      <span className="text-xs font-mono-tabular xq-text-muted shrink-0">
                         红{mv.redWinPct}% · 和{mv.drawPct}% · 黑{mv.blackWinPct}%
                       </span>
                     </div>
@@ -380,11 +380,11 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
               </>
             ) : matchedNode ? (
               <div className="p-3.5 space-y-1.5 text-center">
-                <div className="flex items-center justify-center gap-1.5 font-medium xq-text-secondary">
+                <div className="flex items-center justify-center gap-1.5 text-sm font-medium xq-text-secondary">
                   <GitFork className="w-4 h-4 text-[var(--xq-accent-gold)]" />
                   <span>已达当前定式末梢节点</span>
                 </div>
-                <p className="text-[11px] xq-text-muted leading-relaxed">
+                <p className="text-[0.8125rem] xq-text-muted leading-relaxed">
                   后续已全面转入中局争夺，可结合上方引擎推荐主变或查阅棋谱库同类实战继续深研。
                 </p>
               </div>
@@ -393,18 +393,18 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
             {/* 完整模式显示 7 套主流骨架；复盘轻查询模式收敛为跳转「开局研习」引导 */}
             {mode === 'full' ? (
               <div className="p-3.5 space-y-2.5 bg-[var(--xq-bg-canvas)]/40">
-                <div className="flex items-center justify-between text-[11px] font-medium xq-text-secondary">
+                <div className="flex items-center justify-between text-[0.8125rem] font-medium xq-text-secondary">
                   <span className="flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5 text-[var(--xq-accent-gold)]" />
                     <span>主流开局定式骨架</span>
                   </span>
-                  <span className="font-mono-tabular xq-text-muted">
+                  <span className="text-xs font-mono-tabular xq-text-muted">
                     {filteredPresets.length} / {OPENING_PRESETS.length} 套
                   </span>
                 </div>
 
                 {/* 体系过滤按钮组 */}
-                <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+                <div className="flex flex-wrap items-center gap-1.5">
                   {(
                     [
                       { id: 'all', label: '全部' },
@@ -418,7 +418,7 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
                       key={cat.id}
                       type="button"
                       onClick={() => setCategoryFilter(cat.id)}
-                      className={`px-2 py-0.5 rounded text-[11px] cursor-pointer whitespace-nowrap shrink-0 ${
+                      className={`px-2 py-0.5 rounded text-xs cursor-pointer whitespace-nowrap shrink-0 ${
                         categoryFilter === cat.id ? 'xq-btn-option-active' : 'xq-btn-option'
                       }`}
                     >
@@ -431,17 +431,17 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
                   {filteredPresets.map((preset) => (
                     <div
                       key={preset.id}
-                      className="p-2 rounded-lg xq-btn-option flex items-center justify-between gap-2"
+                      className="p-2.5 rounded-lg xq-btn-option flex items-center justify-between gap-2"
                     >
                       <button
                         type="button"
                         onClick={() => onApplyOpeningPreset(preset)}
                         className="flex-1 min-w-0 text-left cursor-pointer"
                       >
-                        <div className="font-serif-sc font-semibold text-xs xq-text-primary truncate">
+                        <div className="font-serif-sc font-semibold text-sm xq-text-primary truncate">
                           {preset.title}
                         </div>
-                        <div className="text-[11px] xq-text-muted truncate mt-0.5 font-normal">
+                        <div className="text-xs xq-text-muted truncate mt-0.5 font-normal">
                           {preset.category} · {preset.difficulty} · {preset.moves.length} 手
                         </div>
                       </button>
@@ -450,14 +450,14 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
                         <button
                           type="button"
                           onClick={() => onApplyOpeningPreset(preset)}
-                          className="px-2 py-1 rounded text-[11px] xq-btn-secondary cursor-pointer whitespace-nowrap"
+                          className="px-2.5 py-1 rounded text-xs xq-btn-secondary cursor-pointer whitespace-nowrap"
                         >
                           载入
                         </button>
                         <button
                           type="button"
                           onClick={() => onStartDrill(preset, drillCampChoice)}
-                          className="px-2 py-1 rounded text-[11px] xq-btn-primary cursor-pointer whitespace-nowrap"
+                          className="px-2.5 py-1 rounded text-xs xq-btn-primary cursor-pointer whitespace-nowrap"
                         >
                           对练
                         </button>
@@ -469,13 +469,13 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
             ) : (
               onGoToOpeningWorkspace && (
                 <div className="p-3.5 bg-[var(--xq-bg-canvas)]/40 space-y-2">
-                  <div className="text-[11px] xq-text-secondary leading-relaxed">
+                  <div className="text-[0.8125rem] xq-text-secondary leading-relaxed">
                     复盘侧栏提供实时盘面定式查询与支线试走；如需浏览 7 套体系骨架或进行防剧透变例记忆对练，可前往专属「开局研习」工作台。
                   </div>
                   <button
                     type="button"
                     onClick={onGoToOpeningWorkspace}
-                    className="w-full py-2 rounded-md xq-btn-secondary text-xs font-medium flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="w-full py-2 rounded-md xq-btn-secondary text-[0.8125rem] font-medium flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <GraduationCap className="w-3.5 h-3.5 text-[var(--xq-accent-gold)]" />
                     <span>前往「开局研习」精练本体系 →</span>
@@ -492,13 +492,13 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
             <div className="flex-1 overflow-y-auto no-scrollbar p-3.5 space-y-3">
               {/* 执红/执黑选择 + 规则提示 */}
               <div className="p-3 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-semibold text-xs xq-text-primary">选择对练执方</span>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-semibold text-[0.8125rem] xq-text-primary">选择对练执方</span>
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
                       onClick={() => setDrillCampChoice('red')}
-                      className={`px-2.5 py-1 rounded text-[11px] cursor-pointer whitespace-nowrap ${
+                      className={`px-2.5 py-1 rounded text-xs cursor-pointer whitespace-nowrap ${
                         drillCampChoice === 'red' ? 'xq-btn-option-active' : 'xq-btn-option'
                       }`}
                     >
@@ -507,7 +507,7 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
                     <button
                       type="button"
                       onClick={() => setDrillCampChoice('black')}
-                      className={`px-2.5 py-1 rounded text-[11px] cursor-pointer whitespace-nowrap ${
+                      className={`px-2.5 py-1 rounded text-xs cursor-pointer whitespace-nowrap ${
                         drillCampChoice === 'black' ? 'xq-btn-option-active' : 'xq-btn-option'
                       }`}
                     >
@@ -515,7 +515,7 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
                     </button>
                   </div>
                 </div>
-                <p className="text-[11px] xq-text-muted leading-relaxed">
+                <p className="text-xs xq-text-muted leading-relaxed">
                   进入对练后自动隐藏棋盘引擎剧透箭头，系统模拟对手自动应招，请在左侧棋盘走出正确的定式回应。
                 </p>
               </div>
@@ -527,21 +527,21 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
                   return (
                     <div
                       key={preset.id}
-                      className="p-2.5 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] space-y-1.5"
+                      className="p-3 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] space-y-1.5"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="font-serif-sc font-bold text-sm xq-text-primary truncate">
+                        <span className="font-serif-sc font-bold text-[0.9375rem] xq-text-primary truncate">
                           {preset.title}
                         </span>
                         {prog && prog.completedCount > 0 && (
-                          <span className="text-[11px] text-[#10B981] font-mono-tabular font-semibold shrink-0 flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3" />
+                          <span className="text-xs text-[#10B981] font-mono-tabular font-semibold shrink-0 flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
                             最佳 {prog.bestAccuracyPct}%
                           </span>
                         )}
                       </div>
 
-                      <div className="text-[11px] xq-text-secondary flex items-center gap-1.5">
+                      <div className="text-xs xq-text-secondary flex items-center gap-1.5 flex-wrap">
                         <span>{preset.category}</span>
                         <span aria-hidden="true">·</span>
                         <span>{preset.difficulty}</span>
@@ -549,7 +549,7 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
                         <span className="font-mono-tabular">全线 {preset.moves.length} 手</span>
                       </div>
 
-                      <p className="text-[11px] xq-text-muted leading-relaxed">
+                      <p className="text-[0.8125rem] xq-text-muted leading-relaxed">
                         {preset.summary}
                       </p>
 
@@ -557,14 +557,14 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
                         <button
                           type="button"
                           onClick={() => onOpenMatchingLibrary(preset.matchKeyword)}
-                          className="text-[11px] xq-text-secondary hover:underline cursor-pointer whitespace-nowrap"
+                          className="text-xs xq-text-secondary hover:underline cursor-pointer whitespace-nowrap"
                         >
                           看同局名谱
                         </button>
                         <button
                           type="button"
                           onClick={() => onStartDrill(preset, drillCampChoice)}
-                          className="px-3 py-1 rounded-md xq-btn-primary text-[11px] flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                          className="px-3 py-1 rounded-md xq-btn-primary text-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
                         >
                           <Play className="w-3 h-3" />
                           <span>开始对练</span>
@@ -581,19 +581,19 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
               {/* 当前对练进度面板 */}
               <div className="p-3 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-serif-sc font-bold text-sm xq-text-primary truncate">
+                  <span className="font-serif-sc font-bold text-[0.9375rem] xq-text-primary truncate">
                     {activeDrillPreset.title}
                   </span>
                   <button
                     type="button"
                     onClick={onExitDrill}
-                    className="text-[11px] xq-text-secondary hover:text-[var(--xq-text-primary)] hover:underline cursor-pointer whitespace-nowrap shrink-0"
+                    className="text-xs xq-text-secondary hover:text-[var(--xq-text-primary)] hover:underline cursor-pointer whitespace-nowrap shrink-0"
                   >
                     切换定式
                   </button>
                 </div>
 
-                <div className="flex items-center justify-between text-[11px] xq-text-secondary font-mono-tabular">
+                <div className="flex items-center justify-between text-xs xq-text-secondary font-mono-tabular">
                   <span>
                     {drillState.playerCamp === 'red' ? '执红先手' : '执黑后手'} · 步序{' '}
                     {drillState.stepIndex} / {drillTotalSteps}
@@ -616,7 +616,7 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
                     <CheckCircle2 className="w-4 h-4 shrink-0" />
                     <span>定式通关！</span>
                   </div>
-                  <p className="text-xs xq-text-primary leading-relaxed">
+                  <p className="text-[0.8125rem] xq-text-primary leading-relaxed">
                     您已完整走出「{activeDrillPreset.title}」全线 {drillTotalSteps} 手变例，本次一次命中率{' '}
                     <span className="font-mono-tabular font-semibold">{liveDrillAccuracy}%</span>
                     {drillState.mistakes === 0 ? '（零失误完美掌握）' : `（期间修正 ${drillState.mistakes} 处）`}
@@ -642,18 +642,18 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
                 </div>
               ) : drillState.status === 'mistake' ? (
                 <div className="p-3 rounded-lg border border-[#EF4444]/50 bg-[#EF4444]/10 space-y-2">
-                  <div className="flex items-center gap-1.5 text-[#EF4444] font-semibold">
+                  <div className="flex items-center gap-1.5 text-[#EF4444] text-sm font-semibold">
                     <AlertTriangle className="w-4 h-4 shrink-0" />
                     <span>偏离定式主线</span>
                   </div>
-                  <p className="text-xs leading-relaxed xq-text-primary">
+                  <p className="text-[0.8125rem] leading-relaxed xq-text-primary">
                     {drillState.feedback}
                   </p>
                   <div className="flex items-center gap-2 pt-1 flex-wrap">
                     <button
                       type="button"
                       onClick={onShowDrillHint}
-                      className="px-2.5 py-1 rounded-md xq-btn-primary text-[11px] flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                      className="px-2.5 py-1 rounded-md xq-btn-primary text-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
                     >
                       <Eye className="w-3 h-3" />
                       <span>在棋盘提示正着</span>
@@ -661,7 +661,7 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
                     <button
                       type="button"
                       onClick={() => onStartDrill(activeDrillPreset, drillState.playerCamp)}
-                      className="px-2.5 py-1 rounded-md xq-btn-secondary text-[11px] flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                      className="px-2.5 py-1 rounded-md xq-btn-secondary text-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
                     >
                       <RotateCcw className="w-3 h-3" />
                       <span>重开本线</span>
@@ -670,12 +670,12 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
                 </div>
               ) : (
                 <div className="p-3 rounded-lg border border-[var(--xq-accent-gold)]/45 bg-[var(--xq-accent-gold)]/8 space-y-1.5">
-                  <div className="font-semibold text-[var(--xq-accent-gold)]">
+                  <div className="font-semibold text-sm text-[var(--xq-accent-gold)]">
                     {turn === drillState.playerCamp
                       ? `轮到您走棋（第 ${drillState.stepIndex + 1} 步）`
                       : '对方正在走出定式应手…'}
                   </div>
-                  <p className="text-xs leading-relaxed xq-text-secondary">
+                  <p className="text-[0.8125rem] leading-relaxed xq-text-secondary">
                     {drillState.feedback ||
                       `请在左侧棋盘直接走子，延续「${activeDrillPreset.title}」定式。`}
                   </p>
@@ -683,7 +683,7 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
                     <button
                       type="button"
                       onClick={onShowDrillHint}
-                      className="px-2.5 py-1 rounded-md xq-btn-secondary text-[11px] flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                      className="px-2.5 py-1 rounded-md xq-btn-secondary text-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
                     >
                       <Eye className="w-3 h-3 text-[var(--xq-accent-gold)]" />
                       <span>提示此步</span>
@@ -691,7 +691,7 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
                     <button
                       type="button"
                       onClick={() => onStartDrill(activeDrillPreset, drillState.playerCamp)}
-                      className="px-2.5 py-1 rounded-md xq-btn-secondary text-[11px] flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                      className="px-2.5 py-1 rounded-md xq-btn-secondary text-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
                     >
                       <RotateCcw className="w-3 h-3" />
                       <span>重开</span>
@@ -702,7 +702,7 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
 
               {/* 本线参考手数概览（仅揭示已走出手数，未走手数以「？」遮罩防剧透） */}
               <div className="p-2.5 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] space-y-1.5">
-                <div className="text-[11px] font-medium xq-text-secondary">
+                <div className="text-xs font-medium xq-text-secondary">
                   本定式进度轨迹（已走实着 / 待回忆步数）
                 </div>
                 <div className="flex flex-wrap gap-1.5">
@@ -712,7 +712,7 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
                     return (
                       <span
                         key={idx}
-                        className={`px-2 py-0.5 rounded border text-[11px] font-serif-sc ${
+                        className={`px-2 py-0.5 rounded border text-xs font-serif-sc ${
                           playedMove
                             ? 'border-[#10B981]/40 bg-[#10B981]/10 text-[#10B981]'
                             : isCurrent
@@ -733,13 +733,13 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
 
       {/* 独立工作台底部固定交接 CTA：携带当前定式转入复盘分析（与残局/人机/摆子保持同一交接契约） */}
       {mode === 'full' && onTransferOpeningToStudy && (
-        <div className="p-3 border-t xq-border bg-[var(--xq-bg-surface)] shrink-0">
+        <div className="p-3.5 border-t xq-border bg-[var(--xq-bg-surface)] shrink-0">
           <button
             type="button"
             onClick={onTransferOpeningToStudy}
-            className="w-full py-2 rounded-lg xq-btn-primary text-xs font-medium flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+            className="w-full py-2.5 px-4 rounded-lg xq-btn-primary text-sm font-semibold flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
           >
-            <ArrowRightCircle className="w-3.5 h-3.5" />
+            <ArrowRightCircle className="w-4 h-4" />
             <span>
               {activeMoves.length > 0
                 ? `携带 ${activeMoves.length} 手定式转入复盘分析`

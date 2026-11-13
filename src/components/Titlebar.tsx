@@ -44,7 +44,7 @@ export const Titlebar: React.FC<TitlebarProps> = React.memo(({
   ];
 
   return (
-    <header className="h-13 px-6 border-b xq-surface flex items-center justify-between gap-8 select-none shrink-0 z-40">
+    <header className="min-h-13 py-1.5 px-5 lg:px-6 border-b xq-surface flex items-center justify-between gap-4 xl:gap-8 select-none shrink-0 z-40">
       {/* Zone 1: 单行品牌印记 (Single-element Brand Wordmark) */}
       <a
         href="#study"
@@ -61,7 +61,7 @@ export const Titlebar: React.FC<TitlebarProps> = React.memo(({
       </a>
 
       {/* Zone 2: 五大核心工作空间导航 (5 Concise Single-Line Links) */}
-      <nav className="flex items-center gap-6 text-[13px] font-medium">
+      <nav className="flex items-center gap-4 xl:gap-6 text-sm font-medium min-w-0">
         {navItems.map((item) => {
           const isActive = workspace === item.id;
           return (
@@ -87,7 +87,7 @@ export const Titlebar: React.FC<TitlebarProps> = React.memo(({
           type="button"
           onClick={() => onOpenModal('fen-pgn')}
           title="导入或导出 FEN / PGN 棋谱与图片识别局面"
-          className="px-3 py-1.5 rounded-md xq-btn-secondary text-[13px] flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+          className="px-3 py-1.5 rounded-md xq-btn-secondary text-[0.8125rem] flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
         >
           <FileCode2 className="w-3.5 h-3.5 opacity-80" />
           <span>导入 / 导出</span>
@@ -97,7 +97,7 @@ export const Titlebar: React.FC<TitlebarProps> = React.memo(({
           type="button"
           onClick={() => onOpenModal('library')}
           title="浏览经典名局、古谱与自存复盘棋谱库"
-          className="px-3 py-1.5 rounded-md xq-btn-secondary text-[13px] flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+          className="px-3 py-1.5 rounded-md xq-btn-secondary text-[0.8125rem] flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
         >
           <BookOpen className="w-3.5 h-3.5 text-[var(--xq-accent-gold)]" />
           <span>棋谱库</span>
@@ -108,7 +108,7 @@ export const Titlebar: React.FC<TitlebarProps> = React.memo(({
           type="button"
           onClick={() => onOpenModal('connect')}
           title="连线外部象棋平台同步至复盘分析"
-          className={`px-3 py-1.5 rounded-md text-[13px] flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
+          className={`px-3 py-1.5 rounded-md text-[0.8125rem] flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
             isConnected ? 'xq-btn-engine-on' : 'xq-btn-secondary'
           }`}
         >

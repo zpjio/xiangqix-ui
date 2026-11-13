@@ -2677,9 +2677,9 @@ export default function App() {
 
       {/* ==================== 2. 主工作台：中央棋盘画布 + 右侧专业工作台 ==================== */}
       <main className="flex-1 min-h-0 flex overflow-hidden relative">
-        {/* 左侧主画布区：统一舞台容器确保上席位条、评估条+棋盘、下步进控制条左右边缘严格对齐且一屏无滚动条 */}
-        <div className="flex-1 min-w-0 h-full overflow-hidden px-5 py-1.5 flex flex-col items-center justify-center relative">
-          <div className="w-fit max-h-full flex flex-col items-stretch justify-center gap-1">
+        {/* 左侧主画布区：~62% 黄金比例主视角，启用 size 容器以便棋盘随可用高宽尽享视口空间 */}
+        <div className="flex-1 min-w-0 h-full overflow-hidden px-4 py-1.5 flex flex-col items-center justify-center relative [container-type:size]">
+          <div className="w-fit max-w-full max-h-full flex flex-col items-stretch justify-center gap-1">
             {/* 上方棋手信息栏 */}
             {workspace !== 'setup' && (
               <PlayerSeatBar
@@ -2872,9 +2872,17 @@ export default function App() {
           )}
         </div>
 
-        {/* ==================== 3. 右侧专业工作台 (加宽至 410px~450px 保证详细棋谱宽敞易读) ==================== */}
+        {/* ==================== 3. 右侧专业工作台 (~38% 黄金比例并随全局字号微调放宽) ==================== */}
         {!sidebarCollapsed && (
-          <aside className="w-[410px] xl:w-[450px] h-full border-l xq-surface flex flex-col shrink-0 relative">
+          <aside
+            className={`${
+              fontScale === 'xlarge'
+                ? 'w-[clamp(430px,39.5vw,600px)]'
+                : fontScale === 'large'
+                ? 'w-[clamp(410px,38.5vw,570px)]'
+                : 'w-[clamp(390px,37.5vw,540px)]'
+            } h-full border-l xq-surface flex flex-col shrink-0 relative`}
+          >
             {/* 侧栏折叠按钮 */}
             <button
               type="button"
@@ -2949,11 +2957,11 @@ export default function App() {
               />
             ) : workspace === 'play' ? (
               /* 人机对弈工作台 */
-              <div className="flex-1 flex flex-col min-h-0 overflow-hidden text-xs">
-                <div className="px-3.5 py-2.5 border-b xq-border flex items-center justify-between gap-2 shrink-0">
+              <div className="flex-1 flex flex-col min-h-0 overflow-hidden text-[0.8125rem]">
+                <div className="px-3.5 py-2.5 border-b xq-border flex items-center justify-between flex-wrap gap-2 shrink-0">
                   <div className="flex items-center gap-2">
                     <Swords className="w-4 h-4 text-[var(--xq-accent-gold)]" />
-                    <span className="font-semibold text-sm">人机对弈设置</span>
+                    <span className="font-semibold text-[0.9375rem]">人机对弈设置</span>
                   </div>
                   <span className="text-xs xq-text-muted">支持悔棋与支招</span>
                 </div>
@@ -2989,7 +2997,7 @@ export default function App() {
                             handicap === h.id ? 'xq-btn-option-active' : 'xq-btn-option'
                           }`}
                         >
-                          <div className="font-semibold">{h.title}</div>
+                          <div className="font-semibold text-sm">{h.title}</div>
                           <div className="text-xs xq-text-muted mt-0.5 font-normal">{h.desc}</div>
                         </button>
                       ))}
@@ -3041,7 +3049,7 @@ export default function App() {
                         mainMoves.map((m) => (
                           <span
                             key={m.ply}
-                            className="px-2 py-0.5 rounded border xq-border font-serif-sc text-xs"
+                            className="px-2 py-0.5 rounded border xq-border font-serif-sc text-[0.8125rem]"
                           >
                             {m.ply}.{m.notation}
                           </span>
@@ -3056,7 +3064,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={handleTransferPlayToStudy}
-                    className="w-full py-2.5 px-4 rounded-lg xq-btn-primary text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                    className="w-full py-2.5 px-4 rounded-lg xq-btn-primary text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer shadow-sm"
                   >
                     <ArrowRightCircle className="w-4 h-4" />
                     <span>
@@ -3085,7 +3093,7 @@ export default function App() {
               <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                 {/* 三页签切换栏 */}
                 <div className="px-3.5 pt-1.5 border-b xq-border flex items-center justify-between gap-2 shrink-0">
-                  <div className="flex items-center gap-4 text-xs font-medium">
+                  <div className="flex items-center flex-wrap gap-x-4 gap-y-1 text-sm font-medium">
                     <button
                       type="button"
                       onClick={() => setRightTab('moves')}
@@ -3128,7 +3136,7 @@ export default function App() {
                 </div>
 
                 {/* 复盘工作台常驻：实时定式识别条与「同开局名局」/「去开局研习」双联动 */}
-                <div className="px-3.5 py-1.5 border-b xq-border bg-[var(--xq-bg-canvas)]/75 flex items-center justify-between gap-2 text-[11px] shrink-0">
+                <div className="px-3.5 py-1.5 border-b xq-border bg-[var(--xq-bg-canvas)]/75 flex items-center justify-between flex-wrap gap-2 text-xs shrink-0">
                   <button
                     type="button"
                     onClick={handleOpenOpeningTab}

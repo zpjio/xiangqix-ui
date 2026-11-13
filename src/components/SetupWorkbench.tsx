@@ -64,14 +64,14 @@ export const SetupWorkbench: React.FC<SetupWorkbenchProps> = React.memo(({
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-hidden text-xs">
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden text-[0.8125rem]">
       {/* 顶栏 */}
-      <div className="px-3.5 py-2.5 border-b xq-border flex items-center justify-between gap-2 shrink-0">
+      <div className="px-3.5 py-2.5 border-b xq-border flex flex-wrap items-center justify-between gap-2 shrink-0">
         <div className="flex items-center gap-2">
           <Grid className="w-4 h-4 text-[var(--xq-accent-gold)]" />
-          <span className="font-semibold text-sm">摆子编辑工坊</span>
+          <span className="font-semibold text-[0.9375rem]">摆子编辑工坊</span>
         </div>
-        <span className="text-[11px] xq-text-muted">点选子力落子 · 点盘面子移除</span>
+        <span className="text-xs xq-text-muted">点选子力落子 · 点盘面子移除</span>
       </div>
 
       {/* 中间可适应内容区 */}
@@ -96,7 +96,7 @@ export const SetupWorkbench: React.FC<SetupWorkbenchProps> = React.memo(({
                 : '请确保红帅与黑将均已在盘面上'}
             </span>
           </div>
-          <span className="font-mono-tabular text-[11px] opacity-85 shrink-0">
+          <span className="font-mono-tabular text-xs opacity-85 shrink-0">
             {setupTurn === 'red' ? '红先' : '黑先'}
           </span>
         </div>
@@ -105,7 +105,7 @@ export const SetupWorkbench: React.FC<SetupWorkbenchProps> = React.memo(({
         <div className="grid grid-cols-2 gap-2.5">
           {/* 红方子力列 */}
           <div className="space-y-1.5">
-            <div className="text-[11px] font-semibold xq-text-secondary text-center pb-1 border-b xq-border">
+            <div className="text-xs font-semibold xq-text-secondary text-center pb-1 border-b xq-border">
               红方子力库
             </div>
             <div className="space-y-1">
@@ -145,7 +145,7 @@ export const SetupWorkbench: React.FC<SetupWorkbenchProps> = React.memo(({
                         红{label}
                       </span>
                     </div>
-                    <span className="font-mono-tabular text-[11px] xq-text-secondary">
+                    <span className="font-mono-tabular text-xs xq-text-secondary">
                       余 {remain}
                     </span>
                   </button>
@@ -156,7 +156,7 @@ export const SetupWorkbench: React.FC<SetupWorkbenchProps> = React.memo(({
 
           {/* 黑方子力列 */}
           <div className="space-y-1.5">
-            <div className="text-[11px] font-semibold xq-text-secondary text-center pb-1 border-b xq-border">
+            <div className="text-xs font-semibold xq-text-secondary text-center pb-1 border-b xq-border">
               黑方子力库
             </div>
             <div className="space-y-1">
@@ -196,7 +196,7 @@ export const SetupWorkbench: React.FC<SetupWorkbenchProps> = React.memo(({
                         黑{label}
                       </span>
                     </div>
-                    <span className="font-mono-tabular text-[11px] xq-text-secondary">
+                    <span className="font-mono-tabular text-xs xq-text-secondary">
                       余 {remain}
                     </span>
                   </button>
@@ -208,9 +208,9 @@ export const SetupWorkbench: React.FC<SetupWorkbenchProps> = React.memo(({
 
         {/* 先行方与快捷重置 */}
         <div className="p-2.5 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] space-y-2.5">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="xq-text-secondary font-medium">设定先行方</span>
-            <div className="grid grid-cols-2 gap-1.5 w-44">
+            <div className="grid grid-cols-2 gap-1.5 w-[11.5rem]">
               <button
                 type="button"
                 onClick={() => onChangeSetupTurn('red')}
@@ -254,14 +254,14 @@ export const SetupWorkbench: React.FC<SetupWorkbenchProps> = React.memo(({
 
         {/* 实时 FEN 预览 */}
         <div className="p-2 rounded-md border xq-border bg-[var(--xq-bg-canvas)]/70 flex items-center justify-between gap-2">
-          <code className="font-mono-tabular text-[11px] xq-text-secondary truncate">
+          <code className="font-mono-tabular text-xs xq-text-secondary truncate">
             {currentFen}
           </code>
           <button
             type="button"
             onClick={handleCopyFen}
             title="复制当前摆子 FEN"
-            className="px-2 py-1 rounded xq-btn-secondary flex items-center gap-1 shrink-0 cursor-pointer"
+            className="px-2 py-1 rounded text-xs xq-btn-secondary flex items-center gap-1 shrink-0 cursor-pointer"
           >
             {copiedFen ? (
               <>
@@ -284,7 +284,7 @@ export const SetupWorkbench: React.FC<SetupWorkbenchProps> = React.memo(({
           type="button"
           disabled={!isPositionValid}
           onClick={onFinishSetup}
-          className="w-full py-2.5 px-4 rounded-lg xq-btn-primary disabled:opacity-45 text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+          className="w-full py-2.5 px-4 rounded-lg xq-btn-primary disabled:opacity-45 text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer shadow-sm"
         >
           <ArrowRightCircle className="w-4 h-4" />
           <span>完成摆子 · 转入复盘分析</span>

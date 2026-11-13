@@ -44,14 +44,14 @@ export const EvalGraph: React.FC<EvalGraphProps> = React.memo(({
 
   return (
     <div className="w-full px-3 py-2 rounded-lg border xq-surface select-none">
-      <div className="flex items-center justify-between text-[11px] mb-1">
+      <div className="flex items-center justify-between text-xs mb-1">
         <span className="font-medium xq-text-secondary">整局优劣势曲线（点击圆点跳手）</span>
         <span className="font-mono-tabular xq-text-muted">
           手数 {currentPly}/{moves.length}
         </span>
       </div>
 
-      <div className="relative w-full h-[72px]">
+      <div className="relative w-full h-[4.5rem]">
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible">
           <defs>
             <linearGradient id="evalAreaRed2" x1="0" y1="0" x2="0" y2="1">
@@ -61,16 +61,17 @@ export const EvalGraph: React.FC<EvalGraphProps> = React.memo(({
             </linearGradient>
           </defs>
 
-          <text x="2" y="15" className="text-[10px] fill-[#C8372D] font-serif-sc font-bold">
+          <text x="2" y="15" fontSize="11" className="fill-[#C8372D] font-serif-sc font-bold">
             红优
           </text>
-          <text x="2" y={midY + 3} className="text-[9px] fill-[#827363] font-mono-tabular">
+          <text x="2" y={midY + 3} fontSize="10" className="fill-[#827363] font-mono-tabular">
             0.0
           </text>
           <text
             x="2"
             y={height - 5}
-            className="text-[10px] fill-[#827363] font-serif-sc font-bold"
+            fontSize="11"
+            className="fill-[#827363] font-serif-sc font-bold"
           >
             黑优
           </text>

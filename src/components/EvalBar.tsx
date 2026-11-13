@@ -69,7 +69,7 @@ export const EvalBar: React.FC<EvalBarProps> = React.memo(({
   return (
     <div
       data-component="EvalBar.tsx"
-      className={`relative w-9 sm:w-10 shrink-0 rounded-lg overflow-hidden border xq-border flex flex-col select-none shadow-inner ${heightClass}`}
+      className={`relative w-[2.5rem] sm:w-[2.75rem] shrink-0 rounded-lg overflow-hidden border xq-border flex flex-col select-none shadow-inner ${heightClass}`}
       title={`当前局面评估：${fullTooltipText}`}
     >
       {/* 顶部区域（默认黑方在顶，翻转后红方在顶） */}
@@ -108,7 +108,7 @@ export const EvalBar: React.FC<EvalBarProps> = React.memo(({
 
       {/* 阵营微标（固定在与分值相对的另一端，互不挤压） */}
       <span
-        className={`absolute inset-x-0 text-center text-[10px] font-medium text-[#EFE6D8]/70 pointer-events-none ${
+        className={`absolute inset-x-0 text-center text-xs font-medium text-[#EFE6D8]/75 pointer-events-none ${
           placeAtBottom ? 'top-1.5' : 'bottom-1.5'
         }`}
       >
@@ -121,11 +121,11 @@ export const EvalBar: React.FC<EvalBarProps> = React.memo(({
           placeAtBottom ? 'bottom-1.5' : 'top-1.5'
         }`}
       >
-        <span className="px-1 py-0.5 rounded bg-black/70 text-[11px] font-mono-tabular font-bold tracking-tight leading-none text-[#FAF5EB] whitespace-nowrap">
+        <span className="px-1 py-0.5 rounded bg-black/70 text-xs font-mono-tabular font-bold tracking-tight leading-none text-[#FAF5EB] whitespace-nowrap">
           {compactText}
         </span>
         {compareMode && secondaryScoreCp !== null && (
-          <span className="px-1 py-0.2 rounded bg-[#1E3A8A]/90 border border-[#3B82F6]/60 text-[10px] font-mono-tabular font-semibold leading-none text-[#93C5FD] whitespace-nowrap">
+          <span className="px-1 py-0.5 rounded bg-[#1E3A8A]/90 border border-[#3B82F6]/60 text-[0.6875rem] font-mono-tabular font-semibold leading-none text-[#93C5FD] whitespace-nowrap">
             {formatCompactScore(secondaryScoreCp)}
           </span>
         )}

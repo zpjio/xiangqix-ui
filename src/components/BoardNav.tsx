@@ -78,7 +78,7 @@ export const BoardNav: React.FC<BoardNavProps> = React.memo(({
   const isHintDisabled = disabled || (canHint !== undefined ? !canHint : false);
 
   return (
-    <div className="w-full px-3 py-1.5 rounded-lg border xq-surface flex items-center justify-between gap-2 select-none shadow-2xs">
+    <div className="w-full px-2.5 py-1 rounded-lg border xq-surface flex flex-wrap items-center justify-between gap-2 select-none shadow-2xs">
       {/* 左侧步进导航（自动播放仅在复盘模式且已有着法时按需出现） */}
       <div className="flex items-center gap-0.5">
         <button
@@ -107,7 +107,7 @@ export const BoardNav: React.FC<BoardNavProps> = React.memo(({
             disabled={disabled}
             onClick={onToggleReplay}
             title={isReplaying ? '暂停自动播放' : '自动播放棋谱'}
-            className={`px-2 py-1 rounded-md text-xs flex items-center gap-1 whitespace-nowrap transition-colors ${
+            className={`px-2 py-1 rounded-md text-[0.8125rem] flex items-center gap-1 whitespace-nowrap transition-colors ${
               disabled ? 'opacity-35 cursor-not-allowed' : 'cursor-pointer'
             } ${
               isReplaying
@@ -148,13 +148,13 @@ export const BoardNav: React.FC<BoardNavProps> = React.memo(({
       </div>
 
       {/* 右侧常用操作：新局/重开 · 翻转 · 悔棋 · 支招 */}
-      <div className="flex items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
         <button
           type="button"
           disabled={isNewGameDisabled}
           onClick={onNewGame}
           title={isNewGameDisabled ? newGameDisabledReason || '当前已是初始局面，无需重开' : defaultNewGameTitle}
-          className={`px-2.5 py-1 rounded-md xq-btn-secondary text-xs flex items-center gap-1 whitespace-nowrap ${
+          className={`px-2.5 py-1 rounded-md xq-btn-secondary text-[0.8125rem] flex items-center gap-1 whitespace-nowrap ${
             isNewGameDisabled ? 'opacity-35 cursor-not-allowed' : 'cursor-pointer'
           }`}
         >
@@ -166,7 +166,7 @@ export const BoardNav: React.FC<BoardNavProps> = React.memo(({
           type="button"
           onClick={onFlipBoard}
           title="翻转棋盘 (F)"
-          className="px-2.5 py-1 rounded-md xq-btn-secondary text-xs flex items-center gap-1 whitespace-nowrap cursor-pointer"
+          className="px-2.5 py-1 rounded-md xq-btn-secondary text-[0.8125rem] flex items-center gap-1 whitespace-nowrap cursor-pointer"
         >
           <ArrowUpDown className="w-3.5 h-3.5 opacity-80" />
           <span>翻转</span>
@@ -177,7 +177,7 @@ export const BoardNav: React.FC<BoardNavProps> = React.memo(({
           disabled={isUndoDisabled}
           onClick={onUndoMove}
           title={isUndoDisabled ? undoDisabledReason || '当前暂无可悔着法' : '悔棋'}
-          className={`px-2.5 py-1 rounded-md xq-btn-secondary text-xs flex items-center gap-1 whitespace-nowrap ${
+          className={`px-2.5 py-1 rounded-md xq-btn-secondary text-[0.8125rem] flex items-center gap-1 whitespace-nowrap ${
             isUndoDisabled ? 'opacity-35 cursor-not-allowed' : 'cursor-pointer'
           }`}
         >
@@ -190,7 +190,7 @@ export const BoardNav: React.FC<BoardNavProps> = React.memo(({
           disabled={isHintDisabled}
           onClick={onTriggerHint}
           title={isHintDisabled ? hintDisabledReason || '当前局面不可支招' : '引擎推荐支招'}
-          className={`px-2.5 py-1 rounded-md text-xs flex items-center gap-1 whitespace-nowrap ${
+          className={`px-2.5 py-1 rounded-md text-[0.8125rem] flex items-center gap-1 whitespace-nowrap ${
             isHintDisabled
               ? 'xq-btn-secondary opacity-35 cursor-not-allowed'
               : 'xq-btn-primary cursor-pointer shadow-2xs'

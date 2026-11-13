@@ -194,11 +194,11 @@ export const XiangqiPiece: React.FC<XiangqiPieceProps> = React.memo(({
         )}
       </svg>
 
-      {/* 核心汉字阴刻层 */}
+      {/* 核心汉字阴刻层：随棋盘宽度 (cqw) 等比缩放，免疫根字号 rem 缩放 */}
       <span
         className={`relative z-10 leading-none tracking-tight select-none pointer-events-none ${getFontClass(
           fontScheme
-        )} ${getCharClass(piece.camp, craftStyle)} text-[1.35rem] sm:text-[1.6rem] xl:text-[1.8rem]`}
+        )} ${getCharClass(piece.camp, craftStyle)} text-[4.5cqw]`}
       >
         {char}
       </span>

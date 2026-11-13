@@ -109,12 +109,12 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-      {/* 对局信息条：红方 vs 黑方 · 开局 · 收藏 */}
-      <div className="px-3.5 py-1.5 border-b xq-border flex items-center justify-between gap-2 text-xs shrink-0">
+      {/* 对局信息条：红方 vs 黑方 · 存局 · 收藏 · 导出 */}
+      <div className="px-3.5 py-1.5 border-b xq-border flex flex-wrap items-center justify-between gap-2 text-[0.8125rem] shrink-0">
         <button
           type="button"
           onClick={onOpenGameInfo}
-          className="text-left min-w-0 hover:underline cursor-pointer truncate"
+          className="text-left min-w-0 flex-1 hover:underline cursor-pointer truncate"
         >
           <span className="font-semibold text-[#EF4444]">{metadata.redPlayer}</span>
           <span className="xq-text-muted mx-1.5">vs</span>
@@ -200,7 +200,7 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
 
       {/* 若处于外部平台连线观棋中，在棋谱顶部显示轻量连线同步条 */}
       {connectState?.connected && (
-        <div className="px-3.5 py-1.5 border-b border-[#10B981]/40 bg-[#10B981]/10 flex items-center justify-between gap-2 text-xs shrink-0">
+        <div className="px-3.5 py-1.5 border-b border-[#10B981]/40 bg-[#10B981]/10 flex flex-wrap items-center justify-between gap-2 text-[0.8125rem] shrink-0">
           <div className="flex items-center gap-1.5 text-[#10B981] font-medium min-w-0">
             <span className="w-2 h-2 rounded-full bg-[#10B981] animate-pulse shrink-0" />
             <span className="truncate">
@@ -230,7 +230,7 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
 
       {/* 若存在无感内联推演支线，在顶部显示推演支线控制台 */}
       {variationMoves && branchOriginPly !== null && (
-        <div className="px-3.5 py-1.5 border-b border-[var(--xq-accent-gold)]/45 bg-[var(--xq-accent-gold)]/12 flex items-center justify-between gap-2 text-xs shrink-0">
+        <div className="px-3.5 py-1.5 border-b border-[var(--xq-accent-gold)]/45 bg-[var(--xq-accent-gold)]/12 flex flex-wrap items-center justify-between gap-2 text-[0.8125rem] shrink-0">
           <div className="flex items-center gap-1.5 text-[var(--xq-accent-gold)] font-medium min-w-0">
             <GitBranch className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">
@@ -272,7 +272,7 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
       </div>
 
       {/* 双栏回合制着法表格主体 */}
-      <div className="flex-1 overflow-y-auto no-scrollbar divide-y divide-[var(--xq-border-subtle)] text-xs">
+      <div className="flex-1 overflow-y-auto no-scrollbar divide-y divide-[var(--xq-border-subtle)] text-[0.8125rem]">
         {/* 0. 初始阵列行 */}
         <button
           type="button"
@@ -291,23 +291,23 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
         {rounds.length === 0 && !variationMoves && (
           <div className="p-3.5 space-y-2.5">
             <div className="p-3 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] space-y-2">
-              <div className="font-medium xq-text-primary">
+              <div className="font-medium text-sm xq-text-primary">
                 已就绪，可从以下任意方式开始拆棋复盘：
               </div>
-              <p className="text-[11px] xq-text-muted leading-relaxed">
+              <p className="text-xs xq-text-muted leading-relaxed">
                 直接在左侧棋盘走子，或点击上方引擎推荐着法「试走」；进度将自动保存在本地。
               </p>
               <div className="grid grid-cols-1 gap-1.5 pt-0.5">
                 <button
                   type="button"
                   onClick={onLoadSampleGame}
-                  className="w-full px-2.5 py-1.5 rounded-md xq-btn-option-active text-xs flex items-center justify-between cursor-pointer"
+                  className="w-full px-2.5 py-1.5 rounded-md xq-btn-option-active text-[0.8125rem] flex items-center justify-between gap-2 cursor-pointer"
                 >
-                  <span className="flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>载入示范名局（王天一 vs 郑惟桐）</span>
+                  <span className="flex items-center gap-1.5 min-w-0 truncate">
+                    <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">载入示范名局（王天一 vs 郑惟桐）</span>
                   </span>
-                  <span className="text-[11px] opacity-80">12手含批注</span>
+                  <span className="text-xs opacity-80 shrink-0">12手含批注</span>
                 </button>
 
                 <div className="grid grid-cols-3 gap-1.5">
@@ -371,26 +371,26 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
                     <button
                       type="button"
                       onClick={() => onSelectPly(r.redMove!.ply, false)}
-                      className={`w-full px-2 py-1 rounded-md text-left flex items-center justify-between transition-colors cursor-pointer ${
+                      className={`w-full px-2 py-1 rounded-md text-left flex items-center justify-between gap-1 transition-colors cursor-pointer ${
                         isRedSelected
                           ? 'bg-[var(--xq-bg-active)] ring-1 ring-inset ring-[var(--xq-accent-gold)]'
                           : 'hover:bg-[var(--xq-bg-hover)]'
                       }`}
                     >
-                      <span className="font-serif-sc font-bold text-[13px] text-[#EF4444]">
+                      <span className="font-serif-sc font-bold text-sm text-[#EF4444] whitespace-nowrap">
                         {r.redMove.notation}
                       </span>
-                      <div className="flex items-center gap-1.5 shrink-0">
+                      <div className="flex items-center gap-1 shrink-0">
                         {r.redMove.quality && (
                           <span
-                            className={`px-1.5 py-0.5 text-[10px] leading-none rounded border ${getQualityBadgeStyle(
+                            className={`px-1 py-0.5 text-xs leading-none rounded border ${getQualityBadgeStyle(
                               r.redMove.quality
                             )}`}
                           >
                             {r.redMove.quality}
                           </span>
                         )}
-                        <span className="font-mono-tabular text-xs xq-text-secondary w-8 text-right">
+                        <span className="font-mono-tabular text-xs xq-text-secondary min-w-[2.4rem] text-right">
                           {r.redMove.evalScore >= 0
                             ? `+${r.redMove.evalScore.toFixed(1)}`
                             : r.redMove.evalScore.toFixed(1)}
@@ -406,26 +406,26 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
                     <button
                       type="button"
                       onClick={() => onSelectPly(r.blackMove!.ply, false)}
-                      className={`w-full px-2 py-1 rounded-md text-left flex items-center justify-between transition-colors cursor-pointer ${
+                      className={`w-full px-2 py-1 rounded-md text-left flex items-center justify-between gap-1 transition-colors cursor-pointer ${
                         isBlackSelected
                           ? 'bg-[var(--xq-bg-active)] ring-1 ring-inset ring-[var(--xq-accent-gold)]'
                           : 'hover:bg-[var(--xq-bg-hover)]'
                       }`}
                     >
-                      <span className="font-serif-sc font-bold text-[13px] xq-text-primary">
+                      <span className="font-serif-sc font-bold text-sm xq-text-primary whitespace-nowrap">
                         {r.blackMove.notation}
                       </span>
-                      <div className="flex items-center gap-1.5 shrink-0">
+                      <div className="flex items-center gap-1 shrink-0">
                         {r.blackMove.quality && (
                           <span
-                            className={`px-1.5 py-0.5 text-[10px] leading-none rounded border ${getQualityBadgeStyle(
+                            className={`px-1 py-0.5 text-xs leading-none rounded border ${getQualityBadgeStyle(
                               r.blackMove.quality
                             )}`}
                           >
                             {r.blackMove.quality}
                           </span>
                         )}
-                        <span className="font-mono-tabular text-xs xq-text-secondary w-8 text-right">
+                        <span className="font-mono-tabular text-xs xq-text-secondary min-w-[2.4rem] text-right">
                           {r.blackMove.evalScore >= 0
                             ? `+${r.blackMove.evalScore.toFixed(1)}`
                             : r.blackMove.evalScore.toFixed(1)}
@@ -453,7 +453,7 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
                         key={`var-ply-${vm.ply}`}
                         type="button"
                         onClick={() => onSelectPly(vm.ply, true)}
-                        className={`px-2 py-0.5 rounded text-xs font-serif-sc font-bold border transition-colors cursor-pointer ${
+                        className={`px-2 py-0.5 rounded text-[0.8125rem] font-serif-sc font-bold border transition-colors cursor-pointer ${
                           currentPly === vm.ply
                             ? 'bg-[var(--xq-accent-gold)] text-[#121316] border-[var(--xq-accent-gold)]'
                             : 'bg-[var(--xq-bg-surface)] xq-border hover:border-[var(--xq-accent-gold)]'
@@ -471,11 +471,11 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
       </div>
 
       {/* 底部：当前手战术批注与正着提示卡 */}
-      <div className="px-3.5 py-2 border-t xq-border bg-[var(--xq-bg-canvas)] text-xs shrink-0">
+      <div className="px-3.5 py-2 border-t xq-border bg-[var(--xq-bg-canvas)] text-[0.8125rem] shrink-0">
         {activeMoveRecord ? (
           <div className="space-y-0.5">
-            <div className="flex items-center justify-between">
-              <span className="font-serif-sc font-bold text-xs">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <span className="font-serif-sc font-bold text-[0.8125rem]">
                 第 {activeMoveRecord.ply} 手 · {activeMoveRecord.notation}
               </span>
               {activeMoveRecord.bestAlternative && (

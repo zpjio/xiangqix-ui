@@ -930,10 +930,18 @@ export const Board: React.FC<BoardProps> = React.memo(
       ? 'ring-2 ring-[#C87D3B]'
       : '';
 
+    const verticalReserve = workspace === 'setup' ? '4.75rem' : '8.5rem';
+    const horizontalReserve = workspace === 'study' ? '5.75rem' : '2.25rem';
+
     return (
       <div className="relative flex items-center justify-center gap-3 select-none">
-        {/* 棋盘主体容器：随视口高度自适应缩放，确保与上下棋手栏、操控栏在一屏内完整容纳不产生滚动条 */}
-        <div className="relative w-[clamp(280px,calc((100vh-226px)*0.86),590px)] transition-all">
+        {/* 棋盘主体容器：基于左侧舞台尺寸容器 (cqh/cqw) 自适应放大至高宽极限并保留微距呼吸边 */}
+        <div
+          className="relative transition-all"
+          style={{
+            width: `clamp(280px, min(calc((100cqh - ${verticalReserve}) * 0.89), calc(100cqw - ${horizontalReserve})), 820px)`,
+          }}
+        >
           <div
             className={`relative rounded-xl p-2 sm:p-2.5 border-2 transition-all duration-200 ${themeColors.frameClass} ${modeRimClass}`}
           >
@@ -964,13 +972,13 @@ export const Board: React.FC<BoardProps> = React.memo(
 
             {/* 内联推演支线激活提示角标 */}
             {isVariationActive && (
-              <div className="absolute top-3 left-4 z-40 px-2 py-0.5 rounded bg-[#D4AF37] text-[#18120E] text-[11px] font-semibold shadow pointer-events-none">
+              <div className="absolute top-3 left-4 z-40 px-2 py-0.5 rounded bg-[#D4AF37] text-[#18120E] text-xs font-semibold shadow pointer-events-none">
                 推演分支中
               </div>
             )}
 
-            {/* 内部盘面画布 (宽高比 9:10) */}
-            <div className="relative w-full aspect-[9/10] rounded-lg overflow-hidden shadow-inner">
+            {/* 内部盘面画布 (宽高比 9:10，提供 inline-size 容器以供棋子刻字等比缩放) */}
+            <div className="relative w-full aspect-[9/10] rounded-lg overflow-hidden shadow-inner [container-type:inline-size]">
               <StaticBoardSurface boardTheme={boardTheme} flipped={flipped} />
 
               <DynamicArrowLayer
@@ -995,7 +1003,7 @@ export const Board: React.FC<BoardProps> = React.memo(
                     <span className="font-calligraphy text-3xl sm:text-4xl leading-none tracking-[0.22em] text-[#FAF5EB] drop-shadow">
                       將軍
                     </span>
-                    <span className="text-[10px] font-serif-sc tracking-widest text-[#F5D68A]">
+                    <span className="text-xs font-serif-sc tracking-widest text-[#F5D68A]">
                       {checkSealEffect.camp === 'red' ? '紅帥受將 · 須應將' : '黑將受將 · 須應將'}
                     </span>
                   </div>
@@ -1004,7 +1012,7 @@ export const Board: React.FC<BoardProps> = React.memo(
 
               {/* 将死 / 绝杀 / 困毙 终局印章（支持自由收起查看棋盘与一键复盘/重开） */}
               {terminalOutcome && !terminalDismissed && (
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 w-[min(86%,312px)] pointer-events-auto">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 w-[min(90%,21rem)] pointer-events-auto">
                   <div className="animate-endgame-seal relative rounded-xl border-2 border-[#D4AF37]/80 bg-[#17110F]/94 px-5 py-4 text-center shadow-[0_22px_50px_rgba(0,0,0,0.82)]">
                     {onDismissTerminal && (
                       <button
@@ -1024,13 +1032,13 @@ export const Board: React.FC<BoardProps> = React.memo(
                     <div className="text-base font-serif-sc font-bold text-[#FAF5EB]">
                       {terminalOutcome.winner === 'red' ? '红方获胜' : '黑方获胜'}
                     </div>
-                    <p className="mt-1 text-xs text-[#C5A880]">
+                    <p className="mt-1 text-[0.8125rem] text-[#C5A880]">
                       {terminalOutcome.kind === 'checkmate'
                         ? `${terminalOutcome.loser === 'red' ? '红帅' : '黑将'}已无着可应，棋局告终`
                         : `${terminalOutcome.loser === 'red' ? '红方' : '黑方'}无子可动，按象棋规例判负`}
                     </p>
 
-                    <div className="mt-3.5 flex items-center justify-center gap-2">
+                    <div className="mt-3.5 flex items-center justify-center gap-2 flex-wrap">
                       {onTerminalPrimaryAction && (
                         <button
                           type="button"

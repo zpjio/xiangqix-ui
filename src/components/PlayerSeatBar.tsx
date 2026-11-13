@@ -23,14 +23,14 @@ export const PlayerSeatBar: React.FC<PlayerSeatBarProps> = React.memo(({
   const isRed = camp === 'red';
 
   return (
-    <div className="w-full px-3.5 py-1.5 rounded-lg border xq-surface flex items-center justify-between gap-3 select-none">
-      {/* 左侧：红/黑标识 + 棋手姓名 + 赛事/难度副标 */}
-      <div className="flex items-center gap-2.5 min-w-0">
+    <div className="w-full px-1 py-0.5 flex items-center justify-between gap-3 select-none">
+      {/* 左侧：轻量红/黑标识 + 棋手姓名 + 赛事/难度副标 */}
+      <div className="flex items-center gap-2 min-w-0">
         <span
-          className={`w-5.5 h-5.5 rounded-full flex items-center justify-center text-xs font-bold border shrink-0 ${
+          className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold border shrink-0 ${
             isRed
-              ? 'bg-[#C8372D]/15 text-[#EF4444] border-[#C8372D]/45'
-              : 'bg-zinc-800 text-zinc-200 border-zinc-600/60'
+              ? 'bg-[#C8372D]/12 text-[#EF4444] border-[#C8372D]/40'
+              : 'bg-zinc-800/80 text-zinc-200 border-zinc-600/50'
           }`}
         >
           {isRed ? '红' : '黑'}
@@ -39,9 +39,9 @@ export const PlayerSeatBar: React.FC<PlayerSeatBarProps> = React.memo(({
         <button
           type="button"
           onClick={onEditGameInfo}
-          className="text-left min-w-0 group cursor-pointer flex items-center gap-2"
+          className="text-left min-w-0 group cursor-pointer flex items-center gap-1.5"
         >
-          <span className="text-[13px] font-semibold truncate group-hover:underline">
+          <span className="text-sm font-semibold truncate group-hover:underline">
             {playerName}
           </span>
           {subtitle && (
@@ -52,8 +52,8 @@ export const PlayerSeatBar: React.FC<PlayerSeatBarProps> = React.memo(({
         </button>
       </div>
 
-      {/* 右侧：行棋态 · 将军提示 · 净子力分差 */}
-      <div className="flex items-center gap-2 shrink-0 text-xs">
+      {/* 右侧：行棋态 · 将军提示 · 净子力分差（去重胶囊化） */}
+      <div className="flex items-center gap-2.5 shrink-0 text-xs">
         {materialDiff > 0.4 && (
           <span className="font-mono-tabular text-xs font-medium xq-text-secondary">
             子力 +{materialDiff.toFixed(1)}
@@ -61,20 +61,18 @@ export const PlayerSeatBar: React.FC<PlayerSeatBarProps> = React.memo(({
         )}
 
         {isInCheck && (
-          <span className="px-2 py-0.5 rounded bg-[#C8372D] text-white text-xs font-semibold whitespace-nowrap">
+          <span className="px-1.5 py-0.5 rounded bg-[#C8372D] text-white text-xs font-semibold whitespace-nowrap">
             将军
           </span>
         )}
 
         {isTurn && (
           <span
-            className={`px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${
-              isRed
-                ? 'bg-[#C8372D]/15 text-[#EF4444]'
-                : 'bg-[var(--xq-accent-gold)]/15 text-[var(--xq-accent-gold)]'
+            className={`text-xs font-semibold whitespace-nowrap ${
+              isRed ? 'text-[#EF4444]' : 'text-[var(--xq-accent-gold)]'
             }`}
           >
-            行棋
+            行棋中
           </span>
         )}
       </div>

@@ -84,7 +84,7 @@ export function ThemeSelect<T extends string>({
         onClick={() => {
           if (!disabled) setOpen((prev) => !prev);
         }}
-        className={`w-full flex items-center justify-between gap-1.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)] xq-text-primary text-xs transition-colors focus:outline-none focus:border-[var(--xq-accent-gold)] ${
+        className={`w-full flex items-center justify-between gap-1.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)] xq-text-primary text-[0.8125rem] transition-colors focus:outline-none focus:border-[var(--xq-accent-gold)] ${
           disabled
             ? 'opacity-45 cursor-not-allowed'
             : 'hover:bg-[var(--xq-bg-hover)] cursor-pointer'
@@ -105,7 +105,7 @@ export function ThemeSelect<T extends string>({
           aria-label={ariaLabel}
           className={`absolute top-full mt-1 ${
             menuAlign === 'right' ? 'right-0' : 'left-0'
-          } ${menuMinWidthClass} w-max max-w-[260px] max-h-60 overflow-y-auto no-scrollbar rounded-lg border xq-border-strong bg-[var(--xq-bg-surface)] shadow-2xl py-1 z-50`}
+          } ${menuMinWidthClass} w-max max-w-[18rem] max-h-60 overflow-y-auto no-scrollbar rounded-lg border xq-border-strong bg-[var(--xq-bg-surface)] shadow-2xl py-1 z-50`}
         >
           {options.map((opt, idx) => {
             const isSelected = opt.value === value;
@@ -121,7 +121,7 @@ export function ThemeSelect<T extends string>({
                   onChange(opt.value);
                   setOpen(false);
                 }}
-                className={`w-full px-3 py-1.5 text-left text-xs flex items-center justify-between gap-3 whitespace-nowrap cursor-pointer transition-colors ${
+                className={`w-full px-3 py-1.5 text-left text-[0.8125rem] flex items-center justify-between gap-3 whitespace-nowrap cursor-pointer transition-colors ${
                   isSelected
                     ? 'bg-[var(--xq-btn-option-active-bg)] text-[var(--xq-accent-gold)] font-semibold'
                     : isHighlighted

@@ -511,7 +511,11 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-2xl rounded-xl border xq-elevated shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+        className={`w-full ${
+          activeModal === 'settings' || activeModal === 'library' || activeModal === 'fen-pgn'
+            ? 'max-w-3xl'
+            : 'max-w-2xl'
+        } max-h-[90vh] overflow-y-auto rounded-xl border xq-elevated shadow-2xl animate-in fade-in zoom-in-95 duration-150`}
       >
         {/* ==================== 1. 命令面板 (⌘K) ==================== */}
         {activeModal === 'command-palette' && (
@@ -525,7 +529,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                   onChange={(e) => setCmdQuery(e.target.value)}
                   placeholder="输入指令搜索（如：图片识别、连线、残局题库、人机对弈、支招…）"
                   autoFocus
-                  className="w-full bg-transparent text-xs focus:outline-none"
+                  className="w-full bg-transparent text-sm focus:outline-none"
                 />
               </div>
               <button
@@ -543,14 +547,14 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                   key={cmd.id}
                   type="button"
                   onClick={cmd.action}
-                  className={`w-full px-3 py-2 rounded-lg text-left text-xs flex items-center justify-between transition-colors cursor-pointer ${
+                  className={`w-full px-3 py-2 rounded-lg text-left text-[0.8125rem] flex items-center justify-between transition-colors cursor-pointer ${
                     idx === 0
                       ? 'bg-[var(--xq-bg-active)] font-medium'
                       : 'hover:bg-[var(--xq-bg-hover)]'
                   }`}
                 >
                   <span>{cmd.label}</span>
-                  <kbd className="px-1.5 py-0.5 rounded bg-[var(--xq-bg-canvas)] border xq-border font-mono-tabular text-[10px] xq-text-muted">
+                  <kbd className="px-1.5 py-0.5 rounded bg-[var(--xq-bg-canvas)] border xq-border font-mono-tabular text-xs xq-text-muted">
                     {cmd.shortcut}
                   </kbd>
                 </button>
@@ -564,7 +568,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
           <div className="p-5 space-y-3.5">
             <div className="flex items-center justify-between border-b xq-border pb-3 gap-3">
               <div className="flex items-center gap-3 min-w-0">
-                <h3 className="text-[15px] font-semibold whitespace-nowrap">
+                <h3 className="text-base font-semibold whitespace-nowrap">
                   棋谱库
                   <span className="ml-1.5 text-xs font-mono-tabular font-normal xq-text-muted">
                     共 {libraryStats.total} 局
@@ -589,7 +593,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                         ? '原地更新棋谱库中的当前对局'
                         : '将当前对局保存至「自存对局」'
                     }
-                    className={`px-3 py-1 rounded-md text-xs flex items-center gap-1.5 whitespace-nowrap ${
+                    className={`px-3 py-1 rounded-md text-[0.8125rem] flex items-center gap-1.5 whitespace-nowrap ${
                       canSaveCurrentGame
                         ? 'xq-btn-primary cursor-pointer'
                         : 'xq-btn-secondary opacity-45 cursor-not-allowed'
@@ -620,8 +624,8 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
             </div>
 
             {/* 双库分工提示条 + 跳转开局研习 */}
-            <div className="px-3 py-1.5 rounded-md bg-[var(--xq-bg-canvas)] border xq-border flex items-center justify-between gap-2 text-[11px] xq-text-muted">
-              <span className="truncate">
+            <div className="px-3 py-1.5 rounded-md bg-[var(--xq-bg-canvas)] border xq-border flex items-center justify-between flex-wrap gap-2 text-xs xq-text-muted">
+              <span className="min-w-0 truncate">
                 棋谱库收录整局名局与自存复盘 · 按盘面查定式胜率或练布局请前往「开局研习」
               </span>
               <button
@@ -641,7 +645,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
             </div>
 
             {/* 分类计数 Tabs */}
-            <div className="flex items-center gap-1.5 text-xs overflow-x-auto no-scrollbar">
+            <div className="flex items-center gap-1.5 text-[0.8125rem] overflow-x-auto no-scrollbar">
               {(
                 [
                   { id: 'all', label: `全部 (${libraryStats.total})` },
@@ -665,8 +669,8 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
             </div>
 
             {/* 搜索 + 赛果筛选 + 排序 */}
-            <div className="flex items-center gap-2 text-xs">
-              <div className="relative flex-1 min-w-0">
+            <div className="flex items-center flex-wrap gap-2 text-[0.8125rem]">
+              <div className="relative flex-1 min-w-[12rem]">
                 <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 xq-text-muted" />
                 <input
                   type="text"
@@ -677,13 +681,13 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                 />
               </div>
 
-              <div className="w-[108px] shrink-0">
+              <div className="w-[7.5rem] shrink-0">
                 <ThemeSelect
                   ariaLabel="按赛果筛选"
                   value={libResultFilter}
                   onChange={setLibResultFilter}
                   triggerClassName="px-2.5 py-1.5"
-                  menuMinWidthClass="min-w-[116px]"
+                  menuMinWidthClass="min-w-[8rem]"
                   options={[
                     { value: 'all', label: '全部赛果' },
                     { value: '红胜', label: '红胜' },
@@ -693,14 +697,14 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                 />
               </div>
 
-              <div className="w-[116px] shrink-0">
+              <div className="w-[8rem] shrink-0">
                 <ThemeSelect
                   ariaLabel="排序方式"
                   value={libSortBy}
                   onChange={setLibSortBy}
                   menuAlign="right"
                   triggerClassName="px-2.5 py-1.5"
-                  menuMinWidthClass="min-w-[124px]"
+                  menuMinWidthClass="min-w-[8.5rem]"
                   options={[
                     { value: 'default', label: '默认排序' },
                     { value: 'date-desc', label: '最新日期' },
@@ -712,7 +716,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
             </div>
 
             {/* 当前筛选数量与胜负分布汇总条 */}
-            <div className="flex items-center justify-between text-[11px] xq-text-muted px-0.5 font-mono-tabular">
+            <div className="flex items-center justify-between text-xs xq-text-muted px-0.5 font-mono-tabular">
               <span>
                 命中 {filteredLibrary.length} 局 · 红胜 {filteredOutcomeCounts.red} · 黑胜{' '}
                 {filteredOutcomeCounts.black} · 和棋 {filteredOutcomeCounts.draw}
@@ -735,7 +739,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
 
             <div className="space-y-2 max-h-64 overflow-y-auto no-scrollbar">
               {filteredLibrary.length === 0 ? (
-                <div className="py-8 text-center text-xs xq-text-muted">
+                <div className="py-8 text-center text-[0.8125rem] xq-text-muted">
                   暂无匹配棋谱（可点击右上角「保存当前对局入库」或在棋谱栏点击「存局」）
                 </div>
               ) : (
@@ -745,7 +749,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                     className="p-3 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] hover:bg-[var(--xq-bg-hover)] flex items-center justify-between gap-3 transition-colors"
                   >
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2 text-xs">
+                      <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 text-[0.8125rem]">
                         <span className="font-semibold text-[#C8372D] truncate">
                           {game.redPlayer}
                         </span>
@@ -800,7 +804,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                           onLoadLibraryGame(game);
                           onClose();
                         }}
-                        className="px-3 py-1 rounded-md xq-btn-primary text-xs cursor-pointer whitespace-nowrap"
+                        className="px-3 py-1 rounded-md xq-btn-primary text-[0.8125rem] cursor-pointer whitespace-nowrap"
                       >
                         载入棋谱
                       </button>
@@ -825,8 +829,8 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
             <div className="flex items-center justify-between border-b xq-border pb-3 gap-3">
               <div className="space-y-1">
                 <div className="flex items-center gap-3 flex-wrap">
-                  <h3 className="text-[15px] font-semibold">导入与导出</h3>
-                  <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--xq-bg-canvas)] border xq-border text-xs">
+                  <h3 className="text-base font-semibold">导入与导出</h3>
+                  <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--xq-bg-canvas)] border xq-border text-[0.8125rem]">
                     <button
                       type="button"
                       onClick={() => {
@@ -859,7 +863,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                     </button>
                   </div>
                 </div>
-                <p className="text-[11px] xq-text-muted">
+                <p className="text-xs xq-text-muted">
                   {fenPgnTab === 'import'
                     ? '支持粘贴 FEN、中文纵线 PGN 棋谱或截图识盘，确认后自动载入「复盘分析」'
                     : `提取当前工作台局面与 ${exportMoves.length} 手着法，支持标准 .pgn / .fen 下载及微信转发`}
@@ -876,24 +880,24 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
 
             {fenPgnTab === 'export' ? (
               /* -------------------- 导出当前对局页签 -------------------- */
-              <div className="space-y-3.5 text-xs">
+              <div className="space-y-3.5 text-[0.8125rem]">
                 {/* 1. 当前局面 FEN 快照 */}
                 <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between flex-wrap gap-1">
                     <span className="font-semibold xq-text-secondary">
                       1. 当前停顿盘面 FEN 编码
                     </span>
-                    <span className="text-[11px] xq-text-muted font-mono-tabular">
+                    <span className="text-xs xq-text-muted font-mono-tabular">
                       可用于分享单步残局或校验当前阵型
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center flex-wrap gap-2">
                     <input
                       type="text"
                       readOnly
                       value={currentFen}
                       onFocus={(e) => e.currentTarget.select()}
-                      className="flex-1 px-3 py-1.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)] font-mono-tabular text-xs xq-text-primary"
+                      className="flex-1 min-w-[14rem] px-3 py-1.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)] font-mono-tabular text-xs xq-text-primary"
                     />
                     <button
                       type="button"
@@ -970,18 +974,18 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                     className="w-full p-2.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)] font-mono-tabular text-xs leading-relaxed"
                   />
 
-                  <div className="text-[11px] xq-text-muted font-mono-tabular">
+                  <div className="text-xs xq-text-muted font-mono-tabular">
                     {exportMoves.length > 0
                       ? `已包含起始基准 [FEN] 与全盘 ${exportMoves.length} 手着法 · 可无损重导`
                       : '当前尚无实走着法，导出仅含对局信息与起始 [FEN]；走子或载入名局后可导出完整着法'}
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between pt-2 border-t xq-border">
+                <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t xq-border">
                   <button
                     type="button"
                     onClick={() => setFenPgnTab('import')}
-                    className="text-xs xq-text-secondary hover:text-[var(--xq-accent-gold)] cursor-pointer"
+                    className="text-[0.8125rem] xq-text-secondary hover:text-[var(--xq-accent-gold)] cursor-pointer"
                   >
                     ← 切换到「导入至复盘」
                   </button>
@@ -1032,7 +1036,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
               </div>
             ) : (
               /* -------------------- 导入至复盘页签 -------------------- */
-              <div className="space-y-3.5 text-xs">
+              <div className="space-y-3.5 text-[0.8125rem]">
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
@@ -1107,7 +1111,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                           </button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center flex-wrap gap-2">
                         <input
                           type="text"
                           value={fenInput}
@@ -1116,7 +1120,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                             setFenError(null);
                           }}
                           placeholder="粘贴 FEN 编码串（例如 rnbakabnr/9/... w - - 0 1）"
-                          className="flex-1 px-3 py-1.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)] font-mono-tabular text-xs"
+                          className="flex-1 min-w-[14rem] px-3 py-1.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)] font-mono-tabular text-xs"
                         />
                         {(fenInput || pgnInput) && (
                           <button
@@ -1137,7 +1141,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
 
                     {/* PGN 完整棋谱区 */}
                     <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
                         <span className="font-semibold xq-text-secondary">
                           2. 或粘贴完整 PGN 文本（支持中文纵线着法与 [FEN] 残局头）
                         </span>
@@ -1148,7 +1152,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                             setPgnDirty(true);
                             setFenError(null);
                           }}
-                          className="text-[11px] xq-text-muted hover:text-[var(--xq-accent-gold)] cursor-pointer"
+                          className="text-xs xq-text-muted hover:text-[var(--xq-accent-gold)] cursor-pointer"
                         >
                           载入当前文本模板
                         </button>
@@ -1170,7 +1174,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                         className="w-full p-2.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)] font-mono-tabular text-xs leading-relaxed"
                       />
                       {parsedPgnPreview && parsedPgnPreview.moves.length > 0 && (
-                        <div className="text-[11px] text-[#10B981] font-mono-tabular">
+                        <div className="text-xs text-[#10B981] font-mono-tabular">
                           已识别 PGN 棋谱：共 {parsedPgnPreview.moves.length} 手合法着法，将完整还原并导入至「复盘分析」
                         </div>
                       )}
@@ -1182,11 +1186,11 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                       </div>
                     )}
 
-                    <div className="flex items-center justify-between pt-2 border-t xq-border">
+                    <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t xq-border">
                       <button
                         type="button"
                         onClick={() => setFenPgnTab('export')}
-                        className="text-xs xq-text-secondary hover:text-[var(--xq-accent-gold)] cursor-pointer"
+                        className="text-[0.8125rem] xq-text-secondary hover:text-[var(--xq-accent-gold)] cursor-pointer"
                       >
                         需要保存或分享？前往「导出当前对局」→
                       </button>
@@ -1231,7 +1235,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                 ) : (
               /* 图片识别局面（极简一键识图：拖入/粘贴/选图 + 红黑先行 + 载入） */
               <div
-                className="space-y-3.5 text-xs"
+                className="space-y-3.5 text-[0.8125rem]"
                 onPaste={(e) => {
                   const items = e.clipboardData?.items;
                   if (items && items.length > 0) {
@@ -1264,7 +1268,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                 </label>
 
                 {/* 底栏：左侧先行方与示例快速切换，右侧操作按钮 */}
-                <div className="flex items-center justify-between pt-2 border-t xq-border gap-3">
+                <div className="flex items-center justify-between flex-wrap pt-2 border-t xq-border gap-3">
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1.5">
                       <button
@@ -1337,12 +1341,12 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
 
         {/* ==================== 4. 极简外部平台连线面板 (复用复盘分析) ==================== */}
         {activeModal === 'connect' && (
-          <div className="p-5 space-y-4 text-xs">
+          <div className="p-5 space-y-4 text-[0.8125rem]">
             <div className="flex items-center justify-between border-b xq-border pb-3">
               <div className="flex items-center gap-2">
                 <Link2 className="w-4 h-4 text-[var(--xq-accent-gold)]" />
                 <div>
-                  <h3 className="text-[15px] font-semibold">连线外部棋盘同步分析</h3>
+                  <h3 className="text-base font-semibold">连线外部棋盘同步分析</h3>
                   <p className="text-xs xq-text-muted">
                     连接成功后直接复用「复盘分析」工作台，实时同步外部棋盘并计算主变
                   </p>
@@ -1372,7 +1376,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                       }`}
                     >
                       <div>
-                        <div className="font-semibold text-[13px]">{p.label}</div>
+                        <div className="font-semibold text-sm">{p.label}</div>
                         <div className="text-xs xq-text-muted mt-0.5 font-normal">{p.desc}</div>
                       </div>
                       <span
@@ -1392,7 +1396,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
 
             <label className="p-3 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] flex items-center justify-between cursor-pointer">
               <div>
-                <div className="font-semibold text-[13px]">同步落子时自动启动引擎分析</div>
+                <div className="font-semibold text-sm">同步落子时自动启动引擎分析</div>
                 <div className="text-xs xq-text-muted">
                   外部棋盘每走一手，自动更新盘面主变箭头与局势评分
                 </div>
@@ -1405,7 +1409,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
               />
             </label>
 
-            <div className="flex items-center justify-between pt-2 border-t xq-border">
+            <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t xq-border">
               {connectState.connected ? (
                 <button
                   type="button"
@@ -1460,7 +1464,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
         {activeModal === 'game-info' && (
           <div className="p-5 space-y-4">
             <div className="flex items-center justify-between border-b xq-border pb-3">
-              <h3 className="text-[15px] font-semibold">编辑对局信息</h3>
+              <h3 className="text-base font-semibold">编辑对局信息</h3>
               <button
                 type="button"
                 onClick={onClose}
@@ -1470,7 +1474,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[0.8125rem]">
               <div>
                 <label className="block xq-text-secondary mb-1 font-medium">红方棋手</label>
                 <input
@@ -1509,7 +1513,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-3 border-t xq-border text-xs">
+            <div className="flex justify-end gap-2 pt-3 border-t xq-border text-[0.8125rem]">
               <button
                 type="button"
                 onClick={onClose}
@@ -1533,10 +1537,10 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
 
         {/* ==================== 6. 单页一屏设置（引擎安装管理 + 外观 + 引擎算力 + 底栏关于） ==================== */}
         {activeModal === 'settings' && (
-          <div className="p-5 space-y-3 text-[13px]">
-            <div className="flex items-center justify-between border-b xq-border pb-2.5">
-              <div className="flex items-center gap-2">
-                <h3 className="text-[15px] font-semibold">设置中心</h3>
+          <div className="p-5 space-y-3 text-[0.8125rem]">
+            <div className="flex items-center justify-between flex-wrap gap-2 border-b xq-border pb-2.5">
+              <div className="flex items-center flex-wrap gap-2">
+                <h3 className="text-base font-semibold">设置中心</h3>
                 <span className="text-xs xq-text-muted">修改后实时生效，点击空白处即可关闭</span>
               </div>
               <button
@@ -1550,15 +1554,15 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
 
             {/* 顶部专享：多引擎库管理 (UCI / UCCI) 与双擎对比分配 */}
             <div className="p-3 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-xs xq-text-primary">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center flex-wrap gap-2">
+                  <span className="font-semibold text-[0.8125rem] xq-text-primary">
                     多引擎库管理（支持 UCI / UCCI 协议与双擎并行对比）
                   </span>
                   <button
                     type="button"
                     onClick={onToggleCompareMode}
-                    className={`px-2 py-0.5 rounded text-[11px] cursor-pointer ${
+                    className={`px-2 py-0.5 rounded text-xs cursor-pointer ${
                       compareMode ? 'xq-btn-option-active' : 'xq-btn-option'
                     }`}
                   >
@@ -1590,7 +1594,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                   return (
                     <div
                       key={eng.id}
-                      className="px-2.5 py-1.5 rounded-md border xq-border bg-[var(--xq-bg-surface)] flex items-center justify-between gap-2 text-xs"
+                      className="px-2.5 py-1.5 rounded-md border xq-border bg-[var(--xq-bg-surface)] flex items-center justify-between flex-wrap gap-2 text-xs"
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         {eng.status === 'ready' ? (
@@ -1599,16 +1603,16 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                           <AlertTriangle className="w-3.5 h-3.5 text-[var(--xq-accent-gold)] shrink-0" />
                         )}
                         <span className="font-semibold truncate">{eng.name}</span>
-                        <span className="px-1.5 py-0.2 rounded text-[10px] font-mono-tabular border xq-border xq-text-secondary shrink-0">
+                        <span className="px-1.5 py-0.2 rounded text-xs font-mono-tabular border xq-border xq-text-secondary shrink-0">
                           {eng.protocol} · {eng.styleLabel}
                         </span>
                         {isPrimary && (
-                          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-[#10B981] text-white shrink-0">
+                          <span className="px-1.5 py-0.2 rounded text-xs font-bold bg-[#10B981] text-white shrink-0">
                             主擎
                           </span>
                         )}
                         {isSecondary && (
-                          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-[#3B82F6] text-white shrink-0">
+                          <span className="px-1.5 py-0.2 rounded text-xs font-bold bg-[#3B82F6] text-white shrink-0">
                             副擎
                           </span>
                         )}
@@ -1621,7 +1625,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                               <button
                                 type="button"
                                 onClick={() => onChangePrimaryEngine(eng.id)}
-                                className="px-2 py-0.5 rounded text-[11px] xq-btn-secondary cursor-pointer"
+                                className="px-2 py-0.5 rounded text-xs xq-btn-secondary cursor-pointer"
                               >
                                 设为主擎
                               </button>
@@ -1630,7 +1634,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                               <button
                                 type="button"
                                 onClick={() => onChangeSecondaryEngine(eng.id)}
-                                className="px-2 py-0.5 rounded text-[11px] xq-btn-secondary cursor-pointer"
+                                className="px-2 py-0.5 rounded text-xs xq-btn-secondary cursor-pointer"
                               >
                                 设为副擎
                               </button>
@@ -1638,7 +1642,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                             <button
                               type="button"
                               onClick={() => onResetEngineMissing(eng.id)}
-                              className="px-2 py-0.5 rounded text-[11px] xq-btn-ghost cursor-pointer"
+                              className="px-2 py-0.5 rounded text-xs xq-btn-ghost cursor-pointer"
                             >
                               卸载
                             </button>
@@ -1648,7 +1652,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                             type="button"
                             disabled={eng.status === 'installing'}
                             onClick={() => onInstallEngine(eng.id)}
-                            className="px-2.5 py-0.5 rounded text-[11px] xq-btn-primary flex items-center gap-1 cursor-pointer"
+                            className="px-2.5 py-0.5 rounded text-xs xq-btn-primary flex items-center gap-1 cursor-pointer"
                           >
                             <Download className="w-3 h-3" />
                             <span>
@@ -1666,7 +1670,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
             </div>
 
             {/* 第一部分：外观与棋具 */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="p-2.5 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] space-y-1.5">
                 <div className="font-semibold text-xs xq-text-secondary">界面主题（与顶栏按钮同步）</div>
                 <div className="grid grid-cols-2 gap-1.5">
@@ -1765,7 +1769,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
             </div>
 
             {/* 第二部分：引擎核心算力配置（MultiPV + 深度 + CPU 线程 + Hash 内存） */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="p-2.5 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] space-y-1.5">
                 <div className="font-semibold text-xs xq-text-secondary">候选变例 (MultiPV) 与计算深度</div>
                 <div className="grid grid-cols-2 gap-1.5">
@@ -1836,22 +1840,22 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
             </div>
 
             {/* 第三部分：字号与音效同行紧凑排列 */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-2.5 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] flex items-center justify-between">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="p-2.5 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] flex items-center justify-between flex-wrap gap-2">
                 <span className="font-semibold text-xs xq-text-secondary">界面字号</span>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center flex-wrap gap-1.5">
                   {(
                     [
-                      { id: 'standard', label: '标准' },
-                      { id: 'large', label: '大' },
-                      { id: 'xlarge', label: '特大' },
+                      { id: 'standard', label: '标准 100%' },
+                      { id: 'large', label: '大 112%' },
+                      { id: 'xlarge', label: '特大 125%' },
                     ] as const
                   ).map((s) => (
                     <button
                       key={s.id}
                       type="button"
                       onClick={() => onChangeFontScale(s.id)}
-                      className={`px-2.5 py-1 rounded-md text-xs cursor-pointer ${
+                      className={`px-2.5 py-1 rounded-md text-xs cursor-pointer whitespace-nowrap ${
                         fontScale === s.id ? 'xq-btn-option-active' : 'xq-btn-option'
                       }`}
                     >
@@ -1873,8 +1877,8 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
             </div>
 
             {/* 底部内嵌关于栏 + 完成按钮 */}
-            <div className="pt-2.5 border-t xq-border flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-xs xq-text-muted">
+            <div className="pt-2.5 border-t xq-border flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center flex-wrap gap-2 text-xs xq-text-muted">
                 <Info className="w-3.5 h-3.5 text-[var(--xq-accent-gold)] shrink-0" />
                 <span>关于：象棋X Desktop v2.4.0 · Pikafish NNUE 内核</span>
                 <span>·</span>
@@ -1902,7 +1906,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-1.5 rounded-md xq-btn-primary text-xs cursor-pointer shrink-0"
+                className="px-4 py-1.5 rounded-md xq-btn-primary text-[0.8125rem] cursor-pointer shrink-0"
               >
                 完成
               </button>

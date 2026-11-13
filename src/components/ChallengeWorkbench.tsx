@@ -79,15 +79,15 @@ export const ChallengeWorkbench: React.FC<ChallengeWorkbenchProps> = React.memo(
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-hidden text-xs">
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden text-[0.8125rem]">
       {/* 顶部固定：标题与破关总进度 */}
       <div className="px-3.5 py-2.5 border-b xq-border space-y-2 shrink-0 bg-[var(--xq-bg-surface)]">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Compass className="w-4 h-4 text-[var(--xq-accent-gold)] shrink-0" />
-            <span className="font-semibold text-sm whitespace-nowrap">经典残局题库</span>
+            <span className="font-semibold text-[0.9375rem] whitespace-nowrap">经典残局题库</span>
           </div>
-          <span className="text-[11px] font-mono-tabular xq-text-secondary whitespace-nowrap">
+          <span className="text-xs font-mono-tabular xq-text-secondary whitespace-nowrap">
             已破关 {solvedCount} / {challenges.length} 关 · {completionPct}%
           </span>
         </div>
@@ -109,18 +109,18 @@ export const ChallengeWorkbench: React.FC<ChallengeWorkbenchProps> = React.memo(
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="搜索残局名称、典籍或杀法…"
-              className="w-full pl-8 pr-2.5 py-1.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)] text-xs focus:outline-none focus:border-[var(--xq-accent-gold)]"
+              className="w-full pl-8 pr-2.5 py-1.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)] text-[0.8125rem] focus:outline-none focus:border-[var(--xq-accent-gold)]"
             />
           </div>
 
-          <div className="w-[132px] shrink-0">
+          <div className="w-[9rem] shrink-0">
             <ThemeSelect
               ariaLabel="按古谱典籍筛选"
               value={selectedBook}
               onChange={setSelectedBook}
               menuAlign="right"
               triggerClassName="px-2 py-1.5"
-              menuMinWidthClass="min-w-[155px]"
+              menuMinWidthClass="min-w-[10.5rem]"
               options={[
                 { value: 'all', label: `全部典籍 (${challenges.length})` },
                 ...bookOptions.map((book) => ({
@@ -133,8 +133,8 @@ export const ChallengeWorkbench: React.FC<ChallengeWorkbenchProps> = React.memo(
         </div>
 
         {/* 难度分段筛选 + 仅看未破 */}
-        <div className="flex items-center justify-between gap-1.5">
-          <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center justify-between gap-1.5">
+          <div className="flex flex-wrap items-center gap-1">
             {(
               [
                 { id: 'all', label: '全部' },
@@ -147,7 +147,7 @@ export const ChallengeWorkbench: React.FC<ChallengeWorkbenchProps> = React.memo(
                 key={d.id}
                 type="button"
                 onClick={() => setDifficultyFilter(d.id)}
-                className={`px-2 py-0.5 rounded text-[11px] cursor-pointer whitespace-nowrap ${
+                className={`px-2 py-0.5 rounded text-xs cursor-pointer whitespace-nowrap ${
                   difficultyFilter === d.id ? 'xq-btn-option-active' : 'xq-btn-option'
                 }`}
               >
@@ -159,7 +159,7 @@ export const ChallengeWorkbench: React.FC<ChallengeWorkbenchProps> = React.memo(
           <button
             type="button"
             onClick={() => setOnlyUnsolved((prev) => !prev)}
-            className={`px-2 py-0.5 rounded text-[11px] cursor-pointer whitespace-nowrap ${
+            className={`px-2 py-0.5 rounded text-xs cursor-pointer whitespace-nowrap ${
               onlyUnsolved ? 'xq-btn-option-active' : 'xq-btn-option'
             }`}
           >
@@ -170,7 +170,7 @@ export const ChallengeWorkbench: React.FC<ChallengeWorkbenchProps> = React.memo(
 
       {/* 中部可滚动：残局列表 + 破局实时反馈卡 */}
       <div className="flex-1 overflow-y-auto no-scrollbar p-3.5 space-y-2.5">
-        <div className="flex items-center justify-between text-[11px] xq-text-muted px-0.5">
+        <div className="flex items-center justify-between text-xs xq-text-muted px-0.5">
           <span className="font-mono-tabular">
             当前显示 {filteredChallenges.length} / {challenges.length} 关
           </span>
@@ -206,12 +206,12 @@ export const ChallengeWorkbench: React.FC<ChallengeWorkbenchProps> = React.memo(
                       onSelectChallenge(ch.id);
                     }
                   }}
-                  className={`w-full p-2.5 rounded-lg text-left cursor-pointer space-y-1 transition-colors ${
+                  className={`w-full p-3 rounded-lg text-left cursor-pointer space-y-1 transition-colors ${
                     isSelected ? 'xq-btn-option-active' : 'xq-btn-option'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-serif-sc font-bold text-sm truncate">
+                    <span className="font-serif-sc font-bold text-[0.9375rem] truncate">
                       {ch.title}
                     </span>
 
@@ -223,7 +223,7 @@ export const ChallengeWorkbench: React.FC<ChallengeWorkbenchProps> = React.memo(
                           onToggleChallengeSolved(ch.id);
                         }}
                         title={isSolved ? '点击重置为未破关' : '手动标记为已破关'}
-                        className={`flex items-center gap-1 text-[11px] cursor-pointer hover:underline ${
+                        className={`flex items-center gap-1 text-xs cursor-pointer hover:underline ${
                           isSolved ? 'text-[#10B981] font-semibold' : 'xq-text-muted'
                         }`}
                       >
@@ -234,7 +234,7 @@ export const ChallengeWorkbench: React.FC<ChallengeWorkbenchProps> = React.memo(
                   </div>
 
                   {/* 无胶囊纯文本元数据分隔行 */}
-                  <div className="text-[11px] xq-text-secondary font-normal flex items-center gap-1.5 flex-wrap">
+                  <div className="text-xs xq-text-secondary font-normal flex items-center gap-1.5 flex-wrap">
                     <span>{ch.sourceBook}</span>
                     <span aria-hidden="true">·</span>
                     <span>{ch.difficulty}</span>
@@ -242,10 +242,10 @@ export const ChallengeWorkbench: React.FC<ChallengeWorkbenchProps> = React.memo(
                     <span className="font-mono-tabular">约 {ch.expectedPlies} 手杀</span>
                   </div>
 
-                  <div className="text-xs text-[var(--xq-accent-gold)] font-medium">
+                  <div className="text-[0.8125rem] text-[var(--xq-accent-gold)] font-medium">
                     {ch.objective}
                   </div>
-                  <p className="text-[11px] xq-text-muted leading-relaxed font-normal line-clamp-2">
+                  <p className="text-xs xq-text-muted leading-relaxed font-normal line-clamp-2">
                     {ch.lore}
                   </p>
                 </div>
@@ -257,11 +257,11 @@ export const ChallengeWorkbench: React.FC<ChallengeWorkbenchProps> = React.memo(
         {/* 破局实时反馈与提示卡 */}
         {challengeStatusBanner && (
           <div className="p-2.5 rounded-lg border border-[var(--xq-accent-gold)]/50 bg-[var(--xq-accent-gold)]/10 space-y-1">
-            <div className="flex items-center gap-1.5 font-semibold text-[var(--xq-accent-gold)]">
+            <div className="flex items-center gap-1.5 font-semibold text-sm text-[var(--xq-accent-gold)]">
               <Award className="w-4 h-4" />
               <span>破局提示</span>
             </div>
-            <p className="text-xs leading-relaxed">{challengeStatusBanner}</p>
+            <p className="text-[0.8125rem] leading-relaxed">{challengeStatusBanner}</p>
           </div>
         )}
       </div>
@@ -271,7 +271,7 @@ export const ChallengeWorkbench: React.FC<ChallengeWorkbenchProps> = React.memo(
         <button
           type="button"
           onClick={onTransferChallengeToStudy}
-          className="w-full py-2.5 px-4 rounded-lg xq-btn-primary text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+          className="w-full py-2.5 px-4 rounded-lg xq-btn-primary text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer shadow-sm"
         >
           <ArrowRightCircle className="w-4 h-4" />
           <span>

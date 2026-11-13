@@ -66,7 +66,7 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({
   };
 
   return (
-    <footer className="h-8 px-6 border-t xq-surface flex items-center justify-between text-xs select-none shrink-0">
+    <footer className="min-h-8 py-1 px-6 border-t xq-surface flex items-center justify-between gap-3 text-xs select-none shrink-0">
       <div className="flex items-center gap-3 min-w-0">
         {illegalMoveWarning ? (
           <span className="font-semibold text-[#F59E0B] truncate">{illegalMoveWarning}</span>
