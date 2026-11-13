@@ -83,12 +83,13 @@ export interface MultiPVLine {
   summaryText: string;
 }
 
-// 四大纯粹工作空间 (Top Bar 导航)
+// 五大纯粹工作空间 (Top Bar 导航：复盘分析 → 开局研习 → 残局题库 → 人机对弈 → 摆子编辑)
 export type WorkspaceMode =
-  | 'study'      // 研习复盘（双栏棋谱 + 无感内联分支 + 整局复盘报告）
-  | 'challenge'  // 古谱闯关（传世残局杀局挑战 + 锦囊提示）
+  | 'study'      // 复盘分析（双栏棋谱 + 无感内联分支 + 整局复盘报告 + 定式查询）
+  | 'opening'    // 开局研习（定式树探索 + 7套经典骨架 + 变例防剧透对练）
+  | 'challenge'  // 残局题库（传世残局杀局挑战 + 锦囊提示）
   | 'play'       // 人机对弈（支持传统让子：平先 / 让先 / 让左马 / 让双马）
-  | 'setup';     // 残局布阵（自由摆子与 FEN 工坊）
+  | 'setup';     // 摆子编辑（自由摆子与 FEN 工坊）
 
 export type HandicapType = 'even' | 'move-first' | 'left-horse' | 'two-horses';
 export type EngineSkillTier = 'scholar' | 'strategist' | 'grandmaster' | 'deity';
@@ -199,13 +200,14 @@ export interface OpeningMoveStat {
   drawPct: number;
   blackWinPct: number;
   targetOpeningName: string;
-  badge?: '主流' | '稳健' | '激烈' | '古谱';
+  badge?: '主流' | '稳健' | '激烈' | '陷阱' | '古谱';
 }
 
 export interface OpeningBookNode {
   positionKey: string;
   openingName: string;
   category: OpeningBookCategory;
+  matchKeyword: string;
   plyDepth: number;
   totalGames: number;
   comment: string;
@@ -216,7 +218,48 @@ export interface OpeningPresetLine {
   id: string;
   title: string;
   category: OpeningBookCategory;
+  matchKeyword: string;
+  difficulty: '基础' | '进阶' | '经典';
   summary: string;
   moves: { from: Position; to: Position }[];
 }
 
+export type OpeningPanelSubMode = 'explorer' | 'drill';
+export type OpeningDrillStatus = 'idle' | 'drilling' | 'mistake' | 'completed';
+
+export interface OpeningDrillProgress {
+  bestAccuracyPct: number;
+  completedCount: number;
+  lastPracticedAt: string;
+}
+
+export interface OpeningDrillRuntime {
+  presetId: string;
+  playerCamp: Camp;
+  stepIndex: number;
+  attempts: number;
+  mistakes: number;
+  status: OpeningDrillStatus;
+  feedback: string | null;
+  expectedMove?: {
+    from: Position;
+    to: Position;
+    notation: string;
+  } | null;
+}
+
+export interface CheckSealEffect {
+  id: number;
+  camp: Camp; // 被将军的一方
+}
+
+export interface CheckAttackLine {
+  from: Position;
+  to: Position;
+}
+
+export interface GameTerminalState {
+  kind: 'checkmate' | 'stalemate';
+  winner: Camp;
+  loser: Camp;
+}

@@ -37,6 +37,7 @@ export const Titlebar: React.FC<TitlebarProps> = React.memo(({
 }) => {
   const navItems: { id: WorkspaceMode; label: string }[] = [
     { id: 'study', label: '复盘分析' },
+    { id: 'opening', label: '开局研习' },
     { id: 'challenge', label: '残局题库' },
     { id: 'play', label: '人机对弈' },
     { id: 'setup', label: '摆子编辑' },
@@ -59,8 +60,8 @@ export const Titlebar: React.FC<TitlebarProps> = React.memo(({
         <span>象棋X</span>
       </a>
 
-      {/* Zone 2: 四大核心工作空间导航 (4 Concise Single-Line Links) */}
-      <nav className="flex items-center gap-7 text-[13px] font-medium">
+      {/* Zone 2: 五大核心工作空间导航 (5 Concise Single-Line Links) */}
+      <nav className="flex items-center gap-6 text-[13px] font-medium">
         {navItems.map((item) => {
           const isActive = workspace === item.id;
           return (
@@ -80,11 +81,22 @@ export const Titlebar: React.FC<TitlebarProps> = React.memo(({
         })}
       </nav>
 
-      {/* Zone 3: 右侧工具栏与主操作 (Quick Utilities & Primary CTA) */}
+      {/* Zone 3: 右侧资源弹窗与系统工具（业务输入/库/连线 | 系统工具） */}
       <div className="flex items-center gap-2 shrink-0">
         <button
           type="button"
+          onClick={() => onOpenModal('fen-pgn')}
+          title="导入或导出 FEN / PGN 棋谱与图片识别局面"
+          className="px-3 py-1.5 rounded-md xq-btn-secondary text-[13px] flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+        >
+          <FileCode2 className="w-3.5 h-3.5 opacity-80" />
+          <span>导入 / 导出</span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => onOpenModal('library')}
+          title="浏览经典名局、古谱与自存复盘棋谱库"
           className="px-3 py-1.5 rounded-md xq-btn-secondary text-[13px] flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
         >
           <BookOpen className="w-3.5 h-3.5 text-[var(--xq-accent-gold)]" />
@@ -94,18 +106,8 @@ export const Titlebar: React.FC<TitlebarProps> = React.memo(({
 
         <button
           type="button"
-          onClick={() => onOpenModal('fen-pgn')}
-          title="FEN / PGN 棋谱导入导出与图片识别局面"
-          className="px-3 py-1.5 rounded-md xq-btn-secondary text-[13px] flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
-        >
-          <FileCode2 className="w-3.5 h-3.5 opacity-80" />
-          <span>导入 / 棋谱</span>
-        </button>
-
-        <button
-          type="button"
           onClick={() => onOpenModal('connect')}
-          title="连线外部象棋平台同步观棋分析"
+          title="连线外部象棋平台同步至复盘分析"
           className={`px-3 py-1.5 rounded-md text-[13px] flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
             isConnected ? 'xq-btn-engine-on' : 'xq-btn-secondary'
           }`}
@@ -117,6 +119,8 @@ export const Titlebar: React.FC<TitlebarProps> = React.memo(({
           )}
           <span>{isConnected ? '连线中' : '连线'}</span>
         </button>
+
+        <span className="w-px h-4 bg-[var(--xq-border)] mx-0.5 shrink-0" aria-hidden="true" />
 
         <button
           type="button"

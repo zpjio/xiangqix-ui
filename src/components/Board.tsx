@@ -1,8 +1,12 @@
 import React, { useMemo } from 'react';
+import { ArrowRightCircle, RotateCcw, X } from 'lucide-react';
 import {
   BoardTheme,
   Camp,
+  CheckAttackLine,
+  CheckSealEffect,
   FontScheme,
+  GameTerminalState,
   ImpactEffect,
   MoveRecord,
   MultiPVArrow,
@@ -32,6 +36,17 @@ interface BoardProps {
   impactEffect?: ImpactEffect | null;
   redCheckPos?: Position | null;
   blackCheckPos?: Position | null;
+  checkAttackLines?: CheckAttackLine[];
+  checkSealEffect?: CheckSealEffect | null;
+  illegalCheckCamp?: Camp | null;
+  terminalOutcome?: GameTerminalState | null;
+  terminalDismissed?: boolean;
+  onDismissTerminal?: () => void;
+  onRestoreTerminal?: () => void;
+  onTerminalPrimaryAction?: () => void;
+  terminalPrimaryLabel?: string;
+  onTerminalRestartAction?: () => void;
+  terminalRestartLabel?: string;
   boardTheme: BoardTheme;
   craftStyle: PieceCraftStyle;
   fontScheme: FontScheme;
@@ -476,6 +491,7 @@ const StaticBoardSurface: React.FC<{ boardTheme: BoardTheme; flipped: boolean }>
 const DynamicArrowLayer: React.FC<{
   flipped: boolean;
   lastMove: MoveRecord | null;
+  checkAttackLines: CheckAttackLine[];
   multiPvArrows: MultiPVArrow[];
   secondaryPvArrow: MultiPVArrow | null;
   threatArrow: MultiPVArrow | null;
@@ -485,6 +501,7 @@ const DynamicArrowLayer: React.FC<{
   ({
     flipped,
     lastMove,
+    checkAttackLines,
     multiPvArrows,
     secondaryPvArrow,
     threatArrow,
@@ -619,6 +636,52 @@ const DynamicArrowLayer: React.FC<{
           </marker>
         </defs>
 
+        {/* 照将（将军）攻击线脉动：从照将子连向受将帅/将 */}
+        {checkAttackLines.map((ray, idx) => {
+          const vf = toVisualCoord(ray.from.row, ray.from.col);
+          const vt = toVisualCoord(ray.to.row, ray.to.col);
+          const x1 = OFFSET_X + vf.vCol * STEP;
+          const y1 = OFFSET_Y + vf.vRow * STEP;
+          const x2 = OFFSET_X + vt.vCol * STEP;
+          const y2 = OFFSET_Y + vt.vRow * STEP;
+          return (
+            <g key={`check-ray-${idx}-${ray.from.row}-${ray.from.col}`} className="pointer-events-none">
+              <line
+                x1={x1}
+                y1={y1}
+                x2={x2}
+                y2={y2}
+                stroke="#E03126"
+                strokeWidth="7"
+                strokeLinecap="round"
+                strokeOpacity="0.24"
+              />
+              <line
+                x1={x1}
+                y1={y1}
+                x2={x2}
+                y2={y2}
+                stroke="#F59E0B"
+                strokeWidth="3.2"
+                strokeLinecap="round"
+                strokeDasharray="10 8"
+                markerEnd="url(#arrow-threat)"
+                className="animate-check-ray"
+              />
+              <circle
+                cx={x1}
+                cy={y1}
+                r="40"
+                fill="none"
+                stroke="#E03126"
+                strokeWidth="2.4"
+                strokeDasharray="6 5"
+                strokeOpacity="0.72"
+              />
+            </g>
+          );
+        })}
+
         {/* 上一步起止轨迹虚线指示 */}
         {lastMove &&
           (() => {
@@ -702,6 +765,7 @@ const IntersectionCell: React.FC<{
   impactIsCapture: boolean;
   impactId: number | null;
   isPieceInCheck: boolean;
+  isAlertShaking: boolean;
   craftStyle: PieceCraftStyle;
   fontScheme: FontScheme;
   useTraditionalChar: boolean;
@@ -720,6 +784,7 @@ const IntersectionCell: React.FC<{
     impactIsCapture,
     impactId,
     isPieceInCheck,
+    isAlertShaking,
     craftStyle,
     fontScheme,
     useTraditionalChar,
@@ -772,6 +837,7 @@ const IntersectionCell: React.FC<{
               isSelected={isSelected}
               isLastMove={isLastMoveDest}
               isInCheck={isPieceInCheck}
+              isAlertShaking={isAlertShaking}
               craftStyle={craftStyle}
               fontScheme={fontScheme}
               useTraditionalChar={useTraditionalChar}
@@ -809,6 +875,17 @@ export const Board: React.FC<BoardProps> = React.memo(
     impactEffect = null,
     redCheckPos: propRedCheckPos,
     blackCheckPos: propBlackCheckPos,
+    checkAttackLines = [],
+    checkSealEffect = null,
+    illegalCheckCamp = null,
+    terminalOutcome = null,
+    terminalDismissed = false,
+    onDismissTerminal,
+    onRestoreTerminal,
+    onTerminalPrimaryAction,
+    terminalPrimaryLabel = '复盘分析',
+    onTerminalRestartAction,
+    terminalRestartLabel = '重开一局',
     boardTheme,
     craftStyle,
     fontScheme,
@@ -866,11 +943,23 @@ export const Board: React.FC<BoardProps> = React.memo(
             <span className="absolute bottom-1.5 left-1.5 w-4 h-4 border-b-2 border-l-2 border-[#D4AF37]/50 pointer-events-none" />
             <span className="absolute bottom-1.5 right-1.5 w-4 h-4 border-b-2 border-r-2 border-[#D4AF37]/50 pointer-events-none" />
 
-            {/* 将军浮层徽章 */}
-            {anyCheckPos && (
-              <div className="absolute top-3 right-4 z-40 px-2.5 py-0.5 rounded bg-[#C8372D] text-[#FAF5EB] text-xs font-serif-sc font-bold tracking-widest shadow-lg border border-[#D4AF37]/60 pointer-events-none">
-                將軍
-              </div>
+            {/* 终局或将军角标（绝杀收起后可点按再现） */}
+            {terminalOutcome ? (
+              <button
+                type="button"
+                onClick={onRestoreTerminal}
+                title="点击查看终局结果卡片"
+                className="absolute top-3 right-4 z-40 px-2.5 py-0.5 rounded bg-[#9E2A2B] text-[#FAF5EB] text-xs font-serif-sc font-bold tracking-widest shadow-lg border border-[#D4AF37]/75 cursor-pointer hover:bg-[#B83227] transition-colors"
+              >
+                {terminalOutcome.kind === 'checkmate' ? '絕殺' : '困斃'} ·{' '}
+                {terminalOutcome.winner === 'red' ? '紅勝' : '黑勝'}
+              </button>
+            ) : (
+              anyCheckPos && (
+                <div className="absolute top-3 right-4 z-40 px-2.5 py-0.5 rounded bg-[#C8372D] text-[#FAF5EB] text-xs font-serif-sc font-bold tracking-widest shadow-lg border border-[#D4AF37]/60 pointer-events-none">
+                  將軍
+                </div>
+              )
             )}
 
             {/* 内联推演支线激活提示角标 */}
@@ -887,12 +976,85 @@ export const Board: React.FC<BoardProps> = React.memo(
               <DynamicArrowLayer
                 flipped={flipped}
                 lastMove={lastMove}
+                checkAttackLines={checkAttackLines}
                 multiPvArrows={multiPvArrows}
                 secondaryPvArrow={secondaryPvArrow}
                 threatArrow={threatArrow}
                 hoveredArrow={hoveredArrow}
                 hintArrow={hintArrow}
               />
+
+              {/* 将军瞬态书法朱印（全穿透点击，不遮挡落子） */}
+              {checkSealEffect && !terminalOutcome && (
+                <div
+                  key={`check-seal-${checkSealEffect.id}`}
+                  aria-hidden="true"
+                  className="absolute top-[15%] left-1/2 -translate-x-1/2 z-40 pointer-events-none"
+                >
+                  <div className="animate-check-seal px-5 py-2 rounded-lg border-2 border-[#D4AF37]/80 bg-[#8F1D19]/92 shadow-[0_12px_28px_rgba(0,0,0,0.65)] flex flex-col items-center gap-0.5">
+                    <span className="font-calligraphy text-3xl sm:text-4xl leading-none tracking-[0.22em] text-[#FAF5EB] drop-shadow">
+                      將軍
+                    </span>
+                    <span className="text-[10px] font-serif-sc tracking-widest text-[#F5D68A]">
+                      {checkSealEffect.camp === 'red' ? '紅帥受將 · 須應將' : '黑將受將 · 須應將'}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* 将死 / 绝杀 / 困毙 终局印章（支持自由收起查看棋盘与一键复盘/重开） */}
+              {terminalOutcome && !terminalDismissed && (
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 w-[min(86%,312px)] pointer-events-auto">
+                  <div className="animate-endgame-seal relative rounded-xl border-2 border-[#D4AF37]/80 bg-[#17110F]/94 px-5 py-4 text-center shadow-[0_22px_50px_rgba(0,0,0,0.82)]">
+                    {onDismissTerminal && (
+                      <button
+                        type="button"
+                        onClick={onDismissTerminal}
+                        title="收起印章继续查看棋盘"
+                        className="absolute top-2.5 right-2.5 p-1 rounded-md text-[#C5A880] hover:text-[#FAF5EB] hover:bg-white/10 cursor-pointer transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+
+                    <div className="inline-flex items-center justify-center px-3 py-0.5 rounded border border-[#D4AF37]/50 bg-[#9E2A2B]/90 font-calligraphy text-2xl tracking-[0.25em] text-[#FAF5EB] mb-2">
+                      {terminalOutcome.kind === 'checkmate' ? '絕殺' : '困斃'}
+                    </div>
+
+                    <div className="text-base font-serif-sc font-bold text-[#FAF5EB]">
+                      {terminalOutcome.winner === 'red' ? '红方获胜' : '黑方获胜'}
+                    </div>
+                    <p className="mt-1 text-xs text-[#C5A880]">
+                      {terminalOutcome.kind === 'checkmate'
+                        ? `${terminalOutcome.loser === 'red' ? '红帅' : '黑将'}已无着可应，棋局告终`
+                        : `${terminalOutcome.loser === 'red' ? '红方' : '黑方'}无子可动，按象棋规例判负`}
+                    </p>
+
+                    <div className="mt-3.5 flex items-center justify-center gap-2">
+                      {onTerminalPrimaryAction && (
+                        <button
+                          type="button"
+                          onClick={onTerminalPrimaryAction}
+                          className="px-3 py-1.5 rounded-md xq-btn-primary text-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                        >
+                          <ArrowRightCircle className="w-3.5 h-3.5" />
+                          <span>{terminalPrimaryLabel}</span>
+                        </button>
+                      )}
+                      {onTerminalRestartAction && (
+                        <button
+                          type="button"
+                          onClick={onTerminalRestartAction}
+                          className="px-3 py-1.5 rounded-md xq-btn-secondary text-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5 opacity-80" />
+                          <span>{terminalRestartLabel}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* 第三层：90 个记忆化交叉点与立体棋子 */}
               <div className="absolute inset-0">
@@ -918,6 +1080,10 @@ export const Board: React.FC<BoardProps> = React.memo(
                       piece.type === 'general' &&
                       ((piece.camp === 'red' && redCheckPos !== null) ||
                         (piece.camp === 'black' && blackCheckPos !== null));
+                    const isAlertShaking =
+                      piece !== null &&
+                      piece.type === 'general' &&
+                      illegalCheckCamp === piece.camp;
 
                     return (
                       <IntersectionCell
@@ -934,6 +1100,7 @@ export const Board: React.FC<BoardProps> = React.memo(
                         impactIsCapture={isImpactHere ? impactEffect.isCapture : false}
                         impactId={isImpactHere ? impactEffect.id : null}
                         isPieceInCheck={isPieceInCheck}
+                        isAlertShaking={isAlertShaking}
                         craftStyle={craftStyle}
                         fontScheme={fontScheme}
                         useTraditionalChar={useTraditionalChar}

@@ -485,6 +485,132 @@ export function isCampInCheck(
   return null;
 }
 
+// 过滤送将、将帅照面及未应将着法，返回严格遵守中国象棋规则的合法目标点
+export function getSafeLegalMovesForPiece(
+  piece: Piece,
+  pieces: Piece[],
+  prebuiltGrid?: (Piece | null)[]
+): Position[] {
+  const grid = prebuiltGrid || buildBoardGrid(pieces);
+  const candidates = getLegalMovesForPiece(piece, pieces, grid);
+  const safeMoves: Position[] = [];
+  for (let i = 0; i < candidates.length; i++) {
+    const to = candidates[i];
+    const nextPieces = pieces
+      .filter((other) => !(other.row === to.row && other.col === to.col))
+      .map((other) => (other.id === piece.id ? { ...other, row: to.row, col: to.col } : other));
+    if (!isCampInCheck(nextPieces, piece.camp)) {
+      safeMoves.push(to);
+    }
+  }
+  return safeMoves;
+}
+
+// 精准提取所有正在照将（将军）的敌方棋子坐标，支持双将多线攻击雷达
+export function getCheckingAttackers(
+  pieces: Piece[],
+  targetCamp: Camp,
+  prebuiltGrid?: (Piece | null)[]
+): { from: Position; to: Position }[] {
+  const general = pieces.find((p) => p.type === 'general' && p.camp === targetCamp);
+  if (!general) return [];
+  const grid = prebuiltGrid || buildBoardGrid(pieces);
+  const enemyCamp: Camp = targetCamp === 'red' ? 'black' : 'red';
+  const attackers: { from: Position; to: Position }[] = [];
+  const gr = general.row;
+  const gc = general.col;
+
+  // 1. 车、炮与将帅照面
+  const orthoDirs = [
+    [-1, 0],
+    [1, 0],
+    [0, -1],
+    [0, 1],
+  ];
+  for (const [dr, dc] of orthoDirs) {
+    let nr = gr + dr;
+    let nc = gc + dc;
+    let screenFound = false;
+    while (nr >= 0 && nr <= 9 && nc >= 0 && nc <= 8) {
+      const p = grid[nr * 9 + nc];
+      if (p) {
+        if (!screenFound) {
+          if (p.camp === enemyCamp && (p.type === 'chariot' || p.type === 'general')) {
+            attackers.push({ from: { row: p.row, col: p.col }, to: { row: gr, col: gc } });
+          }
+          screenFound = true;
+        } else {
+          if (p.camp === enemyCamp && p.type === 'cannon') {
+            attackers.push({ from: { row: p.row, col: p.col }, to: { row: gr, col: gc } });
+          }
+          break;
+        }
+      }
+      nr += dr;
+      nc += dc;
+    }
+  }
+
+  // 2. 敌方马照将
+  const horseChecks = [
+    { hr: -2, hc: -1, legR: -1, legC: -1 },
+    { hr: -2, hc: 1, legR: -1, legC: 1 },
+    { hr: 2, hc: -1, legR: 1, legC: -1 },
+    { hr: 2, hc: 1, legR: 1, legC: 1 },
+    { hr: -1, hc: -2, legR: -1, legC: -1 },
+    { hr: 1, hc: -2, legR: 1, legC: -1 },
+    { hr: -1, hc: 2, legR: -1, legC: 1 },
+    { hr: 1, hc: 2, legR: 1, legC: 1 },
+  ];
+  for (const hc of horseChecks) {
+    const r = gr + hc.hr;
+    const c = gc + hc.hc;
+    if (r < 0 || r > 9 || c < 0 || c > 8) continue;
+    const p = grid[r * 9 + c];
+    if (p && p.camp === enemyCamp && p.type === 'horse') {
+      const lr = gr + hc.legR;
+      const lc = gc + hc.legC;
+      if (lr >= 0 && lr <= 9 && lc >= 0 && lc <= 8 && !grid[lr * 9 + lc]) {
+        attackers.push({ from: { row: p.row, col: p.col }, to: { row: gr, col: gc } });
+      }
+    }
+  }
+
+  // 3. 敌方兵/卒照将
+  const soldierFromRow = targetCamp === 'red' ? gr - 1 : gr + 1;
+  const soldierSpots: [number, number][] = [
+    [soldierFromRow, gc],
+    [gr, gc - 1],
+    [gr, gc + 1],
+  ];
+  for (const [sr, sc] of soldierSpots) {
+    if (sr < 0 || sr > 9 || sc < 0 || sc > 8) continue;
+    const p = grid[sr * 9 + sc];
+    if (p && p.camp === enemyCamp && p.type === 'soldier') {
+      attackers.push({ from: { row: p.row, col: p.col }, to: { row: gr, col: gc } });
+    }
+  }
+
+  return attackers;
+}
+
+// 校验指定行棋方是否仍存在至少一步不致己方被将的合法着法（用于判断绝杀/困毙终局）
+export function hasAnyLegalMoves(
+  pieces: Piece[],
+  camp: Camp,
+  prebuiltGrid?: (Piece | null)[]
+): boolean {
+  const grid = prebuiltGrid || buildBoardGrid(pieces);
+  for (let i = 0; i < pieces.length; i++) {
+    const p = pieces[i];
+    if (p.camp !== camp) continue;
+    if (getSafeLegalMovesForPiece(p, pieces, grid).length > 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // 标准现代简体象棋记谱法（如：炮二平五、马8进7、车一平二）
 export function formatChineseMoveNotation(piece: Piece, from: Position, to: Position): string {
   const isRed = piece.camp === 'red';
@@ -699,7 +825,8 @@ export function formatGameToPgn(
     opening: string;
   },
   moves: MoveRecord[],
-  fen: string
+  baseFen: string,
+  includeAnnotations = false
 ): string {
   const headers = [
     `[Game "Chinese Chess"]`,
@@ -709,18 +836,338 @@ export function formatGameToPgn(
     `[Black "${meta.blackPlayer}"]`,
     `[Result "${meta.result}"]`,
     `[Opening "${meta.opening}"]`,
-    `[FEN "${fen}"]`,
+    `[FEN "${baseFen}"]`,
   ];
+
+  const formatSingleMove = (m?: MoveRecord) => {
+    if (!m) return '';
+    if (!includeAnnotations) return m.notation;
+    const scoreStr = `${m.evalScore >= 0 ? '+' : ''}${m.evalScore.toFixed(2)}`;
+    const tagParts = [m.quality ? `评:${m.quality}` : '', scoreStr].filter(Boolean).join(' ');
+    const noteBody = m.comment ? `${tagParts} | ${m.comment}` : tagParts;
+    return `${m.notation} {${noteBody}}`;
+  };
 
   const moveLines: string[] = [];
   for (let i = 0; i < moves.length; i += 2) {
     const roundNo = Math.floor(i / 2) + 1;
-    const rMove = moves[i]?.notation || '';
-    const bMove = moves[i + 1]?.notation || '';
+    const rMove = formatSingleMove(moves[i]);
+    const bMove = formatSingleMove(moves[i + 1]);
     moveLines.push(`${roundNo}. ${rMove}${bMove ? ` ${bMove}` : ''}`);
   }
 
-  return `${headers.join('\n')}\n\n${moveLines.join(' ') || '1. 炮二平五 马8进7 2. 马二进三 车9平8'}`;
+  return moveLines.length > 0
+    ? `${headers.join('\n')}\n\n${moveLines.join(' ')}`
+    : headers.join('\n');
+}
+
+export function formatGameToWechatText(
+  meta: {
+    redPlayer: string;
+    blackPlayer: string;
+    event: string;
+    date: string;
+    result: string;
+    opening: string;
+  },
+  moves: MoveRecord[],
+  baseFen: string,
+  includeAnnotations = false
+): string {
+  const titleLine = `【${meta.redPlayer} vs ${meta.blackPlayer}】`;
+  const subParts = [meta.opening, meta.event, meta.result, meta.date].filter(Boolean);
+  const subLine = subParts.join(' · ');
+
+  const lines: string[] = [titleLine];
+  if (subLine) lines.push(subLine);
+
+  if (moves.length === 0) {
+    lines.push(`当前局面 FEN：${baseFen}`);
+    return lines.join('\n');
+  }
+
+  lines.push('');
+  for (let i = 0; i < moves.length; i += 2) {
+    const roundNo = Math.floor(i / 2) + 1;
+    const r = moves[i];
+    const b = moves[i + 1];
+    const rText = r ? r.notation : '';
+    const bText = b ? b.notation : '';
+    let row = `${roundNo}. ${rText}${bText ? `  ${bText}` : ''}`;
+    if (includeAnnotations) {
+      const notes: string[] = [];
+      if (r && (r.quality || r.comment)) {
+        const sc = `${r.evalScore >= 0 ? '+' : ''}${r.evalScore.toFixed(1)}`;
+        notes.push(`红(${r.quality || '良'} ${sc}${r.comment ? `: ${r.comment}` : ''})`);
+      }
+      if (b && (b.quality || b.comment)) {
+        const sc = `${b.evalScore >= 0 ? '+' : ''}${b.evalScore.toFixed(1)}`;
+        notes.push(`黑(${b.quality || '良'} ${sc}${b.comment ? `: ${b.comment}` : ''})`);
+      }
+      if (notes.length > 0) {
+        row += `  [${notes.join('；')}]`;
+      }
+    }
+    lines.push(row);
+  }
+  return lines.join('\n');
+}
+
+export function sanitizeExportFilename(rawName: string): string {
+  return rawName.replace(/[\\/:*?"<>|\s]+/g, '_').replace(/^_+|_+$/g, '') || 'xiangqi_game';
+}
+
+export function downloadTextFile(filename: string, content: string): void {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  try {
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch {
+    // Ignore download restrictions
+  }
+}
+
+export interface ParsedPgnSession {
+  basePieces: Piece[];
+  baseTurn: Camp;
+  moves: MoveRecord[];
+  finalPieces: Piece[];
+  finalTurn: Camp;
+  metadata: Partial<{
+    redPlayer: string;
+    blackPlayer: string;
+    event: string;
+    date: string;
+    result: '红胜' | '黑胜' | '和棋' | '进行中';
+    opening: string;
+  }>;
+  hasExplicitFen: boolean;
+}
+
+const TRAD_TO_SIMP_CHAR_MAP: Record<string, string> = {
+  帥: '帅',
+  將: '将',
+  傌: '马',
+  馬: '马',
+  俥: '车',
+  車: '车',
+  砲: '炮',
+  包: '炮',
+  進: '进',
+  平: '平',
+  退: '退',
+  前: '前',
+  中: '中',
+  後: '后',
+  后: '后',
+  '１': '1',
+  '２': '2',
+  '３': '3',
+  '４': '4',
+  '５': '5',
+  '６': '6',
+  '７': '7',
+  '８': '8',
+  '９': '9',
+};
+
+function normalizePgnMoveToken(token: string): string {
+  let out = '';
+  for (const ch of token.trim()) {
+    out += TRAD_TO_SIMP_CHAR_MAP[ch] || ch;
+  }
+  return out;
+}
+
+function matchPieceCandidatesForChineseToken(
+  token: string,
+  camp: Camp,
+  pieces: Piece[],
+  grid: (Piece | null)[]
+): { piece: Piece; to: Position } | null {
+  const norm = normalizePgnMoveToken(token);
+  if (norm.length < 4) return null;
+
+  const isRed = camp === 'red';
+  const pieceTypeMap: Record<string, PieceType> = {
+    帅: 'general',
+    将: 'general',
+    仕: 'advisor',
+    士: 'advisor',
+    相: 'elephant',
+    象: 'elephant',
+    马: 'horse',
+    车: 'chariot',
+    炮: 'cannon',
+    兵: 'soldier',
+    卒: 'soldier',
+  };
+
+  // Handle "前车进一" / "后马进三" or standard "炮二平五"
+  let disambigPos: 'front' | 'back' | 'middle' | null = null;
+  let typeChar = norm[0];
+  let roadChar = norm[1];
+  const actionChar = norm[2];
+  const targetChar = norm[3];
+
+  if (norm[0] === '前' || norm[0] === '后' || norm[0] === '中') {
+    disambigPos = norm[0] === '前' ? 'front' : norm[0] === '后' ? 'back' : 'middle';
+    typeChar = norm[1];
+    roadChar = '';
+  }
+
+  const targetPieceType = pieceTypeMap[typeChar];
+  if (!targetPieceType) return null;
+
+  const roadIndex = roadChar
+    ? isRed
+      ? RED_ROAD_NUMERALS.indexOf(roadChar)
+      : BLACK_ROAD_NUMERALS.indexOf(roadChar)
+    : -1;
+  if (!disambigPos && roadIndex < 0) return null;
+
+  const sameCampType = pieces.filter((p) => p.camp === camp && p.type === targetPieceType);
+  let candidatePieces = sameCampType;
+
+  if (disambigPos) {
+    // Group by column with >= 2 pieces
+    const colCounts = new Map<number, Piece[]>();
+    for (const p of sameCampType) {
+      const arr = colCounts.get(p.col) || [];
+      arr.push(p);
+      colCounts.set(p.col, arr);
+    }
+    const multiColPieces: Piece[] = [];
+    for (const arr of colCounts.values()) {
+      if (arr.length >= 2) {
+        arr.sort((a, b) => (isRed ? a.row - b.row : b.row - a.row));
+        if (disambigPos === 'front') multiColPieces.push(arr[0]);
+        else if (disambigPos === 'back') multiColPieces.push(arr[arr.length - 1]);
+        else if (arr.length >= 3) multiColPieces.push(arr[1]);
+      }
+    }
+    candidatePieces = multiColPieces;
+  } else {
+    candidatePieces = sameCampType.filter((p) => p.col === roadIndex);
+  }
+
+  for (const p of candidatePieces) {
+    const legalTos = getLegalMovesForPiece(p, pieces, grid);
+    for (const to of legalTos) {
+      const stdNotation = formatChineseMoveNotation(p, { row: p.row, col: p.col }, to);
+      if (disambigPos) {
+        if (stdNotation.slice(2) === `${actionChar}${targetChar}`) {
+          return { piece: p, to };
+        }
+      } else if (stdNotation === norm) {
+        return { piece: p, to };
+      }
+    }
+  }
+  return null;
+}
+
+export function parsePgnTextToSession(
+  pgnText: string,
+  fallbackFen?: string
+): ParsedPgnSession | null {
+  const trimmed = pgnText.trim();
+  if (!trimmed) return null;
+
+  const headerMap: Record<string, string> = {};
+  const headerRegex = /\[([A-Za-z0-9_]+)\s+"([^"]*)"\]/g;
+  let match: RegExpExecArray | null;
+  while ((match = headerRegex.exec(trimmed)) !== null) {
+    headerMap[match[1].toLowerCase()] = match[2].trim();
+  }
+
+  const rawFen = headerMap.fen || fallbackFen || INITIAL_FEN;
+  const parsedBase = parseFenToPieces(rawFen);
+  if (!parsedBase) return null;
+
+  // Strip header tags, comments {...}, parentheses (...), round markers, and result tokens
+  const body = trimmed
+    .replace(/\[[^\]]*\]/g, ' ')
+    .replace(/\{[^}]*\}/g, ' ')
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/\b\d+\s*\./g, ' ')
+    .replace(/(?:1-0|0-1|1\/2-1\/2|\*|红胜|黑胜|和棋)/g, ' ');
+
+  const rawTokens = body
+    .split(/[\s,，;；]+/)
+    .map((t) => normalizePgnMoveToken(t))
+    .filter((t) => /^[前中后帅将仕士相象马车炮兵卒][^\s]{2,3}$/.test(t));
+
+  let current = parsedBase.pieces.map((p) => ({ ...p }));
+  let currentTurn: Camp = parsedBase.turn;
+  const moves: MoveRecord[] = [];
+
+  for (let i = 0; i < rawTokens.length; i++) {
+    const token = rawTokens[i];
+    const grid = buildBoardGrid(current);
+    const matched = matchPieceCandidatesForChineseToken(token, currentTurn, current, grid);
+    if (!matched) break;
+
+    const { piece: moving, to } = matched;
+    const from = { row: moving.row, col: moving.col };
+    const captured = getPieceAt(current, to.row, to.col);
+    const notation = formatChineseMoveNotation(moving, from, to);
+
+    current = current
+      .filter((p) => !(p.row === to.row && p.col === to.col))
+      .map((p) => (p.id === moving.id ? { ...p, row: to.row, col: to.col } : p));
+
+    const evalScore = evaluateBoardScore(current);
+    moves.push({
+      ply: i + 1,
+      piece: { ...moving },
+      from,
+      to,
+      captured: captured ? { ...captured } : undefined,
+      notation,
+      evalScore,
+      quality: '良',
+      piecesSnapshot: current.map((p) => ({ ...p })),
+    });
+    currentTurn = currentTurn === 'red' ? 'black' : 'red';
+  }
+
+  const rawResult = headerMap.result || '';
+  const mappedResult: '红胜' | '黑胜' | '和棋' | '进行中' | undefined =
+    rawResult === '1-0' || rawResult === '红胜'
+      ? '红胜'
+      : rawResult === '0-1' || rawResult === '黑胜'
+      ? '黑胜'
+      : rawResult === '1/2-1/2' || rawResult === '和棋'
+      ? '和棋'
+      : rawResult === '进行中'
+      ? '进行中'
+      : undefined;
+
+  return {
+    basePieces: parsedBase.pieces,
+    baseTurn: parsedBase.turn,
+    moves,
+    finalPieces: current,
+    finalTurn: currentTurn,
+    metadata: {
+      ...(headerMap.red ? { redPlayer: headerMap.red } : {}),
+      ...(headerMap.black ? { blackPlayer: headerMap.black } : {}),
+      ...(headerMap.event ? { event: headerMap.event } : {}),
+      ...(headerMap.date ? { date: headerMap.date } : {}),
+      ...(headerMap.opening ? { opening: headerMap.opening } : {}),
+      ...(mappedResult ? { result: mappedResult } : {}),
+    },
+    hasExplicitFen: Boolean(headerMap.fen),
+  };
 }
 
 export function generateSimulatedMultiPV(
@@ -740,7 +1187,7 @@ export function generateSimulatedMultiPV(
   for (let i = 0; i < pieces.length; i++) {
     const p = pieces[i];
     if (p.camp !== turn) continue;
-    const legal = getLegalMovesForPiece(p, pieces, grid);
+    const legal = getSafeLegalMovesForPiece(p, pieces, grid);
     for (const to of legal) {
       const target = grid[to.row * 9 + to.col];
       let priority = 0;
@@ -1014,6 +1461,137 @@ export function playWoodClackSound(
     } else {
       triggerWoodStrike(now, baseFreq, decaySec, 0.26);
     }
+  } catch {
+    // Ignore audio context errors
+  }
+}
+
+// 警示哑木音效（未应将或尝试送将时的克制提示）
+export function playInvalidWarningSound(soundEnabled = true) {
+  if (!soundEnabled) return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  try {
+    const now = ctx.currentTime;
+    [0, 0.075].forEach((offset, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(idx === 0 ? 108 : 88, now + offset);
+      osc.frequency.exponentialRampToValueAtTime(52, now + offset + 0.055);
+      gain.gain.setValueAtTime(0.001, now + offset);
+      gain.gain.linearRampToValueAtTime(0.14, now + offset + 0.005);
+      gain.gain.exponentialRampToValueAtTime(0.0008, now + offset + 0.06);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + offset);
+      osc.stop(now + offset + 0.07);
+    });
+  } catch {
+    // Ignore audio context errors
+  }
+}
+
+// 中式清越编钟/铜磬「将军」提示音
+export function playCheckChimeSound(soundEnabled = true) {
+  if (!soundEnabled) return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  try {
+    const start = ctx.currentTime + 0.025;
+    // 双声叠韵铜磬（D5 + A5 五声音阶清鸣 + 高次泛音瞬态）
+    const strikeChime = (t: number, baseHz: number, dur: number, peak: number) => {
+      const partials = [
+        { ratio: 1, amp: peak, type: 'sine' as OscillatorType, dec: dur },
+        { ratio: 2.0, amp: peak * 0.34, type: 'triangle' as OscillatorType, dec: dur * 0.72 },
+        { ratio: 2.98, amp: peak * 0.16, type: 'sine' as OscillatorType, dec: dur * 0.42 },
+      ];
+      for (const p of partials) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = p.type;
+        osc.frequency.setValueAtTime(baseHz * p.ratio, t);
+        gain.gain.setValueAtTime(0.0008, t);
+        gain.gain.linearRampToValueAtTime(p.amp, t + 0.006);
+        gain.gain.exponentialRampToValueAtTime(0.0006, t + p.dec);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + p.dec + 0.02);
+      }
+    };
+
+    strikeChime(start, 587.33, 0.36, 0.16);
+    strikeChime(start + 0.09, 880.0, 0.46, 0.14);
+  } catch {
+    // Ignore audio context errors
+  }
+}
+
+// 中式大锣余韵 + 金磬收煞「绝杀 / 困毙」终局音效
+export function playCheckmateGongSound(soundEnabled = true) {
+  if (!soundEnabled) return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  try {
+    const start = ctx.currentTime + 0.035;
+    // 1. 低沉铜锣主体泛音群（微非谐波打造传统响铜颤音）
+    const gongPartials = [
+      { freq: 116, endFreq: 109, dur: 1.35, gain: 0.24, type: 'triangle' as OscillatorType },
+      { freq: 174, endFreq: 171, dur: 1.12, gain: 0.14, type: 'sine' as OscillatorType },
+      { freq: 242, endFreq: 238, dur: 0.92, gain: 0.11, type: 'sine' as OscillatorType },
+      { freq: 356, endFreq: 350, dur: 0.65, gain: 0.07, type: 'triangle' as OscillatorType },
+    ];
+    for (const gp of gongPartials) {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = gp.type;
+      osc.frequency.setValueAtTime(gp.freq, start);
+      osc.frequency.exponentialRampToValueAtTime(gp.endFreq, start + gp.dur);
+      g.gain.setValueAtTime(0.001, start);
+      g.gain.linearRampToValueAtTime(gp.gain, start + 0.018);
+      g.gain.exponentialRampToValueAtTime(0.0006, start + gp.dur);
+      osc.connect(g);
+      g.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + gp.dur + 0.03);
+    }
+
+    // 2. 轻微响铜击锤沙响（滤波白噪）
+    const noiseLen = Math.floor(ctx.sampleRate * 0.22);
+    const noiseBuf = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
+    const data = noiseBuf.getChannelData(0);
+    for (let i = 0; i < noiseLen; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.06));
+    }
+    const noiseSrc = ctx.createBufferSource();
+    noiseSrc.buffer = noiseBuf;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(720, start);
+    filter.Q.setValueAtTime(1.8, start);
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.setValueAtTime(0.11, start);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, start + 0.22);
+    noiseSrc.connect(filter);
+    filter.connect(noiseGain);
+    noiseGain.connect(ctx.destination);
+    noiseSrc.start(start);
+
+    // 3. 高音金磬收煞清响（D5 -> A5 微延后定音）
+    const chimeOsc = ctx.createOscillator();
+    const chimeGain = ctx.createGain();
+    chimeOsc.type = 'sine';
+    chimeOsc.frequency.setValueAtTime(587.33, start + 0.06);
+    chimeGain.gain.setValueAtTime(0.0008, start + 0.06);
+    chimeGain.gain.linearRampToValueAtTime(0.12, start + 0.075);
+    chimeGain.gain.exponentialRampToValueAtTime(0.0006, start + 0.95);
+    chimeOsc.connect(chimeGain);
+    chimeGain.connect(ctx.destination);
+    chimeOsc.start(start + 0.06);
+    chimeOsc.stop(start + 0.98);
   } catch {
     // Ignore audio context errors
   }

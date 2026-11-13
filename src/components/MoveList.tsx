@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ArrowDownToLine,
+  ArrowUpFromLine,
   BookmarkPlus,
   BookMarked,
   BookOpen,
   Check,
-  FileCode2,
   GitBranch,
   RefreshCw,
   Sparkles,
@@ -27,9 +28,13 @@ interface MoveListProps {
   onOpenGameInfo: () => void;
   onToggleFavorite: () => void;
   onSaveToLibrary?: () => void;
+  canSaveToLibrary?: boolean;
+  isExistingUserSave?: boolean;
+  isLibraryLinked?: boolean;
   onOpenOpeningTab?: () => void;
   onLoadSampleGame: () => void;
   onOpenImportModal: () => void;
+  onOpenExportModal?: () => void;
   onOpenLibraryModal: () => void;
   onSyncNextExternalMove?: () => void;
   onDisconnectExternal?: () => void;
@@ -48,9 +53,13 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
   onOpenGameInfo,
   onToggleFavorite,
   onSaveToLibrary,
+  canSaveToLibrary = true,
+  isExistingUserSave = false,
+  isLibraryLinked = false,
   onOpenOpeningTab,
   onLoadSampleGame,
   onOpenImportModal,
+  onOpenExportModal,
   onOpenLibraryModal,
   onSyncNextExternalMove,
   onDisconnectExternal,
@@ -118,38 +127,74 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
           {onSaveToLibrary && (
             <button
               type="button"
+              disabled={!canSaveToLibrary}
               onClick={() => {
                 onSaveToLibrary();
                 setSavedNotice(true);
                 window.setTimeout(() => setSavedNotice(false), 1600);
               }}
-              title="将当前对局与着法保存至棋谱库"
-              className="px-2 py-0.5 rounded-md xq-btn-secondary cursor-pointer flex items-center gap-1 text-xs shrink-0"
+              title={
+                !canSaveToLibrary
+                  ? '走子或导入局面后即可存入棋谱库'
+                  : isExistingUserSave
+                  ? '将当前新着法与修订更新至棋谱库中的本局'
+                  : '将当前对局与全部着法保存至棋谱库「自存对局」'
+              }
+              className={`px-2 py-0.5 rounded-md flex items-center gap-1 text-xs shrink-0 whitespace-nowrap ${
+                canSaveToLibrary
+                  ? 'xq-btn-secondary cursor-pointer'
+                  : 'xq-btn-secondary opacity-45 cursor-not-allowed'
+              }`}
             >
               {savedNotice ? (
                 <Check className="w-3 h-3 text-[#10B981]" />
               ) : (
                 <BookmarkPlus className="w-3 h-3 text-[var(--xq-accent-gold)]" />
               )}
-              <span>{savedNotice ? '已入库' : '存局'}</span>
+              <span>
+                {savedNotice ? '已入库' : isExistingUserSave ? '更新存局' : '存局'}
+              </span>
             </button>
           )}
 
           <button
             type="button"
+            disabled={!isLibraryLinked}
             onClick={onToggleFavorite}
-            title={metadata.isFavorite ? '已收藏至棋谱库（点击取消）' : '收藏本局至棋谱库'}
-            className={`px-2 py-0.5 rounded-md cursor-pointer flex items-center gap-1 text-xs shrink-0 ${
-              metadata.isFavorite ? 'xq-btn-option-active' : 'xq-btn-secondary'
+            aria-label={metadata.isFavorite ? '取消收藏' : '星标收藏'}
+            title={
+              !isLibraryLinked
+                ? '请先点击左侧「存局」入库后再标记收藏'
+                : metadata.isFavorite
+                ? '已加入「我的收藏」（点击取消星标）'
+                : '标记为「我的收藏」星标'
+            }
+            className={`px-1.5 py-0.5 rounded-md flex items-center gap-1 text-xs shrink-0 whitespace-nowrap ${
+              !isLibraryLinked
+                ? 'xq-btn-secondary opacity-35 cursor-not-allowed'
+                : metadata.isFavorite
+                ? 'xq-btn-option-active cursor-pointer'
+                : 'xq-btn-secondary cursor-pointer'
             }`}
           >
             <Star
-              className={`w-3 h-3 ${
-                metadata.isFavorite ? 'fill-current' : 'xq-text-muted'
+              className={`w-3.5 h-3.5 ${
+                metadata.isFavorite && isLibraryLinked ? 'fill-current' : 'xq-text-muted'
               }`}
             />
-            <span>{metadata.isFavorite ? '已收藏' : '收藏'}</span>
           </button>
+
+          {onOpenExportModal && (
+            <button
+              type="button"
+              onClick={onOpenExportModal}
+              aria-label="导出当前对局"
+              title="导出当前对局（.pgn / .fen / 微信文本棋谱）"
+              className="px-1.5 py-0.5 rounded-md xq-btn-secondary cursor-pointer flex items-center gap-1 text-xs shrink-0 whitespace-nowrap"
+            >
+              <ArrowUpFromLine className="w-3.5 h-3.5 opacity-85" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -279,8 +324,8 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
                     onClick={onOpenImportModal}
                     className="px-2 py-1.5 rounded-md xq-btn-secondary text-xs flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap"
                   >
-                    <FileCode2 className="w-3.5 h-3.5 opacity-80" />
-                    <span>导入 FEN</span>
+                    <ArrowDownToLine className="w-3.5 h-3.5 opacity-85" />
+                    <span>导入 / 识盘</span>
                   </button>
                   <button
                     type="button"

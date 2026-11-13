@@ -1,5 +1,5 @@
 import React from 'react';
-import { Camp, WorkspaceMode } from '../types/xiangqi';
+import { Camp, GameTerminalState, WorkspaceMode } from '../types/xiangqi';
 
 interface StatusBarProps {
   workspace: WorkspaceMode;
@@ -13,7 +13,10 @@ interface StatusBarProps {
   currentPly: number;
   totalPlies: number;
   inCheckCamp: Camp | null;
+  terminalOutcome?: GameTerminalState | null;
+  illegalMoveWarning?: string | null;
   isVariationActive: boolean;
+  isOpeningDrillActive?: boolean;
   advantageSummary: string;
 }
 
@@ -29,10 +32,18 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({
   currentPly,
   totalPlies,
   inCheckCamp,
+  terminalOutcome = null,
+  illegalMoveWarning = null,
   isVariationActive,
+  isOpeningDrillActive = false,
   advantageSummary,
 }) => {
   const getWorkspaceLabel = () => {
+    if (workspace === 'opening') {
+      return isOpeningDrillActive
+        ? '开局研习 · 变例防剧透对练中（棋盘直接走子校验正误）'
+        : '开局研习 · 定式树探索与7套主流骨架（可随时携带定式转入复盘分析）';
+    }
     if (workspace === 'challenge') {
       return '残局题库 · 执红先行破局（可随时转入复盘分析）';
     }
@@ -57,7 +68,11 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({
   return (
     <footer className="h-8 px-6 border-t xq-surface flex items-center justify-between text-xs select-none shrink-0">
       <div className="flex items-center gap-3 min-w-0">
-        <span className="font-medium xq-text-secondary truncate">{getWorkspaceLabel()}</span>
+        {illegalMoveWarning ? (
+          <span className="font-semibold text-[#F59E0B] truncate">{illegalMoveWarning}</span>
+        ) : (
+          <span className="font-medium xq-text-secondary truncate">{getWorkspaceLabel()}</span>
+        )}
       </div>
 
       <div className="flex items-center gap-2.5 shrink-0 xq-text-muted font-mono-tabular text-xs">
@@ -68,13 +83,23 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({
         <span>
           第 {currentPly}/{totalPlies} 手
         </span>
-        {inCheckCamp && (
+        {terminalOutcome ? (
           <>
             <span aria-hidden="true">·</span>
             <span className="text-[#EF4444] font-semibold">
-              {inCheckCamp === 'red' ? '红帅受将' : '黑将受将'}
+              {terminalOutcome.winner === 'red' ? '红胜' : '黑胜'} ·{' '}
+              {terminalOutcome.kind === 'checkmate' ? '绝杀' : '困毙'}
             </span>
           </>
+        ) : (
+          inCheckCamp && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span className="text-[#EF4444] font-semibold">
+                {inCheckCamp === 'red' ? '红帅受将 · 须先应将' : '黑将受将 · 须先应将'}
+              </span>
+            </>
+          )
         )}
       </div>
     </footer>

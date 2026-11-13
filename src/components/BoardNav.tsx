@@ -19,6 +19,13 @@ interface BoardNavProps {
   totalPlies: number;
   isReplaying: boolean;
   disabled?: boolean;
+  hideReplay?: boolean;
+  canNewGame?: boolean;
+  newGameDisabledReason?: string;
+  canUndo?: boolean;
+  undoDisabledReason?: string;
+  canHint?: boolean;
+  hintDisabledReason?: string;
   onJumpPly: (ply: number) => void;
   onToggleReplay: () => void;
   onNewGame: () => void;
@@ -33,6 +40,13 @@ export const BoardNav: React.FC<BoardNavProps> = React.memo(({
   totalPlies,
   isReplaying,
   disabled = false,
+  hideReplay = false,
+  canNewGame,
+  newGameDisabledReason,
+  canUndo,
+  undoDisabledReason,
+  canHint,
+  hintDisabledReason,
   onJumpPly,
   onToggleReplay,
   onNewGame,
@@ -40,15 +54,28 @@ export const BoardNav: React.FC<BoardNavProps> = React.memo(({
   onUndoMove,
   onTriggerHint,
 }) => {
-  const showReplay = workspace === 'study' && totalPlies > 0;
+  const showReplay =
+    !hideReplay && (workspace === 'study' || workspace === 'opening') && totalPlies > 0;
   const newGameLabel =
-    workspace === 'play' ? '重开' : workspace === 'challenge' ? '重摆' : '新局';
-  const newGameTitle =
+    workspace === 'play' || workspace === 'opening'
+      ? '重开'
+      : workspace === 'challenge'
+      ? '重摆'
+      : '新局';
+  const defaultNewGameTitle =
     workspace === 'play'
       ? '按当前让子设置重新开局'
       : workspace === 'challenge'
       ? '重摆当前残局关卡'
+      : workspace === 'opening'
+      ? '重置至32子标准开局或重开当前对练'
       : '新拆一局（恢复32子标准开局）';
+
+  const isPrevDisabled = disabled || currentPly <= 0;
+  const isNextDisabled = disabled || currentPly >= totalPlies;
+  const isNewGameDisabled = disabled || (canNewGame !== undefined ? !canNewGame : false);
+  const isUndoDisabled = disabled || (canUndo !== undefined ? !canUndo : currentPly <= 0);
+  const isHintDisabled = disabled || (canHint !== undefined ? !canHint : false);
 
   return (
     <div className="w-full px-3 py-1.5 rounded-lg border xq-surface flex items-center justify-between gap-2 select-none shadow-2xs">
@@ -56,20 +83,20 @@ export const BoardNav: React.FC<BoardNavProps> = React.memo(({
       <div className="flex items-center gap-0.5">
         <button
           type="button"
-          disabled={disabled || currentPly <= 0}
+          disabled={isPrevDisabled}
           onClick={() => onJumpPly(0)}
-          title="开局 (Home)"
-          className="p-1.5 rounded hover:bg-[var(--xq-bg-hover)] disabled:opacity-35 transition-colors cursor-pointer"
+          title={isPrevDisabled ? '已位于开局起点' : '开局 (Home)'}
+          className="p-1.5 rounded hover:bg-[var(--xq-bg-hover)] disabled:opacity-35 disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors cursor-pointer"
         >
           <ChevronFirst className="w-4 h-4" />
         </button>
 
         <button
           type="button"
-          disabled={disabled || currentPly <= 0}
+          disabled={isPrevDisabled}
           onClick={() => onJumpPly(Math.max(0, currentPly - 1))}
-          title="上一步 (←)"
-          className="p-1.5 rounded hover:bg-[var(--xq-bg-hover)] disabled:opacity-35 transition-colors cursor-pointer"
+          title={isPrevDisabled ? '已位于首步之前' : '上一步 (←)'}
+          className="p-1.5 rounded hover:bg-[var(--xq-bg-hover)] disabled:opacity-35 disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors cursor-pointer"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
@@ -80,7 +107,9 @@ export const BoardNav: React.FC<BoardNavProps> = React.memo(({
             disabled={disabled}
             onClick={onToggleReplay}
             title={isReplaying ? '暂停自动播放' : '自动播放棋谱'}
-            className={`px-2 py-1 rounded-md text-xs flex items-center gap-1 whitespace-nowrap cursor-pointer transition-colors ${
+            className={`px-2 py-1 rounded-md text-xs flex items-center gap-1 whitespace-nowrap transition-colors ${
+              disabled ? 'opacity-35 cursor-not-allowed' : 'cursor-pointer'
+            } ${
               isReplaying
                 ? 'xq-btn-primary shadow-2xs'
                 : 'hover:bg-[var(--xq-bg-hover)] xq-text-secondary'
@@ -99,20 +128,20 @@ export const BoardNav: React.FC<BoardNavProps> = React.memo(({
 
         <button
           type="button"
-          disabled={disabled || currentPly >= totalPlies}
+          disabled={isNextDisabled}
           onClick={() => onJumpPly(Math.min(totalPlies, currentPly + 1))}
-          title="下一步 (→)"
-          className="p-1.5 rounded hover:bg-[var(--xq-bg-hover)] disabled:opacity-35 transition-colors cursor-pointer"
+          title={isNextDisabled ? '已位于末步' : '下一步 (→)'}
+          className="p-1.5 rounded hover:bg-[var(--xq-bg-hover)] disabled:opacity-35 disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors cursor-pointer"
         >
           <ChevronRight className="w-4 h-4" />
         </button>
 
         <button
           type="button"
-          disabled={disabled || currentPly >= totalPlies}
+          disabled={isNextDisabled}
           onClick={() => onJumpPly(totalPlies)}
-          title="末步 (End)"
-          className="p-1.5 rounded hover:bg-[var(--xq-bg-hover)] disabled:opacity-35 transition-colors cursor-pointer"
+          title={isNextDisabled ? '已位于末步' : '末步 (End)'}
+          className="p-1.5 rounded hover:bg-[var(--xq-bg-hover)] disabled:opacity-35 disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors cursor-pointer"
         >
           <ChevronLast className="w-4 h-4" />
         </button>
@@ -122,10 +151,12 @@ export const BoardNav: React.FC<BoardNavProps> = React.memo(({
       <div className="flex items-center gap-1.5">
         <button
           type="button"
-          disabled={disabled}
+          disabled={isNewGameDisabled}
           onClick={onNewGame}
-          title={newGameTitle}
-          className="px-2.5 py-1 rounded-md xq-btn-secondary disabled:opacity-35 text-xs flex items-center gap-1 whitespace-nowrap cursor-pointer"
+          title={isNewGameDisabled ? newGameDisabledReason || '当前已是初始局面，无需重开' : defaultNewGameTitle}
+          className={`px-2.5 py-1 rounded-md xq-btn-secondary text-xs flex items-center gap-1 whitespace-nowrap ${
+            isNewGameDisabled ? 'opacity-35 cursor-not-allowed' : 'cursor-pointer'
+          }`}
         >
           <RotateCcw className="w-3.5 h-3.5 opacity-80" />
           <span>{newGameLabel}</span>
@@ -143,10 +174,12 @@ export const BoardNav: React.FC<BoardNavProps> = React.memo(({
 
         <button
           type="button"
-          disabled={disabled || currentPly <= 0}
+          disabled={isUndoDisabled}
           onClick={onUndoMove}
-          title="悔棋"
-          className="px-2.5 py-1 rounded-md xq-btn-secondary disabled:opacity-35 text-xs flex items-center gap-1 whitespace-nowrap cursor-pointer"
+          title={isUndoDisabled ? undoDisabledReason || '当前暂无可悔着法' : '悔棋'}
+          className={`px-2.5 py-1 rounded-md xq-btn-secondary text-xs flex items-center gap-1 whitespace-nowrap ${
+            isUndoDisabled ? 'opacity-35 cursor-not-allowed' : 'cursor-pointer'
+          }`}
         >
           <Undo2 className="w-3.5 h-3.5 opacity-80" />
           <span>悔棋</span>
@@ -154,10 +187,14 @@ export const BoardNav: React.FC<BoardNavProps> = React.memo(({
 
         <button
           type="button"
-          disabled={disabled}
+          disabled={isHintDisabled}
           onClick={onTriggerHint}
-          title="引擎推荐支招"
-          className="px-2.5 py-1 rounded-md xq-btn-primary disabled:opacity-35 text-xs flex items-center gap-1 whitespace-nowrap cursor-pointer shadow-2xs"
+          title={isHintDisabled ? hintDisabledReason || '当前局面不可支招' : '引擎推荐支招'}
+          className={`px-2.5 py-1 rounded-md text-xs flex items-center gap-1 whitespace-nowrap ${
+            isHintDisabled
+              ? 'xq-btn-secondary opacity-35 cursor-not-allowed'
+              : 'xq-btn-primary cursor-pointer shadow-2xs'
+          }`}
         >
           <Lightbulb className="w-3.5 h-3.5" />
           <span>支招</span>

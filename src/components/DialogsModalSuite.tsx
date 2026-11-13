@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
+  ArrowDownToLine,
+  ArrowUpFromLine,
   BookmarkPlus,
   Check,
   CheckCircle2,
@@ -15,9 +17,9 @@ import {
   Search,
   Star,
   Trash2,
-  Upload,
   X,
 } from 'lucide-react';
+import { ThemeSelect } from './ThemeSelect';
 import {
   ActiveModalId,
   AppTheme,
@@ -30,10 +32,18 @@ import {
   FontScale,
   GameMetadata,
   LibraryGameItem,
+  MoveRecord,
   PieceCraftStyle,
   WorkspaceMode,
 } from '../types/xiangqi';
-import { INITIAL_FEN } from '../utils/xiangqiRules';
+import {
+  downloadTextFile,
+  formatGameToPgn,
+  formatGameToWechatText,
+  INITIAL_FEN,
+  parsePgnTextToSession,
+  sanitizeExportFilename,
+} from '../utils/xiangqiRules';
 
 interface DialogsModalSuiteProps {
   activeModal: ActiveModalId;
@@ -54,14 +64,24 @@ interface DialogsModalSuiteProps {
   connectState: ExternalConnectState;
   currentFen: string;
   currentPgn: string;
+  exportBaseFen?: string;
+  exportMoves?: MoveRecord[];
+  initialFenPgnTab?: 'import' | 'export';
   metadata: GameMetadata;
   libraryGames: LibraryGameItem[];
+  initialLibrarySearch?: string | null;
   onClose: () => void;
+  onOpenModal?: (modal: ActiveModalId) => void;
   onSwitchWorkspace: (ws: WorkspaceMode) => void;
+  onOpenOpeningBook?: () => void;
   onApplyFen: (fen: string) => boolean;
+  onApplyPgnSession?: (pgnText: string, fenFallback: string) => boolean;
   onSaveMetadata: (meta: GameMetadata) => void;
   onLoadLibraryGame: (game: LibraryGameItem) => void;
+  onExportLibraryGame?: (game: LibraryGameItem) => void;
   onSaveCurrentGameToLibrary?: () => void;
+  canSaveCurrentGame?: boolean;
+  isExistingUserSave?: boolean;
   onToggleLibraryFavorite: (id: string) => void;
   onDeleteLibraryGame: (id: string) => void;
   onChangeAppTheme: (theme: AppTheme) => void;
@@ -133,14 +153,24 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
   connectState,
   currentFen,
   currentPgn,
+  exportBaseFen,
+  exportMoves = [],
+  initialFenPgnTab = 'import',
   metadata,
   libraryGames,
+  initialLibrarySearch = null,
   onClose,
+  onOpenModal,
   onSwitchWorkspace,
+  onOpenOpeningBook,
   onApplyFen,
+  onApplyPgnSession,
   onSaveMetadata,
   onLoadLibraryGame,
+  onExportLibraryGame,
   onSaveCurrentGameToLibrary,
+  canSaveCurrentGame = true,
+  isExistingUserSave = false,
   onToggleLibraryFavorite,
   onDeleteLibraryGame,
   onChangeAppTheme,
@@ -163,12 +193,16 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
   onTriggerHint,
 }) => {
   const [cmdQuery, setCmdQuery] = useState('');
+  const [fenPgnTab, setFenPgnTab] = useState<'import' | 'export'>(initialFenPgnTab);
   const [importMode, setImportMode] = useState<'fen-pgn' | 'image'>('fen-pgn');
-  const [fenInput, setFenInput] = useState(currentFen);
-  const [pgnInput, setPgnInput] = useState(currentPgn);
+  const [fenInput, setFenInput] = useState('');
+  const [pgnInput, setPgnInput] = useState('');
+  const [pgnDirty, setPgnDirty] = useState(false);
   const [fenError, setFenError] = useState<string | null>(null);
+  const [exportFormat, setExportFormat] = useState<'pgn' | 'wechat'>('pgn');
+  const [exportIncludeNotes, setExportIncludeNotes] = useState<boolean>(false);
   const [copiedFen, setCopiedFen] = useState(false);
-  const [copiedPgn, setCopiedPgn] = useState(false);
+  const [copiedExportText, setCopiedExportText] = useState(false);
 
   // 图片识别状态
   const [imgTurn, setImgTurn] = useState<Camp>('red');
@@ -197,10 +231,57 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
   const [updateCheckStatus, setUpdateCheckStatus] = useState<'idle' | 'checking' | 'latest'>('idle');
 
   useEffect(() => {
-    setFenInput(currentFen);
-    setPgnInput(currentPgn);
     setMetaDraft(metadata);
-  }, [currentFen, currentPgn, metadata, activeModal]);
+    if (activeModal === 'fen-pgn') {
+      setFenPgnTab(initialFenPgnTab);
+      setFenInput('');
+      setPgnInput('');
+      setPgnDirty(false);
+      setFenError(null);
+      setCopiedFen(false);
+      setCopiedExportText(false);
+    }
+    if (activeModal === 'library') {
+      setLibSearch(initialLibrarySearch || '');
+      if (initialLibrarySearch) {
+        setLibCategory('all');
+        setLibResultFilter('all');
+      }
+    }
+  }, [metadata, activeModal, initialLibrarySearch, initialFenPgnTab]);
+
+  const parsedPgnPreview = useMemo(() => {
+    if (activeModal !== 'fen-pgn' || fenPgnTab !== 'import' || importMode !== 'fen-pgn' || !pgnDirty) {
+      return null;
+    }
+    return parsePgnTextToSession(pgnInput, fenInput.trim() || undefined);
+  }, [activeModal, fenPgnTab, importMode, pgnDirty, pgnInput, fenInput]);
+
+  const effectiveExportBaseFen = exportBaseFen || currentFen || INITIAL_FEN;
+  const exportPreviewText = useMemo(() => {
+    if (activeModal !== 'fen-pgn') return '';
+    if (exportFormat === 'wechat') {
+      return formatGameToWechatText(
+        metadata,
+        exportMoves,
+        effectiveExportBaseFen,
+        exportIncludeNotes
+      );
+    }
+    return formatGameToPgn(
+      metadata,
+      exportMoves,
+      effectiveExportBaseFen,
+      exportIncludeNotes
+    );
+  }, [
+    activeModal,
+    exportFormat,
+    metadata,
+    exportMoves,
+    effectiveExportBaseFen,
+    exportIncludeNotes,
+  ]);
 
   const commands = [
     {
@@ -213,9 +294,18 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
       },
     },
     {
+      id: 'cmd-opening',
+      label: '进入「开局研习」（定式树探索 · 变例对练）',
+      shortcut: '2',
+      action: () => {
+        onSwitchWorkspace('opening');
+        onClose();
+      },
+    },
+    {
       id: 'cmd-challenge',
       label: '进入「残局题库」（七星聚会 / 野马操田）',
-      shortcut: '2',
+      shortcut: '3',
       action: () => {
         onSwitchWorkspace('challenge');
         onClose();
@@ -224,7 +314,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
     {
       id: 'cmd-play',
       label: '开启「人机对弈」（支持分先/让左马/让双马）',
-      shortcut: '3',
+      shortcut: '4',
       action: () => {
         onSwitchWorkspace('play');
         onClose();
@@ -233,18 +323,45 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
     {
       id: 'cmd-setup',
       label: '打开「摆子编辑」自由摆设局面',
-      shortcut: '4',
+      shortcut: '5',
       action: () => {
         onSwitchWorkspace('setup');
         onClose();
       },
     },
     {
+      id: 'cmd-export',
+      label: '导出当前对局（下载 .pgn / .fen / 复制微信文本）',
+      shortcut: 'E',
+      action: () => {
+        setFenPgnTab('export');
+        if (onOpenModal) {
+          onOpenModal('fen-pgn');
+        }
+      },
+    },
+    {
+      id: 'cmd-import-fen',
+      label: '导入 FEN / PGN 棋谱至「复盘分析」',
+      shortcut: 'F',
+      action: () => {
+        setFenPgnTab('import');
+        setImportMode('fen-pgn');
+        if (onOpenModal) {
+          onOpenModal('fen-pgn');
+        }
+      },
+    },
+    {
       id: 'cmd-image-board',
-      label: '从图片识别导入局面（截图识谱）',
+      label: '从图片识别导入至「复盘分析」（截图识谱）',
       shortcut: 'I',
       action: () => {
+        setFenPgnTab('import');
         setImportMode('image');
+        if (onOpenModal) {
+          onOpenModal('fen-pgn');
+        }
       },
     },
     {
@@ -459,19 +576,37 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                 {onSaveCurrentGameToLibrary && (
                   <button
                     type="button"
+                    disabled={!canSaveCurrentGame}
                     onClick={() => {
                       onSaveCurrentGameToLibrary();
                       setLibSaveToast(true);
                       window.setTimeout(() => setLibSaveToast(false), 1800);
                     }}
-                    className="px-3 py-1 rounded-md xq-btn-primary text-xs flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                    title={
+                      !canSaveCurrentGame
+                        ? '走子或导入局面后即可存入棋谱库'
+                        : isExistingUserSave
+                        ? '原地更新棋谱库中的当前对局'
+                        : '将当前对局保存至「自存对局」'
+                    }
+                    className={`px-3 py-1 rounded-md text-xs flex items-center gap-1.5 whitespace-nowrap ${
+                      canSaveCurrentGame
+                        ? 'xq-btn-primary cursor-pointer'
+                        : 'xq-btn-secondary opacity-45 cursor-not-allowed'
+                    }`}
                   >
                     {libSaveToast ? (
                       <Check className="w-3.5 h-3.5" />
                     ) : (
                       <BookmarkPlus className="w-3.5 h-3.5" />
                     )}
-                    <span>{libSaveToast ? '已保存到棋谱库' : '保存当前对局入库'}</span>
+                    <span>
+                      {libSaveToast
+                        ? '已保存到棋谱库'
+                        : isExistingUserSave
+                        ? '更新当前存局'
+                        : '保存当前对局入库'}
+                    </span>
                   </button>
                 )}
                 <button
@@ -482,6 +617,27 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                   <X className="w-4 h-4" />
                 </button>
               </div>
+            </div>
+
+            {/* 双库分工提示条 + 跳转开局研习 */}
+            <div className="px-3 py-1.5 rounded-md bg-[var(--xq-bg-canvas)] border xq-border flex items-center justify-between gap-2 text-[11px] xq-text-muted">
+              <span className="truncate">
+                棋谱库收录整局名局与自存复盘 · 按盘面查定式胜率或练布局请前往「开局研习」
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onOpenOpeningBook) {
+                    onOpenOpeningBook();
+                  } else {
+                    onSwitchWorkspace('opening');
+                  }
+                  onClose();
+                }}
+                className="text-[var(--xq-accent-gold)] font-medium hover:underline cursor-pointer whitespace-nowrap shrink-0"
+              >
+                打开开局研习 →
+              </button>
             </div>
 
             {/* 分类计数 Tabs */}
@@ -521,35 +677,38 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                 />
               </div>
 
-              <select
-                value={libResultFilter}
-                onChange={(e) =>
-                  setLibResultFilter(e.target.value as 'all' | '红胜' | '黑胜' | '和棋')
-                }
-                aria-label="按赛果筛选"
-                className="px-2.5 py-1.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)] cursor-pointer"
-              >
-                <option value="all">全部赛果</option>
-                <option value="红胜">红胜</option>
-                <option value="黑胜">黑胜</option>
-                <option value="和棋">和棋</option>
-              </select>
+              <div className="w-[108px] shrink-0">
+                <ThemeSelect
+                  ariaLabel="按赛果筛选"
+                  value={libResultFilter}
+                  onChange={setLibResultFilter}
+                  triggerClassName="px-2.5 py-1.5"
+                  menuMinWidthClass="min-w-[116px]"
+                  options={[
+                    { value: 'all', label: '全部赛果' },
+                    { value: '红胜', label: '红胜' },
+                    { value: '黑胜', label: '黑胜' },
+                    { value: '和棋', label: '和棋' },
+                  ]}
+                />
+              </div>
 
-              <select
-                value={libSortBy}
-                onChange={(e) =>
-                  setLibSortBy(
-                    e.target.value as 'default' | 'date-desc' | 'plies-desc' | 'accuracy-desc'
-                  )
-                }
-                aria-label="排序方式"
-                className="px-2.5 py-1.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)] cursor-pointer"
-              >
-                <option value="default">默认排序</option>
-                <option value="date-desc">最新日期</option>
-                <option value="plies-desc">手数最多</option>
-                <option value="accuracy-desc">精准度最高</option>
-              </select>
+              <div className="w-[116px] shrink-0">
+                <ThemeSelect
+                  ariaLabel="排序方式"
+                  value={libSortBy}
+                  onChange={setLibSortBy}
+                  menuAlign="right"
+                  triggerClassName="px-2.5 py-1.5"
+                  menuMinWidthClass="min-w-[124px]"
+                  options={[
+                    { value: 'default', label: '默认排序' },
+                    { value: 'date-desc', label: '最新日期' },
+                    { value: 'plies-desc', label: '手数最多' },
+                    { value: 'accuracy-desc', label: '精准度最高' },
+                  ]}
+                />
+              </div>
             </div>
 
             {/* 当前筛选数量与胜负分布汇总条 */}
@@ -577,7 +736,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
             <div className="space-y-2 max-h-64 overflow-y-auto no-scrollbar">
               {filteredLibrary.length === 0 ? (
                 <div className="py-8 text-center text-xs xq-text-muted">
-                  暂无匹配棋谱（可点击右上角「保存当前对局入库」或在棋谱栏点击「★ 收藏」）
+                  暂无匹配棋谱（可点击右上角「保存当前对局入库」或在棋谱栏点击「存局」）
                 </div>
               ) : (
                 filteredLibrary.map((game) => (
@@ -625,6 +784,16 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                           }`}
                         />
                       </button>
+                      {onExportLibraryGame && (
+                        <button
+                          type="button"
+                          onClick={() => onExportLibraryGame(game)}
+                          title="下载标准 .pgn 棋谱文件"
+                          className="p-1.5 rounded-md xq-btn-secondary cursor-pointer"
+                        >
+                          <ArrowUpFromLine className="w-3.5 h-3.5 opacity-85" />
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => {
@@ -650,90 +819,86 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
           </div>
         )}
 
-        {/* ==================== 3. 导入 / 棋谱（FEN + PGN + 图片识别二合一弹窗） ==================== */}
+        {/* ==================== 3. 导入与导出（双页签分流：导入至复盘 / 导出当前对局） ==================== */}
         {activeModal === 'fen-pgn' && (
           <div className="p-5 space-y-4">
-            <div className="flex items-center justify-between border-b xq-border pb-3">
-              <div className="flex items-center gap-3">
-                <h3 className="text-[15px] font-semibold">导入与导出</h3>
-                <div className="flex items-center gap-1.5 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setImportMode('fen-pgn')}
-                    className={`px-3 py-1 rounded-md flex items-center gap-1.5 cursor-pointer ${
-                      importMode === 'fen-pgn' ? 'xq-btn-option-active' : 'xq-btn-option'
-                    }`}
-                  >
-                    <FileCode2 className="w-3.5 h-3.5" />
-                    <span>FEN / PGN 棋谱</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setImportMode('image')}
-                    className={`px-3 py-1 rounded-md flex items-center gap-1.5 cursor-pointer ${
-                      importMode === 'image' ? 'xq-btn-option-active' : 'xq-btn-option'
-                    }`}
-                  >
-                    <ImageIcon className="w-3.5 h-3.5" />
-                    <span>图片识别局面</span>
-                  </button>
+            <div className="flex items-center justify-between border-b xq-border pb-3 gap-3">
+              <div className="space-y-1">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h3 className="text-[15px] font-semibold">导入与导出</h3>
+                  <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--xq-bg-canvas)] border xq-border text-xs">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFenPgnTab('import');
+                        setFenError(null);
+                      }}
+                      className={`px-3 py-1 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap ${
+                        fenPgnTab === 'import'
+                          ? 'bg-[var(--xq-bg-active)] text-[var(--xq-accent-gold)] font-semibold'
+                          : 'xq-text-secondary hover:text-[var(--xq-text-primary)]'
+                      }`}
+                    >
+                      <ArrowDownToLine className="w-3.5 h-3.5" />
+                      <span>导入至复盘</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFenPgnTab('export');
+                        setFenError(null);
+                      }}
+                      className={`px-3 py-1 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap ${
+                        fenPgnTab === 'export'
+                          ? 'bg-[var(--xq-bg-active)] text-[var(--xq-accent-gold)] font-semibold'
+                          : 'xq-text-secondary hover:text-[var(--xq-text-primary)]'
+                      }`}
+                    >
+                      <ArrowUpFromLine className="w-3.5 h-3.5" />
+                      <span>导出当前对局</span>
+                    </button>
+                  </div>
                 </div>
+                <p className="text-[11px] xq-text-muted">
+                  {fenPgnTab === 'import'
+                    ? '支持粘贴 FEN、中文纵线 PGN 棋谱或截图识盘，确认后自动载入「复盘分析」'
+                    : `提取当前工作台局面与 ${exportMoves.length} 手着法，支持标准 .pgn / .fen 下载及微信转发`}
+                </p>
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="p-1 rounded hover:bg-[var(--xq-bg-hover)] cursor-pointer"
+                className="p-1 rounded hover:bg-[var(--xq-bg-hover)] cursor-pointer self-start shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {importMode === 'fen-pgn' ? (
+            {fenPgnTab === 'export' ? (
+              /* -------------------- 导出当前对局页签 -------------------- */
               <div className="space-y-3.5 text-xs">
-                {/* FEN 区 */}
+                {/* 1. 当前局面 FEN 快照 */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold xq-text-secondary">1. FEN 局面编码</span>
-                    <div className="flex items-center gap-2 text-xs xq-text-secondary">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFenInput(INITIAL_FEN);
-                          setFenError(null);
-                        }}
-                        className="hover:underline cursor-pointer"
-                      >
-                        标准开局 FEN
-                      </button>
-                      <span>·</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFenInput(
-                            '5k3/4a4/4b4/7R1/3r4R/1p7/9/4p4/4pp3/4K3C w - - 0 1'
-                          );
-                          setFenError(null);
-                        }}
-                        className="hover:underline cursor-pointer text-[var(--xq-accent-gold)] font-medium"
-                      >
-                        《七星聚会》FEN
-                      </button>
-                    </div>
+                    <span className="font-semibold xq-text-secondary">
+                      1. 当前停顿盘面 FEN 编码
+                    </span>
+                    <span className="text-[11px] xq-text-muted font-mono-tabular">
+                      可用于分享单步残局或校验当前阵型
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <input
                       type="text"
-                      value={fenInput}
-                      onChange={(e) => {
-                        setFenInput(e.target.value);
-                        setFenError(null);
-                      }}
-                      className="flex-1 px-3 py-1.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)] font-mono-tabular text-xs"
+                      readOnly
+                      value={currentFen}
+                      onFocus={(e) => e.currentTarget.select()}
+                      className="flex-1 px-3 py-1.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)] font-mono-tabular text-xs xq-text-primary"
                     />
                     <button
                       type="button"
                       onClick={() => {
-                        navigator.clipboard?.writeText(fenInput).catch(() => {});
+                        navigator.clipboard?.writeText(currentFen).catch(() => {});
                         setCopiedFen(true);
                         setTimeout(() => setCopiedFen(false), 1600);
                       }}
@@ -746,77 +911,324 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                       )}
                       <span>{copiedFen ? '已复制' : '复制 FEN'}</span>
                     </button>
-                  </div>
-                </div>
-
-                {/* PGN 完整棋谱区 */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold xq-text-secondary">
-                      2. PGN 完整棋谱文本（支持复制导出或粘贴含 [FEN] 棋谱）
-                    </span>
                     <button
                       type="button"
                       onClick={() => {
-                        navigator.clipboard?.writeText(pgnInput).catch(() => {});
-                        setCopiedPgn(true);
-                        setTimeout(() => setCopiedPgn(false), 1600);
+                        const baseName = sanitizeExportFilename(
+                          `${metadata.opening || 'position'}_${metadata.date || ''}`
+                        );
+                        downloadTextFile(`${baseName}.fen`, `${currentFen}\n`);
                       }}
-                      className="text-xs text-[var(--xq-accent-gold)] font-medium hover:underline flex items-center gap-1 cursor-pointer"
+                      className="px-3 py-1.5 rounded-md xq-btn-secondary flex items-center gap-1 cursor-pointer whitespace-nowrap"
                     >
-                      {copiedPgn ? (
+                      <ArrowUpFromLine className="w-3.5 h-3.5 opacity-85" />
+                      <span>下载 .fen</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. 完整棋谱导出（标准 PGN / 微信纯中文文本 + 可选评分批注） */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setExportFormat('pgn')}
+                        className={`px-2.5 py-1 rounded-md cursor-pointer whitespace-nowrap ${
+                          exportFormat === 'pgn' ? 'xq-btn-option-active' : 'xq-btn-option'
+                        }`}
+                      >
+                        标准 PGN 格式
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setExportFormat('wechat')}
+                        className={`px-2.5 py-1 rounded-md cursor-pointer whitespace-nowrap ${
+                          exportFormat === 'wechat' ? 'xq-btn-option-active' : 'xq-btn-option'
+                        }`}
+                      >
+                        微信纯中文棋谱
+                      </button>
+                    </div>
+
+                    <label className="flex items-center gap-1.5 cursor-pointer xq-text-secondary select-none">
+                      <input
+                        type="checkbox"
+                        checked={exportIncludeNotes}
+                        onChange={(e) => setExportIncludeNotes(e.target.checked)}
+                        className="w-3.5 h-3.5 accent-[var(--xq-accent-primary)] cursor-pointer"
+                      />
+                      <span>附带引擎评分与战术批注</span>
+                    </label>
+                  </div>
+
+                  <textarea
+                    rows={7}
+                    readOnly
+                    value={exportPreviewText}
+                    onFocus={(e) => e.currentTarget.select()}
+                    className="w-full p-2.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)] font-mono-tabular text-xs leading-relaxed"
+                  />
+
+                  <div className="text-[11px] xq-text-muted font-mono-tabular">
+                    {exportMoves.length > 0
+                      ? `已包含起始基准 [FEN] 与全盘 ${exportMoves.length} 手着法 · 可无损重导`
+                      : '当前尚无实走着法，导出仅含对局信息与起始 [FEN]；走子或载入名局后可导出完整着法'}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t xq-border">
+                  <button
+                    type="button"
+                    onClick={() => setFenPgnTab('import')}
+                    className="text-xs xq-text-secondary hover:text-[var(--xq-accent-gold)] cursor-pointer"
+                  >
+                    ← 切换到「导入至复盘」
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard?.writeText(exportPreviewText).catch(() => {});
+                        setCopiedExportText(true);
+                        setTimeout(() => setCopiedExportText(false), 1600);
+                      }}
+                      className="px-3.5 py-1.5 rounded-md xq-btn-secondary flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                    >
+                      {copiedExportText ? (
                         <Check className="w-3.5 h-3.5 text-[#10B981]" />
                       ) : (
                         <Copy className="w-3.5 h-3.5" />
                       )}
-                      <span>{copiedPgn ? '已复制完整 PGN' : '复制 PGN 棋谱'}</span>
+                      <span>
+                        {copiedExportText
+                          ? '已复制内容'
+                          : exportFormat === 'pgn'
+                          ? '复制 PGN'
+                          : '复制微信文本'}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const pgnContent = formatGameToPgn(
+                          metadata,
+                          exportMoves,
+                          effectiveExportBaseFen,
+                          exportIncludeNotes
+                        );
+                        const fileName = sanitizeExportFilename(
+                          `${metadata.redPlayer}_vs_${metadata.blackPlayer}_${metadata.opening || 'xiangqi'}`
+                        );
+                        downloadTextFile(`${fileName}.pgn`, pgnContent);
+                      }}
+                      className="px-4 py-1.5 rounded-md xq-btn-primary flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                    >
+                      <ArrowUpFromLine className="w-3.5 h-3.5" />
+                      <span>下载 .pgn 文件</span>
                     </button>
                   </div>
-                  <textarea
-                    rows={5}
-                    value={pgnInput}
-                    onChange={(e) => {
-                      setPgnInput(e.target.value);
-                      const fenMatch = e.target.value.match(/\[FEN\s+"([^"]+)"\]/i);
-                      if (fenMatch?.[1]) {
-                        setFenInput(fenMatch[1]);
-                      }
-                    }}
-                    className="w-full p-2.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)] font-mono-tabular text-xs leading-relaxed"
-                  />
                 </div>
-
-                {fenError && (
-                  <div className="p-2 rounded-md xq-btn-danger text-xs">
-                    {fenError}
-                  </div>
-                )}
-
-                <div className="flex justify-end gap-2 pt-2 border-t xq-border">
+              </div>
+            ) : (
+              /* -------------------- 导入至复盘页签 -------------------- */
+              <div className="space-y-3.5 text-xs">
+                <div className="flex items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={onClose}
-                    className="px-3.5 py-1.5 rounded-md xq-btn-secondary cursor-pointer"
+                    onClick={() => {
+                      setImportMode('fen-pgn');
+                      setFenError(null);
+                    }}
+                    className={`px-3 py-1 rounded-md flex items-center gap-1.5 cursor-pointer ${
+                      importMode === 'fen-pgn' ? 'xq-btn-option-active' : 'xq-btn-option'
+                    }`}
                   >
-                    取消
+                    <FileCode2 className="w-3.5 h-3.5" />
+                    <span>FEN / PGN 文本</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => {
-                      const ok = onApplyFen(fenInput);
-                      if (!ok) {
-                        setFenError('FEN 格式不合法：必须包含 10 行有效九路盘面编码');
-                      } else {
-                        onClose();
-                      }
+                      setImportMode('image');
+                      setFenError(null);
                     }}
-                    className="px-4 py-1.5 rounded-md xq-btn-primary cursor-pointer"
+                    className={`px-3 py-1 rounded-md flex items-center gap-1.5 cursor-pointer ${
+                      importMode === 'image' ? 'xq-btn-option-active' : 'xq-btn-option'
+                    }`}
                   >
-                    载入到棋盘
+                    <ImageIcon className="w-3.5 h-3.5" />
+                    <span>图片识别局面</span>
                   </button>
                 </div>
-              </div>
-            ) : (
+
+                {importMode === 'fen-pgn' ? (
+                  <div className="space-y-3.5">
+                    {/* FEN 粘贴区 */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <span className="font-semibold xq-text-secondary">
+                          1. 粘贴 FEN 局面编码（单局面导入）
+                        </span>
+                        <div className="flex items-center gap-2 text-xs xq-text-secondary">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFenInput(INITIAL_FEN);
+                              setFenError(null);
+                            }}
+                            className="hover:underline cursor-pointer"
+                          >
+                            标准开局
+                          </button>
+                          <span>·</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFenInput(
+                                '5k3/4a4/4b4/7R1/3r4R/1p7/9/4p4/4pp3/4K3C w - - 0 1'
+                              );
+                              setFenError(null);
+                            }}
+                            className="hover:underline cursor-pointer text-[var(--xq-accent-gold)] font-medium"
+                          >
+                            《七星聚会》
+                          </button>
+                          <span>·</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFenInput(currentFen);
+                              setFenError(null);
+                            }}
+                            className="hover:underline cursor-pointer"
+                          >
+                            填入当前盘面
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={fenInput}
+                          onChange={(e) => {
+                            setFenInput(e.target.value);
+                            setFenError(null);
+                          }}
+                          placeholder="粘贴 FEN 编码串（例如 rnbakabnr/9/... w - - 0 1）"
+                          className="flex-1 px-3 py-1.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)] font-mono-tabular text-xs"
+                        />
+                        {(fenInput || pgnInput) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFenInput('');
+                              setPgnInput('');
+                              setPgnDirty(false);
+                              setFenError(null);
+                            }}
+                            className="px-2.5 py-1.5 rounded-md xq-btn-secondary cursor-pointer whitespace-nowrap"
+                          >
+                            清空
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* PGN 完整棋谱区 */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold xq-text-secondary">
+                          2. 或粘贴完整 PGN 文本（支持中文纵线着法与 [FEN] 残局头）
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPgnInput(currentPgn);
+                            setPgnDirty(true);
+                            setFenError(null);
+                          }}
+                          className="text-[11px] xq-text-muted hover:text-[var(--xq-accent-gold)] cursor-pointer"
+                        >
+                          载入当前文本模板
+                        </button>
+                      </div>
+                      <textarea
+                        rows={5}
+                        value={pgnInput}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setPgnInput(val);
+                          setPgnDirty(true);
+                          setFenError(null);
+                          const fenMatch = val.match(/\[FEN\s+"([^"]+)"\]/i);
+                          if (fenMatch?.[1]) {
+                            setFenInput(fenMatch[1]);
+                          }
+                        }}
+                        placeholder="粘贴完整 PGN 文本（含中文纵线着法如 1. 炮二平五 马8进7 2. 马二进三 车9平8）"
+                        className="w-full p-2.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)] font-mono-tabular text-xs leading-relaxed"
+                      />
+                      {parsedPgnPreview && parsedPgnPreview.moves.length > 0 && (
+                        <div className="text-[11px] text-[#10B981] font-mono-tabular">
+                          已识别 PGN 棋谱：共 {parsedPgnPreview.moves.length} 手合法着法，将完整还原并导入至「复盘分析」
+                        </div>
+                      )}
+                    </div>
+
+                    {fenError && (
+                      <div className="p-2 rounded-md xq-btn-danger text-xs">
+                        {fenError}
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between pt-2 border-t xq-border">
+                      <button
+                        type="button"
+                        onClick={() => setFenPgnTab('export')}
+                        className="text-xs xq-text-secondary hover:text-[var(--xq-accent-gold)] cursor-pointer"
+                      >
+                        需要保存或分享？前往「导出当前对局」→
+                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={onClose}
+                          className="px-3.5 py-1.5 rounded-md xq-btn-secondary cursor-pointer"
+                        >
+                          取消
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (pgnDirty && pgnInput.trim() && onApplyPgnSession) {
+                              const ok = onApplyPgnSession(pgnInput, fenInput);
+                              if (!ok) {
+                                setFenError('PGN 或 FEN 格式不合法：请检查盘面编码与着法记谱');
+                              } else {
+                                onClose();
+                              }
+                              return;
+                            }
+                            if (!fenInput.trim()) {
+                              setFenError('请先粘贴有效的 FEN 局面或 PGN 棋谱文本');
+                              return;
+                            }
+                            const ok = onApplyFen(fenInput);
+                            if (!ok) {
+                              setFenError('FEN 格式不合法：必须包含 10 行有效九路盘面编码');
+                            } else {
+                              onClose();
+                            }
+                          }}
+                          className="px-4 py-1.5 rounded-md xq-btn-primary cursor-pointer"
+                        >
+                          导入至复盘分析
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
               /* 图片识别局面（极简一键识图：拖入/粘贴/选图 + 红黑先行 + 载入） */
               <div
                 className="space-y-3.5 text-xs"
@@ -829,7 +1241,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
               >
                 {/* 极简核心上传/粘贴区 */}
                 <label className="p-6 rounded-xl border-2 border-dashed xq-border bg-[var(--xq-bg-canvas)] hover:border-[var(--xq-accent-gold)]/60 transition-colors flex flex-col items-center justify-center gap-2 text-center cursor-pointer">
-                  <Upload className="w-6 h-6 text-[var(--xq-accent-gold)]" />
+                  <ArrowDownToLine className="w-6 h-6 text-[var(--xq-accent-gold)]" />
                   <div className="font-semibold text-sm">
                     {uploadedFileName
                       ? `已识别图片：${uploadedFileName}`
@@ -908,16 +1320,17 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = ({
                         const baseFen = activeSampleRecognition.fen.split(' ')[0];
                         const finalFen = `${baseFen} ${imgTurn === 'red' ? 'w' : 'b'} - - 0 1`;
                         onApplyFen(finalFen);
-                        onSwitchWorkspace('study');
                         onClose();
                       }}
                       className="px-4 py-1.5 rounded-md xq-btn-primary cursor-pointer"
                     >
-                      识别并载入棋盘
+                      识别并导入至复盘分析
                     </button>
                   </div>
                 </div>
               </div>
+            )}
+            </div>
             )}
           </div>
         )}

@@ -7,6 +7,7 @@ interface XiangqiPieceProps {
   isSelected?: boolean;
   isLastMove?: boolean;
   isInCheck?: boolean;
+  isAlertShaking?: boolean;
   craftStyle: PieceCraftStyle;
   fontScheme: FontScheme;
   useTraditionalChar: boolean;
@@ -20,6 +21,7 @@ export const XiangqiPiece: React.FC<XiangqiPieceProps> = React.memo(({
   isSelected = false,
   isLastMove = false,
   isInCheck = false,
+  isAlertShaking = false,
   craftStyle,
   fontScheme,
   useTraditionalChar,
@@ -91,7 +93,7 @@ export const XiangqiPiece: React.FC<XiangqiPieceProps> = React.memo(({
         isSelected
           ? '-translate-y-1.5 scale-110 ring-2 ring-[#D4AF37] shadow-[0_14px_24px_rgba(0,0,0,0.85)] z-30'
           : 'hover:-translate-y-0.5 active:translate-y-0 z-10'
-      }`}
+      } ${isAlertShaking ? 'animate-illegal-shake' : ''}`}
     >
       {/* 上一步落子微光光环 */}
       {isLastMove && !isSelected && (

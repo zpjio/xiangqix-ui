@@ -12,6 +12,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { EngineProfile, MultiPVArrow, MultiPVLine, Position } from '../types/xiangqi';
+import { ThemeSelect } from './ThemeSelect';
 
 interface EnginePanelProps {
   engines: EngineProfile[];
@@ -114,18 +115,19 @@ export const EnginePanel: React.FC<EnginePanelProps> = React.memo(({
 
           {/* 单引擎模式显示主引擎下拉；双擎模式在下方展示对称双引擎选择器 */}
           {!compareMode ? (
-            <select
-              aria-label="选择主分析引擎"
-              value={primaryEngine.id}
-              onChange={(e) => onChangePrimaryEngine(e.target.value)}
-              className="px-2 py-1 rounded-md text-xs font-medium border xq-border bg-[var(--xq-bg-canvas)] xq-text-primary cursor-pointer focus:outline-none focus:border-[var(--xq-accent-gold)] min-w-0 max-w-[148px] truncate"
-            >
-              {engines.map((eng) => (
-                <option key={eng.id} value={eng.id}>
-                  {eng.shortName} [{eng.protocol}]{eng.status !== 'ready' ? ' (未装)' : ''}
-                </option>
-              ))}
-            </select>
+            <div className="min-w-0 max-w-[158px]">
+              <ThemeSelect
+                ariaLabel="选择主分析引擎"
+                value={primaryEngine.id}
+                onChange={onChangePrimaryEngine}
+                triggerClassName="px-2 py-1 font-medium"
+                menuMinWidthClass="min-w-[175px]"
+                options={engines.map((eng) => ({
+                  value: eng.id,
+                  label: `${eng.shortName} [${eng.protocol}]${eng.status !== 'ready' ? ' (未装)' : ''}`,
+                }))}
+              />
+            </div>
           ) : (
             <span className="text-xs font-medium text-[var(--xq-accent-gold)] truncate">
               双擎并行推演
@@ -168,18 +170,19 @@ export const EnginePanel: React.FC<EnginePanelProps> = React.memo(({
             <span className="px-1.5 py-0.5 rounded bg-[#10B981] text-white font-bold text-[10px] shrink-0">
               主
             </span>
-            <select
-              aria-label="选择对比主引擎"
-              value={primaryEngine.id}
-              onChange={(e) => onChangePrimaryEngine(e.target.value)}
-              className="w-full min-w-0 px-1.5 py-1 rounded border border-[#10B981]/45 bg-[var(--xq-bg-surface)] xq-text-primary text-xs font-medium cursor-pointer focus:outline-none focus:border-[#10B981] truncate"
-            >
-              {engines.map((eng) => (
-                <option key={`cmp-pri-${eng.id}`} value={eng.id}>
-                  {eng.shortName} [{eng.protocol}]{eng.status !== 'ready' ? ' (未装)' : ''}
-                </option>
-              ))}
-            </select>
+            <div className="flex-1 min-w-0">
+              <ThemeSelect
+                ariaLabel="选择对比主引擎"
+                value={primaryEngine.id}
+                onChange={onChangePrimaryEngine}
+                triggerClassName="px-1.5 py-1 font-medium border-[#10B981]/45 bg-[var(--xq-bg-surface)] focus:border-[#10B981]"
+                menuMinWidthClass="min-w-[175px]"
+                options={engines.map((eng) => ({
+                  value: eng.id,
+                  label: `${eng.shortName} [${eng.protocol}]${eng.status !== 'ready' ? ' (未装)' : ''}`,
+                }))}
+              />
+            </div>
           </div>
 
           <button
@@ -195,18 +198,20 @@ export const EnginePanel: React.FC<EnginePanelProps> = React.memo(({
             <span className="px-1.5 py-0.5 rounded bg-[#3B82F6] text-white font-bold text-[10px] shrink-0">
               副
             </span>
-            <select
-              aria-label="选择对比副引擎"
-              value={secondaryEngine.id}
-              onChange={(e) => onChangeSecondaryEngine(e.target.value)}
-              className="w-full min-w-0 px-1.5 py-1 rounded border border-[#3B82F6]/45 bg-[var(--xq-bg-surface)] xq-text-primary text-xs font-medium cursor-pointer focus:outline-none focus:border-[#3B82F6] truncate"
-            >
-              {engines.map((eng) => (
-                <option key={`cmp-sec-${eng.id}`} value={eng.id}>
-                  {eng.shortName} [{eng.protocol}]{eng.status !== 'ready' ? ' (未装)' : ''}
-                </option>
-              ))}
-            </select>
+            <div className="flex-1 min-w-0">
+              <ThemeSelect
+                ariaLabel="选择对比副引擎"
+                value={secondaryEngine.id}
+                onChange={onChangeSecondaryEngine}
+                menuAlign="right"
+                triggerClassName="px-1.5 py-1 font-medium border-[#3B82F6]/45 bg-[var(--xq-bg-surface)] focus:border-[#3B82F6]"
+                menuMinWidthClass="min-w-[175px]"
+                options={engines.map((eng) => ({
+                  value: eng.id,
+                  label: `${eng.shortName} [${eng.protocol}]${eng.status !== 'ready' ? ' (未装)' : ''}`,
+                }))}
+              />
+            </div>
           </div>
         </div>
       )}

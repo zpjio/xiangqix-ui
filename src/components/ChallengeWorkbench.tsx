@@ -8,6 +8,7 @@ import {
   Search,
 } from 'lucide-react';
 import { ClassicalChallengeItem } from '../types/xiangqi';
+import { ThemeSelect } from './ThemeSelect';
 
 interface ChallengeWorkbenchProps {
   challenges: ClassicalChallengeItem[];
@@ -112,22 +113,23 @@ export const ChallengeWorkbench: React.FC<ChallengeWorkbenchProps> = React.memo(
             />
           </div>
 
-          <select
-            value={selectedBook}
-            onChange={(e) => setSelectedBook(e.target.value)}
-            aria-label="按古谱典籍筛选"
-            className="px-2 py-1.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)] text-xs cursor-pointer max-w-[125px] truncate"
-          >
-            <option value="all">全部典籍 ({challenges.length})</option>
-            {bookOptions.map((book) => {
-              const cnt = challenges.filter((c) => c.bookSeries === book).length;
-              return (
-                <option key={book} value={book}>
-                  {book} ({cnt})
-                </option>
-              );
-            })}
-          </select>
+          <div className="w-[132px] shrink-0">
+            <ThemeSelect
+              ariaLabel="按古谱典籍筛选"
+              value={selectedBook}
+              onChange={setSelectedBook}
+              menuAlign="right"
+              triggerClassName="px-2 py-1.5"
+              menuMinWidthClass="min-w-[155px]"
+              options={[
+                { value: 'all', label: `全部典籍 (${challenges.length})` },
+                ...bookOptions.map((book) => ({
+                  value: book,
+                  label: `${book} (${challenges.filter((c) => c.bookSeries === book).length})`,
+                })),
+              ]}
+            />
+          </div>
         </div>
 
         {/* 难度分段筛选 + 仅看未破 */}
