@@ -135,11 +135,20 @@ html[data-font-scale="xlarge"] {
     font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
     background-color: var(--xq-bg-canvas);
     color: var(--xq-text-primary);
-    overflow-x: hidden;
+    overflow: hidden;
     margin: 0;
     padding: 0;
     -webkit-font-smoothing: antialiased;
   }
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 /* 字体工具类 */

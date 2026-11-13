@@ -335,10 +335,10 @@ export const Board: React.FC<BoardProps> = ({
 
   return (
     <div className="relative flex items-center justify-center gap-3 select-none">
-      {/* 棋盘主体容器：随视口高度自适应放大（最高可达 620px 宽），同时确保一屏完整容纳不产生纵向滚动 */}
-      <div className="relative w-[clamp(430px,calc((100vh-228px)*0.89),620px)] transition-all">
+      {/* 棋盘主体容器：随视口高度自适应缩放，确保与上下棋手栏、操控栏在一屏内完整容纳不产生滚动条 */}
+      <div className="relative w-[clamp(280px,calc((100vh-226px)*0.86),590px)] transition-all">
         <div
-          className={`relative rounded-xl p-2.5 sm:p-3 border-2 transition-all duration-200 ${themeColors.frameClass} ${modeRimClass}`}
+          className={`relative rounded-xl p-2 sm:p-2.5 border-2 transition-all duration-200 ${themeColors.frameClass} ${modeRimClass}`}
         >
           {/* 四个传统黄铜回纹包角 */}
           <span className="absolute top-1.5 left-1.5 w-4 h-4 border-t-2 border-l-2 border-[#D4AF37]/50 pointer-events-none" />

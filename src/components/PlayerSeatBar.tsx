@@ -23,7 +23,7 @@ export const PlayerSeatBar: React.FC<PlayerSeatBarProps> = ({
   const isRed = camp === 'red';
 
   return (
-    <div className="w-full px-3.5 py-2 rounded-lg border xq-surface flex items-center justify-between gap-3 select-none">
+    <div className="w-full px-3.5 py-1.5 rounded-lg border xq-surface flex items-center justify-between gap-3 select-none">
       {/* 左侧：红/黑标识 + 棋手姓名 + 赛事/难度副标 */}
       <div className="flex items-center gap-2.5 min-w-0">
         <span

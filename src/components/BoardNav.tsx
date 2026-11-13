@@ -35,7 +35,7 @@ export const BoardNav: React.FC<BoardNavProps> = ({
   onTriggerHint,
 }) => {
   return (
-    <div className="w-full px-3.5 py-2 rounded-lg border xq-surface flex items-center justify-between gap-2 select-none shadow-2xs">
+    <div className="w-full px-3.5 py-1.5 rounded-lg border xq-surface flex items-center justify-between gap-2 select-none shadow-2xs">
       {/* 左侧步进导航 */}
       <div className="flex items-center gap-1">
         <button

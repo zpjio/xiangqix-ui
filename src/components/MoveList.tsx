@@ -76,7 +76,7 @@ export const MoveList: React.FC<MoveListProps> = ({
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       {/* 对局信息条：红方 vs 黑方 · 开局 · 收藏 */}
-      <div className="px-4 py-2.5 border-b xq-border flex items-center justify-between gap-2 text-[13px] shrink-0">
+      <div className="px-3.5 py-1.5 border-b xq-border flex items-center justify-between gap-2 text-xs shrink-0">
         <button
           type="button"
           onClick={onOpenGameInfo}
@@ -93,12 +93,12 @@ export const MoveList: React.FC<MoveListProps> = ({
           type="button"
           onClick={onToggleFavorite}
           title={metadata.isFavorite ? '已收藏至棋谱库（点击取消）' : '收藏本局至棋谱库'}
-          className={`px-2.5 py-1 rounded-md cursor-pointer flex items-center gap-1.5 text-xs shrink-0 ${
+          className={`px-2 py-0.5 rounded-md cursor-pointer flex items-center gap-1 text-xs shrink-0 ${
             metadata.isFavorite ? 'xq-btn-option-active' : 'xq-btn-secondary'
           }`}
         >
           <Star
-            className={`w-3.5 h-3.5 ${
+            className={`w-3 h-3 ${
               metadata.isFavorite ? 'fill-current' : 'xq-text-muted'
             }`}
           />
@@ -108,7 +108,7 @@ export const MoveList: React.FC<MoveListProps> = ({
 
       {/* 若处于外部平台连线观棋中，在棋谱顶部显示轻量连线同步条 */}
       {connectState?.connected && (
-        <div className="px-4 py-2 border-b border-[#10B981]/40 bg-[#10B981]/10 flex items-center justify-between gap-2 text-xs shrink-0">
+        <div className="px-3.5 py-1.5 border-b border-[#10B981]/40 bg-[#10B981]/10 flex items-center justify-between gap-2 text-xs shrink-0">
           <div className="flex items-center gap-1.5 text-[#10B981] font-medium min-w-0">
             <span className="w-2 h-2 rounded-full bg-[#10B981] animate-pulse shrink-0" />
             <span className="truncate">
@@ -119,7 +119,7 @@ export const MoveList: React.FC<MoveListProps> = ({
             <button
               type="button"
               onClick={onSyncNextExternalMove}
-              className="px-2.5 py-1 rounded-md xq-btn-engine-on text-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
+              className="px-2 py-0.5 rounded-md xq-btn-engine-on text-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
             >
               <RefreshCw className="w-3 h-3" />
               <span>同步下一手</span>
@@ -127,7 +127,7 @@ export const MoveList: React.FC<MoveListProps> = ({
             <button
               type="button"
               onClick={onDisconnectExternal}
-              className="px-2.5 py-1 rounded-md xq-btn-secondary text-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
+              className="px-2 py-0.5 rounded-md xq-btn-secondary text-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
             >
               <Unplug className="w-3 h-3" />
               <span>断开</span>
@@ -138,7 +138,7 @@ export const MoveList: React.FC<MoveListProps> = ({
 
       {/* 若存在无感内联推演支线，在顶部显示推演支线控制台 */}
       {variationMoves && branchOriginPly !== null && (
-        <div className="px-4 py-2 border-b border-[var(--xq-accent-gold)]/45 bg-[var(--xq-accent-gold)]/12 flex items-center justify-between gap-2 text-xs shrink-0">
+        <div className="px-3.5 py-1.5 border-b border-[var(--xq-accent-gold)]/45 bg-[var(--xq-accent-gold)]/12 flex items-center justify-between gap-2 text-xs shrink-0">
           <div className="flex items-center gap-1.5 text-[var(--xq-accent-gold)] font-medium min-w-0">
             <GitBranch className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">
@@ -149,7 +149,7 @@ export const MoveList: React.FC<MoveListProps> = ({
             <button
               type="button"
               onClick={onPromoteVariationToMain}
-              className="px-2.5 py-1 rounded-md xq-btn-primary text-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
+              className="px-2 py-0.5 rounded-md xq-btn-primary text-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
             >
               <Check className="w-3 h-3" />
               <span>升为主线</span>
@@ -157,7 +157,7 @@ export const MoveList: React.FC<MoveListProps> = ({
             <button
               type="button"
               onClick={onDiscardVariation}
-              className="px-2.5 py-1 rounded-md xq-btn-secondary text-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
+              className="px-2 py-0.5 rounded-md xq-btn-secondary text-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
             >
               <X className="w-3 h-3" />
               <span>回主谱</span>
@@ -167,7 +167,7 @@ export const MoveList: React.FC<MoveListProps> = ({
       )}
 
       {/* 棋谱表头（连续平整数据表格，对齐回合、红方着法/评估、黑方着法/评估） */}
-      <div className="grid grid-cols-12 items-center px-3 py-1.5 border-b xq-border bg-[var(--xq-bg-canvas)] text-xs font-medium xq-text-muted shrink-0">
+      <div className="grid grid-cols-12 items-center px-3 py-1 border-b xq-border bg-[var(--xq-bg-canvas)] text-xs font-medium xq-text-muted shrink-0">
         <div className="col-span-2 text-center">回合</div>
         <div className="col-span-5 px-2 flex items-center justify-between">
           <span>红方着法</span>
@@ -180,12 +180,12 @@ export const MoveList: React.FC<MoveListProps> = ({
       </div>
 
       {/* 双栏回合制着法表格主体 */}
-      <div className="flex-1 overflow-y-auto divide-y divide-[var(--xq-border-subtle)] text-[13px]">
+      <div className="flex-1 overflow-y-auto no-scrollbar divide-y divide-[var(--xq-border-subtle)] text-xs">
         {/* 0. 初始阵列行 */}
         <button
           type="button"
           onClick={() => onSelectPly(0, false)}
-          className={`w-full px-4 py-2 text-left flex items-center justify-between transition-colors cursor-pointer ${
+          className={`w-full px-3.5 py-1.5 text-left flex items-center justify-between transition-colors cursor-pointer ${
             currentPly === 0
               ? 'bg-[var(--xq-bg-active)] font-semibold text-[var(--xq-accent-gold)]'
               : 'hover:bg-[var(--xq-bg-hover)] xq-text-secondary'
@@ -215,7 +215,7 @@ export const MoveList: React.FC<MoveListProps> = ({
                 }`}
               >
                 {/* 回合序号 */}
-                <div className="col-span-2 py-2 text-center font-mono-tabular text-xs xq-text-muted">
+                <div className="col-span-2 py-1 text-center font-mono-tabular text-xs xq-text-muted">
                   {r.roundNumber}.
                 </div>
 
@@ -225,26 +225,26 @@ export const MoveList: React.FC<MoveListProps> = ({
                     <button
                       type="button"
                       onClick={() => onSelectPly(r.redMove!.ply, false)}
-                      className={`w-full px-2.5 py-1.5 rounded-md text-left flex items-center justify-between transition-colors cursor-pointer ${
+                      className={`w-full px-2 py-1 rounded-md text-left flex items-center justify-between transition-colors cursor-pointer ${
                         isRedSelected
                           ? 'bg-[var(--xq-bg-active)] ring-1 ring-inset ring-[var(--xq-accent-gold)]'
                           : 'hover:bg-[var(--xq-bg-hover)]'
                       }`}
                     >
-                      <span className="font-serif-sc font-bold text-sm text-[#EF4444]">
+                      <span className="font-serif-sc font-bold text-[13px] text-[#EF4444]">
                         {r.redMove.notation}
                       </span>
                       <div className="flex items-center gap-1.5 shrink-0">
                         {r.redMove.quality && (
                           <span
-                            className={`px-1.5 py-0.5 text-[11px] leading-none rounded border ${getQualityBadgeStyle(
+                            className={`px-1.5 py-0.5 text-[10px] leading-none rounded border ${getQualityBadgeStyle(
                               r.redMove.quality
                             )}`}
                           >
                             {r.redMove.quality}
                           </span>
                         )}
-                        <span className="font-mono-tabular text-xs xq-text-secondary w-9 text-right">
+                        <span className="font-mono-tabular text-xs xq-text-secondary w-8 text-right">
                           {r.redMove.evalScore >= 0
                             ? `+${r.redMove.evalScore.toFixed(1)}`
                             : r.redMove.evalScore.toFixed(1)}
@@ -260,26 +260,26 @@ export const MoveList: React.FC<MoveListProps> = ({
                     <button
                       type="button"
                       onClick={() => onSelectPly(r.blackMove!.ply, false)}
-                      className={`w-full px-2.5 py-1.5 rounded-md text-left flex items-center justify-between transition-colors cursor-pointer ${
+                      className={`w-full px-2 py-1 rounded-md text-left flex items-center justify-between transition-colors cursor-pointer ${
                         isBlackSelected
                           ? 'bg-[var(--xq-bg-active)] ring-1 ring-inset ring-[var(--xq-accent-gold)]'
                           : 'hover:bg-[var(--xq-bg-hover)]'
                       }`}
                     >
-                      <span className="font-serif-sc font-bold text-sm xq-text-primary">
+                      <span className="font-serif-sc font-bold text-[13px] xq-text-primary">
                         {r.blackMove.notation}
                       </span>
                       <div className="flex items-center gap-1.5 shrink-0">
                         {r.blackMove.quality && (
                           <span
-                            className={`px-1.5 py-0.5 text-[11px] leading-none rounded border ${getQualityBadgeStyle(
+                            className={`px-1.5 py-0.5 text-[10px] leading-none rounded border ${getQualityBadgeStyle(
                               r.blackMove.quality
                             )}`}
                           >
                             {r.blackMove.quality}
                           </span>
                         )}
-                        <span className="font-mono-tabular text-xs xq-text-secondary w-9 text-right">
+                        <span className="font-mono-tabular text-xs xq-text-secondary w-8 text-right">
                           {r.blackMove.evalScore >= 0
                             ? `+${r.blackMove.evalScore.toFixed(1)}`
                             : r.blackMove.evalScore.toFixed(1)}
@@ -287,14 +287,14 @@ export const MoveList: React.FC<MoveListProps> = ({
                       </div>
                     </button>
                   ) : (
-                    <div className="px-2.5 py-1.5 text-xs xq-text-muted">—</div>
+                    <div className="px-2 py-1 text-xs xq-text-muted">—</div>
                   )}
                 </div>
               </div>
 
               {/* 内联推演支线展示盒 (紧贴分叉回合下方展开) */}
               {showBranchHere && variationMoves && (
-                <div className="mx-3 my-1.5 p-2.5 rounded-lg border border-[var(--xq-accent-gold)]/50 bg-[var(--xq-accent-gold)]/10 space-y-1.5">
+                <div className="mx-3 my-1 p-2 rounded-lg border border-[var(--xq-accent-gold)]/50 bg-[var(--xq-accent-gold)]/10 space-y-1">
                   <div className="flex items-center justify-between text-xs text-[var(--xq-accent-gold)]">
                     <span className="flex items-center gap-1 font-medium">
                       <GitBranch className="w-3.5 h-3.5" />
@@ -307,7 +307,7 @@ export const MoveList: React.FC<MoveListProps> = ({
                         key={`var-ply-${vm.ply}`}
                         type="button"
                         onClick={() => onSelectPly(vm.ply, true)}
-                        className={`px-2.5 py-1 rounded text-xs font-serif-sc font-bold border transition-colors cursor-pointer ${
+                        className={`px-2 py-0.5 rounded text-xs font-serif-sc font-bold border transition-colors cursor-pointer ${
                           currentPly === vm.ply
                             ? 'bg-[var(--xq-accent-gold)] text-[#121316] border-[var(--xq-accent-gold)]'
                             : 'bg-[var(--xq-bg-surface)] xq-border hover:border-[var(--xq-accent-gold)]'
@@ -325,11 +325,11 @@ export const MoveList: React.FC<MoveListProps> = ({
       </div>
 
       {/* 底部：当前手战术批注与正着提示卡 */}
-      <div className="px-4 py-2.5 border-t xq-border bg-[var(--xq-bg-canvas)] text-xs shrink-0">
+      <div className="px-3.5 py-2 border-t xq-border bg-[var(--xq-bg-canvas)] text-xs shrink-0">
         {activeMoveRecord ? (
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             <div className="flex items-center justify-between">
-              <span className="font-serif-sc font-bold text-sm">
+              <span className="font-serif-sc font-bold text-xs">
                 第 {activeMoveRecord.ply} 手 · {activeMoveRecord.notation}
               </span>
               {activeMoveRecord.bestAlternative && (
@@ -338,7 +338,7 @@ export const MoveList: React.FC<MoveListProps> = ({
                 </span>
               )}
             </div>
-            <p className="text-xs xq-text-secondary leading-relaxed">
+            <p className="text-xs xq-text-secondary leading-snug line-clamp-2">
               {activeMoveRecord.comment ||
                 '双方在此处平稳运子，可在任意历史手直接在棋盘走子生成推演分支。'}
             </p>

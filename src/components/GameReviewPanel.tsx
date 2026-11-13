@@ -32,7 +32,7 @@ export const GameReviewPanel: React.FC<GameReviewPanelProps> = ({
   const criticalMistakes = moves.filter((m) => m.quality === '缓' || m.quality === '败');
 
   return (
-    <div className="flex-1 overflow-y-auto p-3.5 space-y-3.5 text-xs">
+    <div className="flex-1 overflow-y-auto no-scrollbar p-3 space-y-3 text-xs">
       {/* 1. 红黑双方整局精准度对比 (Accuracy %) */}
       <div className="grid grid-cols-2 gap-3">
         <div className="p-3 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] space-y-1">

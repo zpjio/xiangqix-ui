@@ -901,9 +901,9 @@ export default function App() {
 
       {/* ==================== 2. 主工作台：中央棋盘画布 + 右侧专业工作台 ==================== */}
       <main className="flex-1 min-h-0 flex overflow-hidden relative">
-        {/* 左侧主画布区：统一舞台容器确保上席位条、评估条+棋盘、下步进控制条左右边缘严格对齐 */}
-        <div className="flex-1 min-w-0 h-full overflow-y-auto px-6 py-2 flex flex-col items-center justify-center relative">
-          <div className="w-fit flex flex-col items-stretch gap-1.5">
+        {/* 左侧主画布区：统一舞台容器确保上席位条、评估条+棋盘、下步进控制条左右边缘严格对齐且一屏无滚动条 */}
+        <div className="flex-1 min-w-0 h-full overflow-hidden px-5 py-1.5 flex flex-col items-center justify-center relative">
+          <div className="w-fit max-h-full flex flex-col items-stretch justify-center gap-1">
             {/* 上方棋手信息栏 */}
             {workspace !== 'setup' && (
               <PlayerSeatBar
@@ -1080,8 +1080,8 @@ export default function App() {
             {/* 下半区：根据当前工作空间自适应呈现 */}
             {workspace === 'challenge' ? (
               /* 残局题库工作台 */
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 text-[13px]">
-                <div className="flex items-center justify-between border-b xq-border pb-2.5">
+              <div className="flex-1 overflow-y-auto no-scrollbar p-3.5 space-y-3 text-xs">
+                <div className="flex items-center justify-between border-b xq-border pb-2">
                   <div className="flex items-center gap-2">
                     <Compass className="w-4 h-4 text-[var(--xq-accent-gold)]" />
                     <span className="font-semibold text-sm">经典残局题库</span>
@@ -1105,7 +1105,7 @@ export default function App() {
                         key={ch.id}
                         type="button"
                         onClick={() => handleSelectChallenge(ch.id)}
-                        className={`w-full p-3 rounded-lg text-left cursor-pointer space-y-1 ${
+                        className={`w-full p-2.5 rounded-lg text-left cursor-pointer space-y-1 ${
                           isSelected ? 'xq-btn-option-active' : 'xq-btn-option'
                         }`}
                       >
@@ -1126,7 +1126,7 @@ export default function App() {
 
                 {/* 破局实时反馈与提示卡 */}
                 {challengeStatusBanner && (
-                  <div className="p-3 rounded-lg border border-[var(--xq-accent-gold)]/50 bg-[var(--xq-accent-gold)]/10 space-y-2">
+                  <div className="p-2.5 rounded-lg border border-[var(--xq-accent-gold)]/50 bg-[var(--xq-accent-gold)]/10 space-y-1.5">
                     <div className="flex items-center gap-1.5 font-semibold text-[var(--xq-accent-gold)]">
                       <Award className="w-4 h-4" />
                       <span>破局提示</span>
@@ -1135,7 +1135,7 @@ export default function App() {
                     <button
                       type="button"
                       onClick={handleTriggerHint}
-                      className="px-3 py-1.5 rounded-md xq-btn-primary text-xs flex items-center gap-1.5 cursor-pointer"
+                      className="px-3 py-1 rounded-md xq-btn-primary text-xs flex items-center gap-1.5 cursor-pointer"
                     >
                       <Lightbulb className="w-3.5 h-3.5" />
                       <span>查看正着提示</span>
@@ -1145,8 +1145,8 @@ export default function App() {
               </div>
             ) : workspace === 'play' ? (
               /* 人机对弈工作台 */
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 text-[13px]">
-                <div className="flex items-center justify-between border-b xq-border pb-2.5">
+              <div className="flex-1 overflow-y-auto no-scrollbar p-3.5 space-y-3 text-xs">
+                <div className="flex items-center justify-between border-b xq-border pb-2">
                   <div className="flex items-center gap-2">
                     <Swords className="w-4 h-4 text-[var(--xq-accent-gold)]" />
                     <span className="font-semibold text-sm">人机对弈设置</span>
@@ -1180,7 +1180,7 @@ export default function App() {
                         key={h.id}
                         type="button"
                         onClick={() => handleStartHandicapGame(h.id, skillTier)}
-                        className={`p-2.5 rounded-lg text-left cursor-pointer ${
+                        className={`p-2 rounded-lg text-left cursor-pointer ${
                           handicap === h.id ? 'xq-btn-option-active' : 'xq-btn-option'
                         }`}
                       >
@@ -1207,7 +1207,7 @@ export default function App() {
                         key={t.id}
                         type="button"
                         onClick={() => setSkillTier(t.id)}
-                        className={`py-2 rounded-md text-center cursor-pointer ${
+                        className={`py-1.5 rounded-md text-center cursor-pointer ${
                           skillTier === t.id ? 'xq-btn-option-active' : 'xq-btn-option'
                         }`}
                       >
@@ -1218,7 +1218,7 @@ export default function App() {
                 </div>
 
                 {/* 当前人机实战着法记录 */}
-                <div className="p-3 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] space-y-2">
+                <div className="p-2.5 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] space-y-2">
                   <div className="flex items-center justify-between text-xs xq-text-secondary">
                     <span>已走手数：{mainMoves.length} 手</span>
                     {isBotThinking && (
@@ -1227,7 +1227,7 @@ export default function App() {
                       </span>
                     )}
                   </div>
-                  <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
+                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto no-scrollbar">
                     {mainMoves.length === 0 ? (
                       <span className="text-xs xq-text-muted">
                         请在左侧棋盘点击红方棋子走棋
@@ -1249,31 +1249,31 @@ export default function App() {
               /* 默认「复盘分析」双页签：回合棋谱 ↔ 复盘报告 */
               <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                 {/* 双页签切换栏 */}
-                <div className="px-4 pt-2.5 border-b xq-border flex items-center justify-between gap-2 shrink-0">
-                  <div className="flex items-center gap-5 text-[13px] font-medium">
+                <div className="px-3.5 pt-1.5 border-b xq-border flex items-center justify-between gap-2 shrink-0">
+                  <div className="flex items-center gap-5 text-xs font-medium">
                     <button
                       type="button"
                       onClick={() => setRightTab('moves')}
-                      className={`pb-2.5 border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                      className={`pb-1.5 border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                         rightTab === 'moves'
                           ? 'border-[var(--xq-accent-gold)] text-[var(--xq-accent-gold)] font-semibold'
                           : 'border-transparent xq-text-secondary hover:text-[var(--xq-text-primary)]'
                       }`}
                     >
-                      <BookOpen className="w-4 h-4" />
+                      <BookOpen className="w-3.5 h-3.5" />
                       <span>回合棋谱</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => setRightTab('review')}
-                      className={`pb-2.5 border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                      className={`pb-1.5 border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                         rightTab === 'review'
                           ? 'border-[var(--xq-accent-gold)] text-[var(--xq-accent-gold)] font-semibold'
                           : 'border-transparent xq-text-secondary hover:text-[var(--xq-text-primary)]'
                       }`}
                     >
-                      <Award className="w-4 h-4" />
+                      <Award className="w-3.5 h-3.5" />
                       <span>复盘报告</span>
                     </button>
                   </div>
