@@ -1,4 +1,5 @@
 import React from 'react';
+import { Pencil } from 'lucide-react';
 import { Camp } from '../types/xiangqi';
 
 interface PlayerSeatBarProps {
@@ -36,20 +37,37 @@ export const PlayerSeatBar: React.FC<PlayerSeatBarProps> = React.memo(({
           {isRed ? '红' : '黑'}
         </span>
 
-        <button
-          type="button"
-          onClick={onEditGameInfo}
-          className="text-left min-w-0 group cursor-pointer flex items-center gap-1.5"
-        >
-          <span className="text-sm font-semibold truncate group-hover:underline">
-            {playerName}
-          </span>
-          {subtitle && (
-            <span className="text-xs xq-text-muted truncate hidden sm:inline">
-              · {subtitle}
+        {onEditGameInfo ? (
+          <button
+            type="button"
+            onClick={onEditGameInfo}
+            title="点击编辑对局信息（红黑棋手、赛事与开局）"
+            aria-label="编辑对局信息"
+            className="text-left min-w-0 group cursor-pointer flex items-center gap-1.5"
+          >
+            <span className="text-sm font-semibold truncate group-hover:underline">
+              {playerName}
             </span>
-          )}
-        </button>
+            {subtitle && (
+              <span className="text-xs xq-text-muted truncate hidden sm:inline">
+                · {subtitle}
+              </span>
+            )}
+            <Pencil
+              className="w-3 h-3 shrink-0 xq-text-muted opacity-45 group-hover:opacity-100 group-hover:text-[var(--xq-accent-gold)] transition-opacity"
+              aria-hidden="true"
+            />
+          </button>
+        ) : (
+          <div className="text-left min-w-0 flex items-center gap-1.5">
+            <span className="text-sm font-semibold truncate">{playerName}</span>
+            {subtitle && (
+              <span className="text-xs xq-text-muted truncate hidden sm:inline">
+                · {subtitle}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 右侧：行棋态 · 将军提示 · 净子力分差（去重胶囊化） */}

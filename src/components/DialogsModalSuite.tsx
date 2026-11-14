@@ -332,6 +332,14 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
         },
       },
       {
+        id: 'cmd-game-info',
+        label: '编辑对局信息（红黑棋手 / 赛事 / 开局）',
+        shortcut: 'G',
+        action: () => {
+          onOpenModal?.('game-info');
+        },
+      },
+      {
         id: 'cmd-export',
         label: '导出当前对局（下载 .pgn / .fen / 复制微信文本）',
         shortcut: 'E',

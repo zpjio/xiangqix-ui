@@ -2771,7 +2771,7 @@ export default function App() {
                     ? -materialStats.netAdvantageRed
                     : materialStats.netAdvantageRed
                 }
-                onEditGameInfo={handleOpenGameInfo}
+                onEditGameInfo={workspace === 'study' ? handleOpenGameInfo : undefined}
               />
             )}
 
@@ -2878,7 +2878,7 @@ export default function App() {
                     ? materialStats.netAdvantageRed
                     : -materialStats.netAdvantageRed
                 }
-                onEditGameInfo={handleOpenGameInfo}
+                onEditGameInfo={workspace === 'study' ? handleOpenGameInfo : undefined}
               />
             )}
 

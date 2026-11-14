@@ -192,16 +192,22 @@ export const XiangqiPiece: React.FC<XiangqiPieceProps> = React.memo(({
             strokeOpacity="0.45"
           />
         )}
-      </svg>
 
-      {/* 核心汉字阴刻层：随棋盘宽度 (cqw) 等比缩放，免疫根字号 rem 缩放 */}
-      <span
-        className={`relative z-10 leading-none tracking-tight select-none pointer-events-none ${getFontClass(
-          fontScheme
-        )} ${getCharClass(piece.camp, craftStyle)} text-[4.5cqw]`}
-      >
-        {char}
-      </span>
+        {/* 核心汉字阴刻层：置于棋子矢量坐标系内，随棋盘与棋子严格等比缩放，免疫浏览器最小字号截断 */}
+        <text
+          x="50"
+          y="50.5"
+          textAnchor="middle"
+          dominantBaseline="central"
+          fill="currentColor"
+          fontSize={fontScheme === 'seal-script' ? 46 : 48}
+          className={`select-none pointer-events-none ${getFontClass(
+            fontScheme
+          )} ${getCharClass(piece.camp, craftStyle)}`}
+        >
+          {char}
+        </text>
+      </svg>
     </button>
   );
 });

@@ -7,6 +7,7 @@ import {
   BookOpen,
   Check,
   GitBranch,
+  Pencil,
   RefreshCw,
   Sparkles,
   Star,
@@ -221,15 +222,23 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
         <button
           type="button"
           onClick={onOpenGameInfo}
-          className="text-left min-w-0 flex-1 hover:underline cursor-pointer truncate"
+          title="点击编辑对局信息（红黑棋手、赛事、开局与结果）"
+          aria-label="编辑对局信息"
+          className="text-left min-w-0 flex-1 group cursor-pointer flex items-center gap-1.5"
         >
-          <span className="font-semibold text-[var(--xq-accent-crimson)]">
-            {metadata.redPlayer}
+          <span className="min-w-0 truncate group-hover:underline">
+            <span className="font-semibold text-[var(--xq-accent-crimson)]">
+              {metadata.redPlayer}
+            </span>
+            <span className="xq-text-muted mx-1.5">vs</span>
+            <span className="font-semibold">{metadata.blackPlayer}</span>
+            <span className="xq-text-muted mx-1.5">·</span>
+            <span className="text-xs xq-text-secondary">{metadata.opening}</span>
           </span>
-          <span className="xq-text-muted mx-1.5">vs</span>
-          <span className="font-semibold">{metadata.blackPlayer}</span>
-          <span className="xq-text-muted mx-1.5">·</span>
-          <span className="text-xs xq-text-secondary">{metadata.opening}</span>
+          <Pencil
+            className="w-3 h-3 shrink-0 xq-text-muted opacity-70 group-hover:opacity-100 group-hover:text-[var(--xq-accent-gold)] transition-all"
+            aria-hidden="true"
+          />
         </button>
 
         <div className="flex items-center gap-1.5 shrink-0">
