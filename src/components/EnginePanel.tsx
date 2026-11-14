@@ -3,16 +3,36 @@ import {
   AlertTriangle,
   ArrowLeftRight,
   CheckCircle2,
+  Clock,
   Download,
   FolderOpen,
   GitCompare,
+  Infinity as InfinityIcon,
+  Layers,
   Play,
   Radar,
   Square,
   Zap,
 } from 'lucide-react';
-import { EngineProfile, MultiPVArrow, MultiPVLine, Position } from '../types/xiangqi';
+import {
+  EngineProfile,
+  EngineSearchMode,
+  EngineSearchPhase,
+  MultiPVArrow,
+  MultiPVLine,
+  Position,
+} from '../types/xiangqi';
 import { ThemeSelect } from './ThemeSelect';
+
+export interface EngineStreamTelemetry {
+  phase: EngineSearchPhase;
+  currentDepth: number;
+  selDepth: number;
+  nodes: number;
+  nps: number;
+  elapsedMs: number;
+  cacheHit?: boolean;
+}
 
 interface EnginePanelProps {
   engines: EngineProfile[];
@@ -21,6 +41,10 @@ interface EnginePanelProps {
   compareMode: boolean;
   isAnalyzing: boolean;
   threatRadarEnabled: boolean;
+  searchMode: EngineSearchMode;
+  targetDepth: 18 | 24 | 30;
+  moveTimeMs: 3000 | 5000;
+  streamTelemetry: EngineStreamTelemetry;
   primaryLines: MultiPVLine[];
   secondaryLines: MultiPVLine[];
   onChangePrimaryEngine: (id: string) => void;
@@ -31,8 +55,16 @@ interface EnginePanelProps {
   onOpenEngineSettings: () => void;
   onToggleAnalysis: () => void;
   onToggleThreatRadar: () => void;
+  onChangeSearchMode: (mode: EngineSearchMode) => void;
+  onChangeMoveTimeMs: (ms: 3000 | 5000) => void;
   onSelectMultiPVMove: (from: Position, to: Position) => void;
   onHoverMultiPVMove: (arrow: MultiPVArrow | null) => void;
+}
+
+function formatNodeCount(nodes: number): string {
+  if (nodes >= 1_000_000) return `${(nodes / 1_000_000).toFixed(2)}M`;
+  if (nodes >= 1_000) return `${Math.round(nodes / 1_000)}k`;
+  return `${nodes}`;
 }
 
 export const EnginePanel: React.FC<EnginePanelProps> = React.memo(({
@@ -42,6 +74,10 @@ export const EnginePanel: React.FC<EnginePanelProps> = React.memo(({
   compareMode,
   isAnalyzing,
   threatRadarEnabled,
+  searchMode,
+  targetDepth,
+  moveTimeMs,
+  streamTelemetry,
   primaryLines,
   secondaryLines,
   onChangePrimaryEngine,
@@ -52,6 +88,8 @@ export const EnginePanel: React.FC<EnginePanelProps> = React.memo(({
   onOpenEngineSettings,
   onToggleAnalysis,
   onToggleThreatRadar,
+  onChangeSearchMode,
+  onChangeMoveTimeMs,
   onSelectMultiPVMove,
   onHoverMultiPVMove,
 }) => {
@@ -80,6 +118,7 @@ export const EnginePanel: React.FC<EnginePanelProps> = React.memo(({
       : '0.00';
 
   const formatScore = (cp: number) => (cp >= 0 ? `+${cp.toFixed(2)}` : cp.toFixed(2));
+  const isSearchingNow = isAnalyzing && streamTelemetry.phase === 'searching';
 
   return (
     <section className="flex flex-col border-b xq-border shrink-0">
@@ -162,6 +201,71 @@ export const EnginePanel: React.FC<EnginePanelProps> = React.memo(({
           </button>
         </div>
       </div>
+
+      {/* 流式分析模式条：限深 / 限时 / 无限 + 实时流式深度与算力节点计数 */}
+      {primaryEngine.status === 'ready' && (
+        <div className="px-3.5 py-1.5 min-[900px]:py-1 border-b xq-border bg-[var(--xq-bg-canvas)]/55 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => onChangeSearchMode('depth')}
+              className={`min-h-[34px] min-[900px]:min-h-0 px-2.5 min-[900px]:px-2 py-1 min-[900px]:py-0.5 rounded flex items-center gap-1 cursor-pointer whitespace-nowrap font-mono-tabular ${
+                searchMode === 'depth' ? 'xq-btn-option-active font-semibold' : 'xq-btn-option'
+              }`}
+            >
+              <Layers className="w-3 h-3" />
+              <span>限深 {targetDepth}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (searchMode === 'movetime') {
+                  onChangeMoveTimeMs(moveTimeMs === 3000 ? 5000 : 3000);
+                } else {
+                  onChangeSearchMode('movetime');
+                }
+              }}
+              title="点击切换限时分析（再点一次切换 3 秒 / 5 秒）"
+              className={`min-h-[34px] min-[900px]:min-h-0 px-2.5 min-[900px]:px-2 py-1 min-[900px]:py-0.5 rounded flex items-center gap-1 cursor-pointer whitespace-nowrap font-mono-tabular ${
+                searchMode === 'movetime' ? 'xq-btn-option-active font-semibold' : 'xq-btn-option'
+              }`}
+            >
+              <Clock className="w-3 h-3" />
+              <span>限时 {moveTimeMs / 1000}s</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onChangeSearchMode('infinite')}
+              className={`min-h-[34px] min-[900px]:min-h-0 px-2.5 min-[900px]:px-2 py-1 min-[900px]:py-0.5 rounded flex items-center gap-1 cursor-pointer whitespace-nowrap ${
+                searchMode === 'infinite' ? 'xq-btn-option-active font-semibold' : 'xq-btn-option'
+              }`}
+            >
+              <InfinityIcon className="w-3 h-3" />
+              <span>无限</span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1.5 font-mono-tabular xq-text-muted shrink-0">
+            {isSearchingNow && (
+              <span
+                className="w-1.5 h-1.5 rounded-full bg-[var(--xq-accent-jade)] animate-pulse"
+                aria-hidden="true"
+              />
+            )}
+            <span>
+              {!isAnalyzing
+                ? '已暂停'
+                : streamTelemetry.cacheHit
+                ? `d=${streamTelemetry.currentDepth} · 缓存直达`
+                : isSearchingNow
+                ? `d=${streamTelemetry.currentDepth}/${streamTelemetry.selDepth} · ${formatNodeCount(streamTelemetry.nodes)}节点 · ${(streamTelemetry.elapsedMs / 1000).toFixed(1)}s`
+                : `d=${streamTelemetry.currentDepth} · 完成 (${(streamTelemetry.elapsedMs / 1000).toFixed(1)}s)`}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* 双擎对称配对选择器（开启双擎对比时常驻显示，支持直接选择两个引擎及一键互换） */}
       {compareMode && (

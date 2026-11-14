@@ -5,6 +5,7 @@ import {
   BoardTheme,
   Camp,
   ChessClockPresetId,
+  EngineSearchMode,
   FontScale,
   GameMetadata,
   LibraryGameItem,
@@ -46,6 +47,8 @@ export interface StoredPrefs {
   compareMode?: boolean;
   multiPvCount?: 1 | 2 | 3;
   engineDepth?: 18 | 24 | 30;
+  engineSearchMode?: EngineSearchMode;
+  engineMoveTimeMs?: 3000 | 5000;
   engineThreads?: 4 | 8 | 16;
   engineHashMb?: 256 | 512 | 1024;
   clockPresetId?: ChessClockPresetId;

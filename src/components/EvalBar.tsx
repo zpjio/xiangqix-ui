@@ -69,7 +69,7 @@ export const EvalBar: React.FC<EvalBarProps> = React.memo(({
   return (
     <div
       data-component="EvalBar.tsx"
-      className={`relative w-[2.5rem] sm:w-[2.75rem] shrink-0 rounded-lg overflow-hidden border xq-border flex flex-col select-none shadow-inner ${heightClass}`}
+      className={`relative w-[1.85rem] sm:w-[2.5rem] md:w-[2.75rem] shrink-0 rounded-lg overflow-hidden border xq-border flex flex-col select-none shadow-inner ${heightClass}`}
       title={`当前局面评估：${fullTooltipText}`}
     >
       {/* 顶部区域（默认黑方在顶，翻转后红方在顶） */}

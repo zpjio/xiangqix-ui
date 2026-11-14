@@ -334,3 +334,89 @@ export interface ChessClockPreset {
   initialMs: number;
   incrementMs: number;
 }
+
+// ==================== v1.0 引擎流式思考 / 整局批量复盘 / 多格式导入与库备份协议 ====================
+
+export type EngineSearchMode = 'depth' | 'movetime' | 'infinite';
+export type EngineSearchPhase = 'idle' | 'searching' | 'completed' | 'stopped';
+
+export interface EngineSearchRequest {
+  sessionId: string;
+  fen: string;
+  engineId: string;
+  mode: EngineSearchMode;
+  targetDepth: 18 | 24 | 30;
+  moveTimeMs: 3000 | 5000;
+  multiPvCount: 1 | 2 | 3;
+  threads: 4 | 8 | 16;
+  hashMb: 256 | 512 | 1024;
+}
+
+export interface EngineSearchStreamEvent {
+  sessionId: string;
+  phase: EngineSearchPhase;
+  currentDepth: number;
+  selDepth: number;
+  nodes: number;
+  nps: number; // kN/s
+  elapsedMs: number;
+  cacheHit?: boolean;
+  lines: MultiPVLine[];
+  arrows: MultiPVArrow[];
+}
+
+export type BatchReviewPreset = 'fast' | 'deep';
+export type BatchReviewStatus = 'idle' | 'running' | 'completed' | 'cancelled';
+
+export interface BatchReviewRequest {
+  reviewId: string;
+  baseFen: string;
+  moves: CompactLibraryMove[];
+  preset: BatchReviewPreset;
+  engineId: string;
+}
+
+export interface BatchReviewMoveDiag {
+  ply: number;
+  evalScore: number;
+  winRateRed: number;
+  quality: MoveQuality;
+  bestAlternative?: string;
+  bestFrom?: Position;
+  bestTo?: Position;
+  comment?: string;
+}
+
+export interface BatchReviewProgressEvent {
+  reviewId: string;
+  status: BatchReviewStatus;
+  preset: BatchReviewPreset;
+  completedPlies: number;
+  totalPlies: number;
+  estimatedRemainingMs: number;
+  results: BatchReviewMoveDiag[];
+}
+
+export type FileImportFormat = 'pgn' | 'fen' | 'xqf' | 'json-backup';
+
+export interface ParsedImportSession {
+  format: Exclude<FileImportFormat, 'json-backup'>;
+  fileName: string;
+  basePieces: Piece[];
+  baseTurn: Camp;
+  moves: MoveRecord[];
+  finalPieces: Piece[];
+  finalTurn: Camp;
+  metadata: Partial<GameMetadata>;
+  warning?: string;
+}
+
+export interface LibraryBackupBundle {
+  schemaVersion: 1;
+  app: 'xiangqix';
+  exportedAt: string;
+  games: LibraryGameItem[];
+}
+
+export type LibraryBackupImportStrategy = 'merge' | 'replace';
+

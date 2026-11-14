@@ -33,12 +33,18 @@ import {
   ExternalPlatformId,
   FontScale,
   GameMetadata,
+  LibraryBackupImportStrategy,
   LibraryGameItem,
   MoveRecord,
+  ParsedImportSession,
   Piece,
   PieceCraftStyle,
   WorkspaceMode,
 } from '../types/xiangqi';
+import {
+  downloadLibraryBackupJson,
+  parseImportedGameFile,
+} from '../utils/fileImportExport';
 import {
   buildShareUrl,
   copyBattleReportPngToClipboard,
@@ -91,6 +97,11 @@ interface DialogsModalSuiteProps {
   onOpenOpeningBook?: () => void;
   onApplyFen: (fen: string) => boolean;
   onApplyPgnSession?: (pgnText: string, fenFallback: string) => boolean;
+  onApplyParsedImportSession?: (session: ParsedImportSession) => void;
+  onRestoreLibraryBackup?: (
+    games: LibraryGameItem[],
+    strategy: LibraryBackupImportStrategy
+  ) => { addedCount: number; updatedCount: number };
   onSaveMetadata: (meta: GameMetadata) => void;
   onLoadLibraryGame: (game: LibraryGameItem) => void;
   onExportLibraryGame?: (game: LibraryGameItem) => void;
@@ -187,6 +198,8 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
   onOpenOpeningBook,
   onApplyFen,
   onApplyPgnSession,
+  onApplyParsedImportSession,
+  onRestoreLibraryBackup,
   onSaveMetadata,
   onLoadLibraryGame,
   onExportLibraryGame,
@@ -222,6 +235,12 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
   const [pgnInput, setPgnInput] = useState('');
   const [pgnDirty, setPgnDirty] = useState(false);
   const [fenError, setFenError] = useState<string | null>(null);
+  const [isFileDragging, setIsFileDragging] = useState(false);
+  const [pendingXqfSession, setPendingXqfSession] = useState<ParsedImportSession | null>(null);
+  const [pendingBackupFromImport, setPendingBackupFromImport] = useState<{
+    games: LibraryGameItem[];
+    fileName: string;
+  } | null>(null);
   const [exportFormat, setExportFormat] = useState<'pgn' | 'wechat'>('pgn');
   const [exportIncludeNotes, setExportIncludeNotes] = useState<boolean>(false);
   const [copiedFen, setCopiedFen] = useState(false);
@@ -243,6 +262,11 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
   const [libSortBy, setLibSortBy] = useState<'default' | 'date-desc' | 'plies-desc' | 'accuracy-desc'>('default');
   const [libSearch, setLibSearch] = useState('');
   const [libSaveToast, setLibSaveToast] = useState(false);
+  const [pendingLibBackup, setPendingLibBackup] = useState<{
+    games: LibraryGameItem[];
+    fileName: string;
+  } | null>(null);
+  const [libBackupNotice, setLibBackupNotice] = useState<string | null>(null);
 
   // 连线配置草稿
   const [connectPlatform, setConnectPlatform] = useState<ExternalPlatformId>(
@@ -279,6 +303,9 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
       setPgnInput('');
       setPgnDirty(false);
       setFenError(null);
+      setPendingXqfSession(null);
+      setPendingBackupFromImport(null);
+      setIsFileDragging(false);
       setCopiedFen(false);
       setCopiedExportText(false);
       setCopiedShareUrl(false);
@@ -286,12 +313,45 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
     }
     if (activeModal === 'library') {
       setLibSearch(initialLibrarySearch || '');
+      setPendingLibBackup(null);
+      setLibBackupNotice(null);
       if (initialLibrarySearch) {
         setLibCategory('all');
         setLibResultFilter('all');
       }
     }
   }, [metadata, activeModal, initialLibrarySearch, initialFenPgnTab]);
+
+  const handleFileInImportModal = useCallback(async (file: File) => {
+    setFenError(null);
+    setPendingXqfSession(null);
+    setPendingBackupFromImport(null);
+    const outcome = await parseImportedGameFile(file);
+    if (outcome.kind === 'error') {
+      setFenError(outcome.error);
+      return;
+    }
+    if (outcome.kind === 'library-backup') {
+      setPendingBackupFromImport({ games: outcome.games, fileName: outcome.fileName });
+      return;
+    }
+    if (outcome.session.format === 'xqf') {
+      setPendingXqfSession(outcome.session);
+      return;
+    }
+    if (outcome.session.format === 'fen' && outcome.rawText) {
+      setFenInput(outcome.rawText);
+      setPgnInput('');
+      setPgnDirty(false);
+      return;
+    }
+    if (outcome.rawText) {
+      setPgnInput(outcome.rawText);
+      setPgnDirty(true);
+      const fenMatch = outcome.rawText.match(/\[FEN\s+"([^"]+)"\]/i);
+      setFenInput(fenMatch?.[1] || '');
+    }
+  }, []);
 
   const parsedPgnPreview = useMemo(() => {
     if (activeModal !== 'fen-pgn' || fenPgnTab !== 'import' || importMode !== 'fen-pgn' || !pgnDirty) {
@@ -735,7 +795,53 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
                 </h3>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center flex-wrap gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    downloadLibraryBackupJson(libraryGames);
+                    setLibBackupNotice(`已导出全库备份 (${libraryGames.length} 局)`);
+                    scheduleFeedbackReset(() => setLibBackupNotice(null), 2400);
+                  }}
+                  title="导出全量棋谱库 JSON 备份文件，防止浏览器缓存清理丢失自存棋谱"
+                  className="px-2.5 py-1 rounded-md xq-btn-secondary text-[0.8125rem] flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                >
+                  <Download className="w-3.5 h-3.5 opacity-85" />
+                  <span>导出备份</span>
+                </button>
+
+                {onRestoreLibraryBackup && (
+                  <label
+                    title="从象棋X JSON 备份文件恢复棋谱库"
+                    className="px-2.5 py-1 rounded-md xq-btn-secondary text-[0.8125rem] flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                  >
+                    <FolderOpen className="w-3.5 h-3.5 opacity-85" />
+                    <span>恢复备份</span>
+                    <input
+                      type="file"
+                      accept=".json,application/json"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = '';
+                        if (!file) return;
+                        const outcome = await parseImportedGameFile(file);
+                        if (outcome.kind === 'library-backup') {
+                          setPendingLibBackup({
+                            games: outcome.games,
+                            fileName: outcome.fileName,
+                          });
+                          setLibBackupNotice(null);
+                        } else if (outcome.kind === 'error') {
+                          setLibBackupNotice(outcome.error);
+                        } else {
+                          setLibBackupNotice('请选择象棋X导出的 .json 棋谱库备份文件');
+                        }
+                      }}
+                    />
+                  </label>
+                )}
+
                 {onSaveCurrentGameToLibrary && (
                   <button
                     type="button"
@@ -781,6 +887,60 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
                 </button>
               </div>
             </div>
+
+            {pendingLibBackup && onRestoreLibraryBackup && (
+              <div className="p-2.5 rounded-lg border border-[var(--xq-accent-gold)]/50 bg-[var(--xq-accent-gold)]/10 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="font-medium xq-text-primary">
+                  已读取备份「{pendingLibBackup.fileName}」，包含 {pendingLibBackup.games.length} 局棋谱：
+                </span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const res = onRestoreLibraryBackup(pendingLibBackup.games, 'merge');
+                      setPendingLibBackup(null);
+                      setLibBackupNotice(
+                        `已合并备份：新增 ${res.addedCount} 局，更新 ${res.updatedCount} 局`
+                      );
+                    }}
+                    className="px-2.5 py-1 rounded xq-btn-primary cursor-pointer"
+                  >
+                    合并去重导入
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const res = onRestoreLibraryBackup(pendingLibBackup.games, 'replace');
+                      setPendingLibBackup(null);
+                      setLibBackupNotice(`已替换本地棋谱库，共载入 ${res.addedCount} 局`);
+                    }}
+                    className="px-2.5 py-1 rounded xq-btn-danger cursor-pointer"
+                  >
+                    覆盖当前库
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPendingLibBackup(null)}
+                    className="px-2 py-1 rounded xq-btn-secondary cursor-pointer"
+                  >
+                    取消
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {libBackupNotice && (
+              <div className="px-3 py-1.5 rounded-md border border-[var(--xq-accent-jade)]/45 bg-[var(--xq-accent-jade)]/10 text-xs text-[var(--xq-accent-jade)] flex items-center justify-between gap-2">
+                <span>{libBackupNotice}</span>
+                <button
+                  type="button"
+                  onClick={() => setLibBackupNotice(null)}
+                  className="hover:opacity-75 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
 
             {/* 双库分工提示条 + 跳转开局研习 */}
             <div className="px-3 py-1.5 rounded-md bg-[var(--xq-bg-canvas)] border xq-border flex items-center justify-between flex-wrap gap-2 text-xs xq-text-muted">
@@ -1337,6 +1497,113 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
 
                 {importMode === 'fen-pgn' ? (
                   <div className="space-y-3.5">
+                    {/* 本地棋谱文件拖拽与上传区 (.pgn / .xqf / .fen / .json) */}
+                    <label
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setIsFileDragging(true);
+                      }}
+                      onDragLeave={() => setIsFileDragging(false)}
+                      onDrop={async (e) => {
+                        e.preventDefault();
+                        setIsFileDragging(false);
+                        const file = e.dataTransfer.files?.[0];
+                        if (file) {
+                          await handleFileInImportModal(file);
+                        }
+                      }}
+                      className={`p-3.5 rounded-lg border-2 border-dashed transition-colors flex flex-col sm:flex-row items-center justify-between gap-2.5 cursor-pointer ${
+                        isFileDragging
+                          ? 'border-[var(--xq-accent-gold)] bg-[var(--xq-accent-gold)]/10'
+                          : 'xq-border bg-[var(--xq-bg-canvas)] hover:border-[var(--xq-accent-gold)]/60'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <ArrowDownToLine className="w-4 h-4 text-[var(--xq-accent-gold)] shrink-0" />
+                        <div className="text-left min-w-0">
+                          <div className="font-semibold text-[0.8125rem] xq-text-primary">
+                            拖入或点击上传 .pgn / .xqf / .fen / .json 文件
+                          </div>
+                          <div className="text-xs xq-text-muted truncate">
+                            自动识别 UTF-8 与 GB18030 中文编码，支持明文象棋演播室 XQF 主变直读
+                          </div>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-md xq-btn-secondary text-xs whitespace-nowrap shrink-0">
+                        选择本地文件
+                      </span>
+                      <input
+                        type="file"
+                        accept=".pgn,.xqf,.fen,.txt,.json,text/plain,application/json"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          e.target.value = '';
+                          if (file) {
+                            await handleFileInImportModal(file);
+                          }
+                        }}
+                      />
+                    </label>
+
+                    {pendingXqfSession && (
+                      <div className="p-3 rounded-lg border border-[var(--xq-accent-jade)]/50 bg-[var(--xq-accent-jade)]/10 space-y-1.5 text-xs">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <span className="font-semibold text-[var(--xq-accent-jade)]">
+                            已成功解析 XQF：「{pendingXqfSession.fileName}」
+                          </span>
+                          <span className="font-mono-tabular xq-text-secondary">
+                            共 {pendingXqfSession.moves.length} 手合法着法
+                          </span>
+                        </div>
+                        <div className="xq-text-secondary">
+                          {pendingXqfSession.metadata.redPlayer || '红方'} vs{' '}
+                          {pendingXqfSession.metadata.blackPlayer || '黑方'}
+                          {pendingXqfSession.metadata.opening
+                            ? ` · ${pendingXqfSession.metadata.opening}`
+                            : ''}
+                        </div>
+                        {pendingXqfSession.warning && (
+                          <div className="text-[var(--xq-accent-amber)]">
+                            {pendingXqfSession.warning}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {pendingBackupFromImport && onRestoreLibraryBackup && (
+                      <div className="p-3 rounded-lg border border-[var(--xq-accent-gold)]/55 bg-[var(--xq-accent-gold)]/10 flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <span className="font-medium xq-text-primary">
+                          检测到棋谱库备份「{pendingBackupFromImport.fileName}」（共{' '}
+                          {pendingBackupFromImport.games.length} 局）：
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onRestoreLibraryBackup(pendingBackupFromImport.games, 'merge');
+                              setPendingBackupFromImport(null);
+                              onOpenModal?.('library');
+                            }}
+                            className="px-2.5 py-1 rounded xq-btn-primary cursor-pointer"
+                          >
+                            合并至棋谱库
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onRestoreLibraryBackup(pendingBackupFromImport.games, 'replace');
+                              setPendingBackupFromImport(null);
+                              onOpenModal?.('library');
+                            }}
+                            className="px-2.5 py-1 rounded xq-btn-danger cursor-pointer"
+                          >
+                            覆盖棋谱库
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     {/* FEN 粘贴区 */}
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -1349,6 +1616,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
                             onClick={() => {
                               setFenInput(INITIAL_FEN);
                               setPgnDirty(false);
+                              setPendingXqfSession(null);
                               setFenError(null);
                             }}
                             className="hover:underline cursor-pointer"
@@ -1363,6 +1631,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
                                 '5k3/4a4/4b4/7R1/3r4R/1p7/9/4p4/4pp3/4K3C w - - 0 1'
                               );
                               setPgnDirty(false);
+                              setPendingXqfSession(null);
                               setFenError(null);
                             }}
                             className="hover:underline cursor-pointer text-[var(--xq-accent-gold)] font-medium"
@@ -1375,6 +1644,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
                             onClick={() => {
                               setFenInput(currentFen);
                               setPgnDirty(false);
+                              setPendingXqfSession(null);
                               setFenError(null);
                             }}
                             className="hover:underline cursor-pointer"
@@ -1390,18 +1660,21 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
                           onChange={(e) => {
                             setFenInput(e.target.value);
                             setPgnDirty(false);
+                            setPendingXqfSession(null);
                             setFenError(null);
                           }}
                           placeholder="粘贴 FEN 编码串（例如 rnbakabnr/9/... w - - 0 1）"
                           className="flex-1 min-w-[14rem] px-3 py-1.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)] font-mono-tabular text-xs"
                         />
-                        {(fenInput || pgnInput) && (
+                        {(fenInput || pgnInput || pendingXqfSession) && (
                           <button
                             type="button"
                             onClick={() => {
                               setFenInput('');
                               setPgnInput('');
                               setPgnDirty(false);
+                              setPendingXqfSession(null);
+                              setPendingBackupFromImport(null);
                               setFenError(null);
                             }}
                             className="px-2.5 py-1.5 rounded-md xq-btn-secondary cursor-pointer whitespace-nowrap"
@@ -1423,6 +1696,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
                           onClick={() => {
                             setPgnInput(currentPgn);
                             setPgnDirty(true);
+                            setPendingXqfSession(null);
                             setFenError(null);
                           }}
                           className="text-xs xq-text-muted hover:text-[var(--xq-accent-gold)] cursor-pointer"
@@ -1431,12 +1705,13 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
                         </button>
                       </div>
                       <textarea
-                        rows={5}
+                        rows={4}
                         value={pgnInput}
                         onChange={(e) => {
                           const val = e.target.value;
                           setPgnInput(val);
                           setPgnDirty(true);
+                          setPendingXqfSession(null);
                           setFenError(null);
                           const fenMatch = val.match(/\[FEN\s+"([^"]+)"\]/i);
                           if (fenMatch?.[1]) {
@@ -1478,6 +1753,11 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
                         <button
                           type="button"
                           onClick={() => {
+                            if (pendingXqfSession && onApplyParsedImportSession) {
+                              onApplyParsedImportSession(pendingXqfSession);
+                              onClose();
+                              return;
+                            }
                             if (pgnDirty && pgnInput.trim() && onApplyPgnSession) {
                               const ok = onApplyPgnSession(pgnInput, fenInput);
                               if (!ok) {
@@ -1488,7 +1768,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
                               return;
                             }
                             if (!fenInput.trim()) {
-                              setFenError('请先粘贴有效的 FEN 局面或 PGN 棋谱文本');
+                              setFenError('请先粘贴有效的 FEN / PGN 文本，或拖入本地棋谱文件');
                               return;
                             }
                             const ok = onApplyFen(fenInput);
@@ -1500,7 +1780,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
                           }}
                           className="px-4 py-1.5 rounded-md xq-btn-primary cursor-pointer"
                         >
-                          导入至复盘分析
+                          {pendingXqfSession ? '导入 XQF 至复盘分析' : '导入至复盘分析'}
                         </button>
                       </div>
                     </div>

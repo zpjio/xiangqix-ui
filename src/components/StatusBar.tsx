@@ -98,8 +98,8 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({
   };
 
   return (
-    <footer className="min-h-8 py-1 px-6 border-t xq-surface flex items-center justify-between gap-3 text-xs select-none shrink-0">
-      <div className="flex items-center gap-3 min-w-0">
+    <footer className="min-h-8 py-1.5 px-3 min-[900px]:px-6 border-t xq-surface flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs select-none shrink-0">
+      <div className="flex items-center gap-3 min-w-0 max-w-full">
         {illegalMoveWarning ? (
           <span className="font-semibold text-[var(--xq-accent-amber)] truncate">
             {illegalMoveWarning}
@@ -109,7 +109,7 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({
         )}
       </div>
 
-      <div className="flex items-center gap-2.5 shrink-0 xq-text-muted font-mono-tabular text-xs">
+      <div className="flex flex-wrap items-center gap-2 min-[900px]:gap-2.5 shrink-0 xq-text-muted font-mono-tabular text-xs">
         <span>{advantageSummary}</span>
         <span aria-hidden="true">·</span>
         <span>{turn === 'red' ? '红方行棋' : '黑方行棋'}</span>

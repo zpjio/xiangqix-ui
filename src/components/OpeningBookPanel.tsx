@@ -142,7 +142,7 @@ export const OpeningBookPanel: React.FC<OpeningBookPanelProps> = React.memo(({
   const effectiveSubMode: OpeningPanelSubMode = mode === 'compact' ? 'explorer' : subMode;
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-hidden text-[0.8125rem]">
+    <div className="min-[900px]:flex-1 flex flex-col min-[900px]:min-h-0 min-[900px]:overflow-hidden text-[0.8125rem]">
       {/* 顶部栏：独立工作台显示「定式树 / 变例对练」双态切换；复盘轻查询仅显示精简头部 */}
       {mode === 'full' ? (
         <div className="px-3.5 py-2 border-b xq-border bg-[var(--xq-bg-surface)] flex flex-wrap items-center justify-between gap-2 shrink-0">

@@ -72,7 +72,7 @@ export const SetupWorkbench: React.FC<SetupWorkbenchProps> = React.memo(({
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-hidden text-[0.8125rem]">
+    <div className="min-[900px]:flex-1 flex flex-col min-[900px]:min-h-0 min-[900px]:overflow-hidden text-[0.8125rem]">
       {/* 顶栏 */}
       <div className="px-3.5 py-2.5 border-b xq-border flex flex-wrap items-center justify-between gap-2 shrink-0">
         <div className="flex items-center gap-2">

@@ -53,6 +53,8 @@ interface BoardProps {
   onRestoreTerminal?: () => void;
   onTerminalPrimaryAction?: () => void;
   terminalPrimaryLabel?: string;
+  onTerminalExtraAction?: () => void;
+  terminalExtraLabel?: string;
   onTerminalRestartAction?: () => void;
   terminalRestartLabel?: string;
   onTerminalShareAction?: () => void;
@@ -1204,6 +1206,8 @@ export const Board: React.FC<BoardProps> = React.memo(
     onRestoreTerminal,
     onTerminalPrimaryAction,
     terminalPrimaryLabel = '复盘分析',
+    onTerminalExtraAction,
+    terminalExtraLabel,
     onTerminalRestartAction,
     terminalRestartLabel = '重开一局',
     onTerminalShareAction,
@@ -1646,6 +1650,7 @@ export const Board: React.FC<BoardProps> = React.memo(
 
     const verticalReserve = workspace === 'setup' ? '4.75rem' : '8.5rem';
     const horizontalReserve = workspace === 'study' ? '5.75rem' : '2.25rem';
+    const mobileHorizontalReserve = workspace === 'study' ? '3.15rem' : '0.75rem';
     const hasUserAnnotations = userArrows.length > 0 || userCircles.length > 0;
     const prevHadAnnotationsRef = useRef(false);
 
@@ -1665,12 +1670,16 @@ export const Board: React.FC<BoardProps> = React.memo(
 
     return (
       <div className="relative flex items-center justify-center gap-3 select-none">
-        {/* 棋盘主体容器：基于左侧舞台尺寸容器 (cqh/cqw) 自适应放大至高宽极限并保留微距呼吸边 */}
+        {/* 棋盘主体容器：桌面基于 cqh/cqw，<900px 竖向堆叠下基于 cqw/dvh 自适应 */}
         <div
-          className="relative transition-all"
-          style={{
-            width: `clamp(280px, min(calc((100cqh - ${verticalReserve}) * 0.89), calc(100cqw - ${horizontalReserve})), 820px)`,
-          }}
+          className="relative transition-all xq-board-stage-width"
+          style={
+            {
+              '--xq-v-reserve': verticalReserve,
+              '--xq-h-reserve': horizontalReserve,
+              '--xq-h-mobile-reserve': mobileHorizontalReserve,
+            } as React.CSSProperties
+          }
         >
           <div
             className={`relative rounded-xl p-2 sm:p-2.5 border-2 transition-all duration-200 ${themeColors.frameClass} ${modeRimClass}`}
@@ -1835,15 +1844,15 @@ export const Board: React.FC<BoardProps> = React.memo(
               {terminalOutcome && terminalCopy && !terminalDismissed && (
                 <div
                   onPointerDown={(e) => e.stopPropagation()}
-                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 w-[min(90%,21rem)] pointer-events-auto"
+                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 w-[min(92%,22.5rem)] pointer-events-auto"
                 >
-                  <div className="animate-endgame-seal relative rounded-xl border-2 border-[#CFA952]/75 bg-[#1B1613]/94 px-5 py-4 text-center shadow-[0_18px_42px_rgba(12,10,8,0.68)]">
+                  <div className="animate-endgame-seal relative rounded-xl border-2 border-[#CFA952]/75 bg-[#1B1613]/94 px-3.5 py-3.5 sm:px-5 sm:py-4 text-center shadow-[0_18px_42px_rgba(12,10,8,0.68)]">
                     {onDismissTerminal && (
                       <button
                         type="button"
                         onClick={onDismissTerminal}
                         title="收起印章继续查看棋盘"
-                        className="absolute top-2.5 right-2.5 p-1 rounded-md text-[#C5A880] hover:text-[#F4EFE2] hover:bg-white/10 cursor-pointer transition-colors"
+                        className="absolute top-2 right-2 p-2 sm:p-1 rounded-md text-[#C5A880] hover:text-[#F4EFE2] hover:bg-white/10 cursor-pointer transition-colors"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
@@ -1859,11 +1868,21 @@ export const Board: React.FC<BoardProps> = React.memo(
                     <p className="mt-1 text-[0.8125rem] text-[#C5A880]">{terminalCopy.desc}</p>
 
                     <div className="mt-3.5 flex items-center justify-center gap-2 flex-wrap">
+                      {onTerminalExtraAction && terminalExtraLabel && (
+                        <button
+                          type="button"
+                          onClick={onTerminalExtraAction}
+                          className="px-3 py-2 sm:py-1.5 rounded-md xq-btn-engine-on text-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                        >
+                          <ArrowRightCircle className="w-3.5 h-3.5" />
+                          <span>{terminalExtraLabel}</span>
+                        </button>
+                      )}
                       {onTerminalPrimaryAction && (
                         <button
                           type="button"
                           onClick={onTerminalPrimaryAction}
-                          className="px-3 py-1.5 rounded-md xq-btn-primary text-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                          className="px-3 py-2 sm:py-1.5 rounded-md xq-btn-primary text-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
                         >
                           <ArrowRightCircle className="w-3.5 h-3.5" />
                           <span>{terminalPrimaryLabel}</span>
@@ -1873,7 +1892,7 @@ export const Board: React.FC<BoardProps> = React.memo(
                         <button
                           type="button"
                           onClick={onTerminalRestartAction}
-                          className="px-3 py-1.5 rounded-md xq-btn-secondary text-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                          className="px-3 py-2 sm:py-1.5 rounded-md xq-btn-secondary text-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
                         >
                           <RotateCcw className="w-3.5 h-3.5 opacity-80" />
                           <span>{terminalRestartLabel}</span>
@@ -1883,7 +1902,7 @@ export const Board: React.FC<BoardProps> = React.memo(
                         <button
                           type="button"
                           onClick={onTerminalShareAction}
-                          className="px-3 py-1.5 rounded-md xq-btn-secondary text-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                          className="px-3 py-2 sm:py-1.5 rounded-md xq-btn-secondary text-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
                         >
                           <Share2 className="w-3.5 h-3.5 text-[var(--xq-accent-gold)]" />
                           <span>分享战报</span>

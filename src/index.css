@@ -733,3 +733,34 @@ html[data-font-scale="xlarge"] {
     animation: none !important;
   }
 }
+
+/* ==================== 响应式棋盘舞台宽度（桌面 cqh/cqw + <900px 竖向堆叠防塌陷） ==================== */
+.xq-board-stage-width {
+  width: clamp(
+    280px,
+    min(
+      calc((100cqh - var(--xq-v-reserve, 8.5rem)) * 0.89),
+      calc(100cqw - var(--xq-h-reserve, 2.25rem))
+    ),
+    820px
+  );
+}
+
+@media (max-width: 899px) {
+  body {
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .xq-board-stage-width {
+    width: clamp(
+      244px,
+      min(
+        calc(100cqw - var(--xq-h-mobile-reserve, 0.75rem)),
+        calc((100dvh - 14.25rem) * 0.89)
+      ),
+      540px
+    );
+  }
+}
+
