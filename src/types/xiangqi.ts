@@ -24,6 +24,8 @@ export interface Position {
 
 export type MoveQuality = '妙' | '优' | '良' | '缓' | '败';
 
+export type MoveNag = '!!' | '!' | '!?' | '?!' | '?' | '??';
+
 export interface MoveRecord {
   ply: number;
   piece: Piece;
@@ -34,6 +36,7 @@ export interface MoveRecord {
   evalScore: number; // 红方视角分值，如 +0.45
   mateIn?: number; // 如 +3 表示红杀3
   quality?: MoveQuality;
+  nag?: MoveNag; // 棋评符号 (!!, !, !?, ?!, ?, ??)
   bestAlternative?: string; // 若为缓/败着，记录引擎推荐正着
   bestFrom?: Position;
   bestTo?: Position;
@@ -164,6 +167,8 @@ export interface CompactLibraryMove {
   to: Position;
   evalScore?: number;
   quality?: MoveQuality;
+  nag?: MoveNag;
+  comment?: string;
 }
 
 export interface LibraryGameItem {
@@ -258,8 +263,51 @@ export interface CheckAttackLine {
   to: Position;
 }
 
+export type GameTerminalKind =
+  | 'checkmate'
+  | 'stalemate'
+  | 'draw-60moves'
+  | 'draw-repetition'
+  | 'draw-agreement'
+  | 'resign'
+  | 'timeout';
+
 export interface GameTerminalState {
-  kind: 'checkmate' | 'stalemate';
-  winner: Camp;
-  loser: Camp;
+  kind: GameTerminalKind;
+  winner?: Camp;
+  loser?: Camp;
+  reasonText?: string;
+}
+
+export interface DrawRuleStatus {
+  halfmoveNoCapture: number;
+  noCaptureRounds: number;
+  repetitionCount: number;
+  canClaim60MoveDraw: boolean;
+  canClaimRepetitionDraw: boolean;
+}
+
+export type BoardAnnotationColor = 'gold' | 'jade' | 'crimson' | 'azure';
+
+export interface BoardUserArrow {
+  id: string;
+  from: Position;
+  to: Position;
+  color: BoardAnnotationColor;
+}
+
+export interface BoardUserCircle {
+  id: string;
+  pos: Position;
+  color: BoardAnnotationColor;
+}
+
+export type ChessClockPresetId = 'none' | 'blitz-5-3' | 'rapid-10-5' | 'classical-20-10';
+
+export interface ChessClockPreset {
+  id: ChessClockPresetId;
+  label: string;
+  shortLabel: string;
+  initialMs: number;
+  incrementMs: number;
 }

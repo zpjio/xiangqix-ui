@@ -7,6 +7,7 @@ import {
   BookOpen,
   Check,
   GitBranch,
+  MessageSquare,
   Pencil,
   RefreshCw,
   Sparkles,
@@ -14,7 +15,14 @@ import {
   Unplug,
   X,
 } from 'lucide-react';
-import { ExternalConnectState, GameMetadata, MoveQuality, MoveRecord } from '../types/xiangqi';
+import { MOVE_NAG_OPTIONS } from '../constants/xiangqiConstants';
+import {
+  ExternalConnectState,
+  GameMetadata,
+  MoveNag,
+  MoveQuality,
+  MoveRecord,
+} from '../types/xiangqi';
 
 interface MoveListProps {
   mainMoves: MoveRecord[];
@@ -27,6 +35,12 @@ interface MoveListProps {
   onPromoteVariationToMain: () => void;
   onDiscardVariation: () => void;
   onOpenGameInfo: () => void;
+  onUpdateMoveAnnotation?: (
+    ply: number,
+    isVariation: boolean,
+    nag: MoveNag | undefined,
+    comment: string
+  ) => void;
   onToggleFavorite: () => void;
   onSaveToLibrary?: () => void;
   canSaveToLibrary?: boolean;
@@ -102,8 +116,19 @@ const MoveRoundRow: React.FC<MoveRoundRowProps> = React.memo(({
               : 'hover:bg-[var(--xq-bg-hover)]'
           }`}
         >
-          <span className="font-serif-sc font-bold text-sm text-[var(--xq-accent-crimson)] whitespace-nowrap">
-            {redMove.notation}
+          <span className="font-serif-sc font-bold text-sm text-[var(--xq-accent-crimson)] whitespace-nowrap flex items-center gap-0.5">
+            <span>{redMove.notation}</span>
+            {redMove.nag && (
+              <span className="font-mono-tabular text-xs font-bold text-[var(--xq-accent-gold)]">
+                {redMove.nag}
+              </span>
+            )}
+            {redMove.comment && (
+              <MessageSquare
+                className="w-2.5 h-2.5 text-[var(--xq-accent-gold)] opacity-80 ml-0.5 shrink-0"
+                aria-label="含批注"
+              />
+            )}
           </span>
           <div className="flex items-center gap-1 shrink-0">
             {redMove.quality && (
@@ -137,8 +162,19 @@ const MoveRoundRow: React.FC<MoveRoundRowProps> = React.memo(({
               : 'hover:bg-[var(--xq-bg-hover)]'
           }`}
         >
-          <span className="font-serif-sc font-bold text-sm xq-text-primary whitespace-nowrap">
-            {blackMove.notation}
+          <span className="font-serif-sc font-bold text-sm xq-text-primary whitespace-nowrap flex items-center gap-0.5">
+            <span>{blackMove.notation}</span>
+            {blackMove.nag && (
+              <span className="font-mono-tabular text-xs font-bold text-[var(--xq-accent-gold)]">
+                {blackMove.nag}
+              </span>
+            )}
+            {blackMove.comment && (
+              <MessageSquare
+                className="w-2.5 h-2.5 text-[var(--xq-accent-gold)] opacity-80 ml-0.5 shrink-0"
+                aria-label="含批注"
+              />
+            )}
           </span>
           <div className="flex items-center gap-1 shrink-0">
             {blackMove.quality && (
@@ -175,6 +211,7 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
   onPromoteVariationToMain,
   onDiscardVariation,
   onOpenGameInfo,
+  onUpdateMoveAnnotation,
   onToggleFavorite,
   onSaveToLibrary,
   canSaveToLibrary = true,
@@ -189,6 +226,9 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
   onDisconnectExternal,
 }) => {
   const [savedNotice, setSavedNotice] = useState(false);
+  const [editingNote, setEditingNote] = useState(false);
+  const [draftNag, setDraftNag] = useState<MoveNag | undefined>(undefined);
+  const [draftComment, setDraftComment] = useState('');
 
   // 将单列手数配对为「红黑双栏回合行」(Round 1: ply 1 Red + ply 2 Black)
   const rounds = useMemo(() => {
@@ -207,13 +247,35 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
     return list;
   }, [mainMoves]);
 
-  const activeMoveList = variationMoves || mainMoves;
+  const isViewingMainDuringVar =
+    !!variationMoves && currentPly > variationMoves.length;
+  const activeMoveList = isViewingMainDuringVar
+    ? mainMoves
+    : variationMoves || mainMoves;
+  const isEditingVariation = !!variationMoves && !isViewingMainDuringVar;
   const activeMoveRecord = currentPly > 0 ? activeMoveList[currentPly - 1] : null;
   const activeRowRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     activeRowRef.current?.scrollIntoView({ block: 'nearest', behavior: 'auto' });
   }, [currentPly]);
+
+  useEffect(() => {
+    setEditingNote(false);
+    setDraftNag(activeMoveRecord?.nag);
+    setDraftComment(activeMoveRecord?.comment || '');
+  }, [currentPly, variationMoves, activeMoveRecord?.nag, activeMoveRecord?.comment]);
+
+  const handleSaveNote = () => {
+    if (!activeMoveRecord || !onUpdateMoveAnnotation) return;
+    onUpdateMoveAnnotation(
+      activeMoveRecord.ply,
+      isEditingVariation,
+      draftNag,
+      draftComment.trim()
+    );
+    setEditingNote(false);
+  };
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -498,13 +560,19 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
                         key={`var-ply-${vm.ply}`}
                         type="button"
                         onClick={() => onSelectPly(vm.ply, true)}
-                        className={`px-2 py-0.5 rounded text-[0.8125rem] font-serif-sc font-bold border transition-colors cursor-pointer ${
+                        className={`px-2 py-0.5 rounded text-[0.8125rem] font-serif-sc font-bold border transition-colors cursor-pointer inline-flex items-center gap-1 ${
                           currentPly === vm.ply
                             ? 'bg-[var(--xq-btn-primary-bg)] text-[var(--xq-btn-primary-text)] border-[var(--xq-btn-primary-border)]'
                             : 'bg-[var(--xq-bg-surface)] xq-border hover:border-[var(--xq-accent-gold)]'
                         }`}
                       >
-                        {vm.ply}手·{vm.notation}
+                        <span>
+                          {vm.ply}手·{vm.notation}
+                          {vm.nag ? ` ${vm.nag}` : ''}
+                        </span>
+                        {vm.comment && (
+                          <MessageSquare className="w-2.5 h-2.5 opacity-85 shrink-0" />
+                        )}
                       </button>
                     ))}
                   </div>
@@ -515,28 +583,121 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
         })}
       </div>
 
-      {/* 底部：当前手战术批注与正着提示卡 */}
+      {/* 底部：当前手战术批注与单步棋评原地编辑器 */}
       <div className="px-3.5 py-2 border-t xq-border bg-[var(--xq-bg-canvas)] text-[0.8125rem] shrink-0">
         {activeMoveRecord ? (
-          <div className="space-y-0.5">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <span className="font-serif-sc font-bold text-[0.8125rem]">
-                第 {activeMoveRecord.ply} 手 · {activeMoveRecord.notation}
-              </span>
-              {activeMoveRecord.bestAlternative && (
-                <span className="text-xs text-[var(--xq-accent-jade)] font-medium">
-                  推荐正着：{activeMoveRecord.bestAlternative}
+          editingNote && onUpdateMoveAnnotation ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <span className="font-serif-sc font-bold text-[0.8125rem]">
+                  批注第 {activeMoveRecord.ply} 手 · {activeMoveRecord.notation}
                 </span>
-              )}
+                <div className="flex items-center gap-1">
+                  {MOVE_NAG_OPTIONS.map((opt) => {
+                    const active = draftNag === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        title={opt.desc}
+                        onClick={() => setDraftNag(active ? undefined : opt.id)}
+                        className={`px-1.5 py-0.5 rounded font-mono-tabular text-xs cursor-pointer ${
+                          active ? 'xq-btn-option-active' : 'xq-btn-option'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <textarea
+                rows={2}
+                value={draftComment}
+                onChange={(e) => setDraftComment(e.target.value)}
+                onKeyDown={(e) => {
+                  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSaveNote();
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    setEditingNote(false);
+                  }
+                }}
+                placeholder="输入本手战略意图、战术杀法或失误原因（Ctrl+Enter 保存）…"
+                className="w-full px-2.5 py-1.5 rounded-md border xq-border bg-[var(--xq-bg-surface)] text-xs xq-text-primary focus:outline-none focus:border-[var(--xq-accent-gold)] resize-none"
+              />
+              <div className="flex items-center justify-end gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDraftNag(activeMoveRecord.nag);
+                    setDraftComment(activeMoveRecord.comment || '');
+                    setEditingNote(false);
+                  }}
+                  className="px-2.5 py-1 rounded-md xq-btn-secondary text-xs cursor-pointer"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveNote}
+                  className="px-2.5 py-1 rounded-md xq-btn-primary text-xs flex items-center gap-1 cursor-pointer"
+                >
+                  <Check className="w-3 h-3" />
+                  <span>保存批注</span>
+                </button>
+              </div>
             </div>
-            <p className="text-xs xq-text-secondary leading-snug line-clamp-2">
-              {activeMoveRecord.comment ||
-                '双方在此处平稳运子，可在任意历史手直接在棋盘走子生成推演分支。'}
-            </p>
-          </div>
+          ) : (
+            <div className="space-y-1">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="font-serif-sc font-bold text-[0.8125rem]">
+                    第 {activeMoveRecord.ply} 手 · {activeMoveRecord.notation}
+                    {activeMoveRecord.nag ? ` ${activeMoveRecord.nag}` : ''}
+                  </span>
+                  {activeMoveRecord.bestAlternative && (
+                    <span className="text-xs text-[var(--xq-accent-jade)] font-medium truncate">
+                      推荐正着：{activeMoveRecord.bestAlternative}
+                    </span>
+                  )}
+                </div>
+                {onUpdateMoveAnnotation && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDraftNag(activeMoveRecord.nag);
+                      setDraftComment(activeMoveRecord.comment || '');
+                      setEditingNote(true);
+                    }}
+                    title="编辑当前手文字批注与棋评符号"
+                    className="px-2 py-0.5 rounded xq-btn-secondary text-xs flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
+                  >
+                    <Pencil className="w-3 h-3 opacity-80" />
+                    <span>{activeMoveRecord.comment || activeMoveRecord.nag ? '改批注' : '加批注'}</span>
+                  </button>
+                )}
+              </div>
+              <p
+                onClick={() => {
+                  if (!onUpdateMoveAnnotation) return;
+                  setDraftNag(activeMoveRecord.nag);
+                  setDraftComment(activeMoveRecord.comment || '');
+                  setEditingNote(true);
+                }}
+                className={`text-xs xq-text-secondary leading-snug line-clamp-2 ${
+                  onUpdateMoveAnnotation ? 'cursor-pointer hover:text-[var(--xq-text-primary)]' : ''
+                }`}
+              >
+                {activeMoveRecord.comment ||
+                  '暂无文字批注，点击右侧「加批注」可记录战术构思或棋评符号（导出 PGN 自动保留）。'}
+              </p>
+            </div>
+          )
         ) : (
           <p className="text-xs xq-text-muted">
-            开局整阵就绪 · 点击棋盘任意棋子或右侧变例即可自然推演
+            开局整阵就绪 · 支持鼠标拖拽落子，右键拖动画战术箭头，右键单击交点标圈
           </p>
         )}
       </div>

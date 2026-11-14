@@ -1,5 +1,5 @@
 import React from 'react';
-import { Camp, GameTerminalState, WorkspaceMode } from '../types/xiangqi';
+import { Camp, DrawRuleStatus, GameTerminalState, WorkspaceMode } from '../types/xiangqi';
 
 interface StatusBarProps {
   workspace: WorkspaceMode;
@@ -14,10 +14,30 @@ interface StatusBarProps {
   totalPlies: number;
   inCheckCamp: Camp | null;
   terminalOutcome?: GameTerminalState | null;
+  drawRuleStatus?: DrawRuleStatus | null;
   illegalMoveWarning?: string | null;
   isVariationActive: boolean;
   isOpeningDrillActive?: boolean;
   advantageSummary: string;
+}
+
+function formatTerminalLabel(outcome: GameTerminalState): string {
+  switch (outcome.kind) {
+    case 'checkmate':
+      return `${outcome.winner === 'red' ? '红胜' : '黑胜'} · 绝杀`;
+    case 'stalemate':
+      return `${outcome.winner === 'red' ? '红胜' : '黑胜'} · 困毙`;
+    case 'resign':
+      return `${outcome.winner === 'red' ? '红胜' : '黑胜'} · 认输`;
+    case 'timeout':
+      return `${outcome.winner === 'red' ? '红胜' : '黑胜'} · 超时`;
+    case 'draw-60moves':
+      return '和棋 · 60回合限着';
+    case 'draw-repetition':
+      return '和棋 · 三次重复';
+    case 'draw-agreement':
+      return '和棋 · 双方议和';
+  }
 }
 
 export const StatusBar: React.FC<StatusBarProps> = React.memo(({
@@ -33,6 +53,7 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({
   totalPlies,
   inCheckCamp,
   terminalOutcome = null,
+  drawRuleStatus = null,
   illegalMoveWarning = null,
   isVariationActive,
   isOpeningDrillActive = false,
@@ -48,7 +69,7 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({
       return '残局题库 · 执红先行破局（可随时转入复盘分析）';
     }
     if (workspace === 'play') {
-      return '人机对弈 · 支持让子与悔棋支招（可随时转入复盘分析）';
+      return '人机对弈 · 支持拖拽落子、棋钟加秒与认输提和';
     }
     if (workspace === 'setup') {
       return '摆子编辑 · 点选右侧子力库布子，点击盘面已有棋子可移除';
@@ -62,7 +83,7 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({
       }
       return `${primaryEngineName} 实时分析中 (${engineThreads}核/${engineHashMb}M) · 悬停变例可预览走法`;
     }
-    return '复盘分析 · 点击「开始分析」或直接落子推演分支';
+    return '复盘分析 · 支持拖拽走子、右键画战术箭头与单步批注编辑';
   };
 
   return (
@@ -85,12 +106,39 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({
         <span>
           第 {currentPly}/{totalPlies} 手
         </span>
+        {drawRuleStatus && drawRuleStatus.noCaptureRounds >= 10 && !terminalOutcome && (
+          <>
+            <span aria-hidden="true">·</span>
+            <span
+              className={
+                drawRuleStatus.canClaim60MoveDraw
+                  ? 'text-[var(--xq-accent-amber)] font-semibold'
+                  : ''
+              }
+            >
+              无吃子 {drawRuleStatus.noCaptureRounds}/60
+            </span>
+          </>
+        )}
+        {drawRuleStatus && drawRuleStatus.repetitionCount >= 2 && !terminalOutcome && (
+          <>
+            <span aria-hidden="true">·</span>
+            <span
+              className={
+                drawRuleStatus.canClaimRepetitionDraw
+                  ? 'text-[var(--xq-accent-amber)] font-semibold'
+                  : ''
+              }
+            >
+              重复 {drawRuleStatus.repetitionCount}/3
+            </span>
+          </>
+        )}
         {terminalOutcome ? (
           <>
             <span aria-hidden="true">·</span>
             <span className="text-[var(--xq-accent-crimson)] font-semibold">
-              {terminalOutcome.winner === 'red' ? '红胜' : '黑胜'} ·{' '}
-              {terminalOutcome.kind === 'checkmate' ? '绝杀' : '困毙'}
+              {formatTerminalLabel(terminalOutcome)}
             </span>
           </>
         ) : (

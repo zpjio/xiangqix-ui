@@ -11,6 +11,11 @@ import {
   BookOpen,
   ChevronLeft,
   ChevronRight,
+  Clock,
+  Flag,
+  Pause,
+  Play,
+  Scale,
   Swords,
 } from 'lucide-react';
 import { Board } from './components/Board';
@@ -29,6 +34,7 @@ import { Titlebar } from './components/Titlebar';
 import { CLASSICAL_CHALLENGES } from './data/catalogRegistry';
 import { countMatchingLibraryGames, lookupOpeningBookNode, OPENING_PRESETS } from './data/openingBook';
 import {
+  CHESS_CLOCK_PRESETS,
   DEFAULT_ENGINE_PROFILES,
   DEFAULT_STUDY_METADATA,
   getMoveQualityAccuracyScore,
@@ -42,6 +48,7 @@ import {
   BoardTheme,
   Camp,
   CheckSealEffect,
+  ChessClockPresetId,
   CompactLibraryMove,
   EngineProfile,
   EngineProtocol,
@@ -54,6 +61,7 @@ import {
   HandicapType,
   ImpactEffect,
   LibraryGameItem,
+  MoveNag,
   MoveRecord,
   MultiPVArrow,
   OpeningBookCategory,
@@ -89,6 +97,7 @@ import {
 import {
   buildBoardGrid,
   calculateMaterialAndCaptures,
+  computeDrawRuleStatus,
   createInitialPieces,
   createKingsOnlyPieces,
   createSampleSessionMoves,
@@ -356,10 +365,47 @@ export default function App() {
   );
   const [challengeStatusBanner, setChallengeStatusBanner] = useState<string | null>(null);
 
-  // 人机对弈（含传统让子）状态
+  // 人机对弈（含传统让子）、手工终局（认输/议和/判和/超时）与包干加秒棋钟状态
   const [handicap, setHandicap] = useState<HandicapType>('even');
   const [skillTier, setSkillTier] = useState<EngineSkillTier>('grandmaster');
   const [isBotThinking, setIsBotThinking] = useState<boolean>(false);
+  const [manualTerminalOutcome, setManualTerminalOutcome] =
+    useState<GameTerminalState | null>(null);
+  const [dismissedDrawClaimKey, setDismissedDrawClaimKey] = useState<string | null>(null);
+  const [playActionNotice, setPlayActionNotice] = useState<string | null>(null);
+  const [hasBoardAnnotations, setHasBoardAnnotations] = useState<boolean>(false);
+  const [clearAnnotationsNonce, setClearAnnotationsNonce] = useState<number>(0);
+
+  const [clockPresetId, setClockPresetId] = useState<ChessClockPresetId>(
+    () => initialPrefs.clockPresetId || 'none'
+  );
+  const activeClockPreset = useMemo(
+    () => CHESS_CLOCK_PRESETS.find((p) => p.id === clockPresetId) || CHESS_CLOCK_PRESETS[0],
+    [clockPresetId]
+  );
+  const [clockRedMs, setClockRedMs] = useState<number>(() => {
+    const preset =
+      CHESS_CLOCK_PRESETS.find((p) => p.id === (initialPrefs.clockPresetId || 'none')) ||
+      CHESS_CLOCK_PRESETS[0];
+    return preset.initialMs;
+  });
+  const [clockBlackMs, setClockBlackMs] = useState<number>(() => {
+    const preset =
+      CHESS_CLOCK_PRESETS.find((p) => p.id === (initialPrefs.clockPresetId || 'none')) ||
+      CHESS_CLOCK_PRESETS[0];
+    return preset.initialMs;
+  });
+  const [clockPaused, setClockPaused] = useState<boolean>(false);
+
+  const resetClocksForPreset = useCallback(
+    (targetId: ChessClockPresetId = clockPresetId) => {
+      const preset = CHESS_CLOCK_PRESETS.find((p) => p.id === targetId) || CHESS_CLOCK_PRESETS[0];
+      setClockRedMs(preset.initialMs);
+      setClockBlackMs(preset.initialMs);
+      setClockPaused(false);
+    },
+    [clockPresetId]
+  );
 
   // 摆子工坊状态
   const [setupSelectedTemplate, setSetupSelectedTemplate] = useState<{
@@ -498,6 +544,7 @@ export default function App() {
       engineDepth,
       engineThreads,
       engineHashMb,
+      clockPresetId,
     });
   }, [
     appTheme,
@@ -513,6 +560,7 @@ export default function App() {
     engineDepth,
     engineThreads,
     engineHashMb,
+    clockPresetId,
   ]);
 
   useEffect(() => {
@@ -784,18 +832,6 @@ export default function App() {
     [workspace, pieces, turn, boardGrid]
   );
 
-  const terminalOutcome = useMemo<GameTerminalState | null>(() => {
-    if (workspace === 'setup') return null;
-    if (hasLegalMovesCurrentTurn) return null;
-    const inCheckNow = checkPositions.inCheckCamp === turn;
-    const winner: Camp = turn === 'red' ? 'black' : 'red';
-    return {
-      kind: inCheckNow ? 'checkmate' : 'stalemate',
-      winner,
-      loser: turn,
-    };
-  }, [workspace, hasLegalMovesCurrentTurn, checkPositions.inCheckCamp, turn]);
-
   const currentChallenge = useMemo(
     () =>
       CLASSICAL_CHALLENGES.find((c) => c.id === selectedChallengeId) ||
@@ -809,6 +845,88 @@ export default function App() {
   if (!openingStandardInitialRef.current) {
     openingStandardInitialRef.current = createInitialPieces('even');
   }
+
+  const drawRuleStatus = useMemo(() => {
+    if (workspace === 'setup') return null;
+    const basePiecesForDraw =
+      workspace === 'opening'
+        ? openingStandardInitialRef.current!
+        : workspace === 'challenge'
+        ? currentChallenge.pieces()
+        : workspace === 'play'
+        ? createInitialPieces(handicap)
+        : studyBasePieces;
+    const baseTurnForDraw: Camp =
+      workspace === 'opening'
+        ? 'red'
+        : workspace === 'challenge'
+        ? currentChallenge.initialTurn
+        : workspace === 'play'
+        ? handicap === 'move-first'
+          ? 'black'
+          : 'red'
+        : studyBaseTurn;
+    return computeDrawRuleStatus(basePiecesForDraw, baseTurnForDraw, activeMovesList, currentPly);
+  }, [
+    workspace,
+    currentChallenge,
+    handicap,
+    studyBasePieces,
+    studyBaseTurn,
+    activeMovesList,
+    currentPly,
+  ]);
+
+  const naturalTerminalOutcome = useMemo<GameTerminalState | null>(() => {
+    if (workspace === 'setup') return null;
+    if (hasLegalMovesCurrentTurn) return null;
+    const inCheckNow = checkPositions.inCheckCamp === turn;
+    const winner: Camp = turn === 'red' ? 'black' : 'red';
+    return {
+      kind: inCheckNow ? 'checkmate' : 'stalemate',
+      winner,
+      loser: turn,
+    };
+  }, [workspace, hasLegalMovesCurrentTurn, checkPositions.inCheckCamp, turn]);
+
+  const terminalOutcome = manualTerminalOutcome || naturalTerminalOutcome;
+
+  const isOpeningDrillSpoilerFree =
+    workspace === 'opening' &&
+    openingSubMode === 'drill' &&
+    (drillState.status === 'drilling' || drillState.status === 'mistake');
+
+  const drawClaimPrompt = useMemo(() => {
+    if (!drawRuleStatus || terminalOutcome || isOpeningDrillSpoilerFree || workspace === 'setup') {
+      return null;
+    }
+    if (!drawRuleStatus.canClaimRepetitionDraw && !drawRuleStatus.canClaim60MoveDraw) {
+      return null;
+    }
+    const kind: '60moves' | 'repetition' = drawRuleStatus.canClaimRepetitionDraw
+      ? 'repetition'
+      : '60moves';
+    const claimKey = `${workspace}-${currentPly}-${kind}`;
+    if (dismissedDrawClaimKey === claimKey) {
+      return null;
+    }
+    return {
+      claimKey,
+      kind,
+      label: kind === 'repetition' ? '三次重复局面 · 可判和' : '60 回合无吃子 · 可判和',
+      detail:
+        kind === 'repetition'
+          ? `当前相同局面已累计出现 ${drawRuleStatus.repetitionCount} 次`
+          : `已连续 ${drawRuleStatus.noCaptureRounds} 回合无吃子，达到自然限着`,
+    };
+  }, [
+    drawRuleStatus,
+    terminalOutcome,
+    isOpeningDrillSpoilerFree,
+    workspace,
+    currentPly,
+    dismissedDrawClaimKey,
+  ]);
 
   const matchedOpeningNode = useMemo(
     () => (isOpeningContext ? lookupOpeningBookNode(pieces, turn) : null),
@@ -877,10 +995,6 @@ export default function App() {
     () => countMatchingLibraryGames(libraryGames, activeMatchKeyword),
     [libraryGames, activeMatchKeyword]
   );
-  const isOpeningDrillSpoilerFree =
-    workspace === 'opening' &&
-    openingSubMode === 'drill' &&
-    (drillState.status === 'drilling' || drillState.status === 'mistake');
 
   // ==================== 4. 切换工作空间、新局重置与载入古谱/示范名局 ====================
   const handleNewStudyGame = useCallback(() => {
@@ -899,6 +1013,10 @@ export default function App() {
     setCheckSealEffect(null);
     setIllegalMoveWarning(null);
     setTerminalDismissed(false);
+    setManualTerminalOutcome(null);
+    setDismissedDrawClaimKey(null);
+    setPlayActionNotice(null);
+    resetClocksForPreset();
     setStudyBasePieces(freshPieces);
     setStudyBaseTurn('red');
     setPieces(freshPieces);
@@ -909,7 +1027,7 @@ export default function App() {
     setTurn('red');
     setMetadata(DEFAULT_STUDY_METADATA);
     setIsAnalyzing(true);
-  }, [clearDrillTimer, clearBotReplyTimer]);
+  }, [clearDrillTimer, clearBotReplyTimer, resetClocksForPreset]);
 
   const handleLoadSampleMasterGame = useCallback(() => {
     clearDrillTimer();
@@ -927,6 +1045,10 @@ export default function App() {
     setCheckSealEffect(null);
     setIllegalMoveWarning(null);
     setTerminalDismissed(false);
+    setManualTerminalOutcome(null);
+    setDismissedDrawClaimKey(null);
+    setPlayActionNotice(null);
+    resetClocksForPreset();
     setStudyBasePieces(sampleSession.initialPieces);
     setStudyBaseTurn('red');
     setPieces(sampleSession.moves[11]?.piecesSnapshot || sampleSession.initialPieces);
@@ -937,7 +1059,7 @@ export default function App() {
     setTurn('red');
     setMetadata(SAMPLE_MASTER_METADATA);
     setIsAnalyzing(true);
-  }, [clearDrillTimer, clearBotReplyTimer, getSampleSession]);
+  }, [clearDrillTimer, clearBotReplyTimer, getSampleSession, resetClocksForPreset]);
 
   const handleTransferToStudy = useCallback(
     (payload: {
@@ -966,6 +1088,10 @@ export default function App() {
       setCheckSealEffect(null);
       setIllegalMoveWarning(null);
       setTerminalDismissed(false);
+      setManualTerminalOutcome(null);
+      setDismissedDrawClaimKey(null);
+      setPlayActionNotice(null);
+      resetClocksForPreset();
       setStudyBasePieces(payload.basePieces.map((p) => ({ ...p })));
       setStudyBaseTurn(payload.baseTurn);
       setPieces(payload.currentPieces.map((p) => ({ ...p })));
@@ -985,7 +1111,58 @@ export default function App() {
       }));
       setIsAnalyzing(true);
     },
-    [clearDrillTimer, clearBotReplyTimer]
+    [clearDrillTimer, clearBotReplyTimer, resetClocksForPreset]
+  );
+
+  const scheduleBotFirstMoveForBlack = useCallback(
+    (boardPieces: Piece[]) => {
+      clearBotReplyTimer();
+      setIsBotThinking(true);
+      botReplyTimerRef.current = window.setTimeout(() => {
+        botReplyTimerRef.current = null;
+        const sim = generateSimulatedMultiPV(boardPieces, 'black', 18);
+        const reply = sim.lines[0]?.firstMove;
+        if (reply) {
+          const botPiece = getPieceAt(boardPieces, reply.from.row, reply.from.col);
+          if (botPiece) {
+            const botCap = getPieceAt(boardPieces, reply.to.row, reply.to.col);
+            const afterBot = boardPieces
+              .filter((p) => !(p.row === reply.to.row && p.col === reply.to.col))
+              .map((p) =>
+                p.id === botPiece.id ? { ...p, row: reply.to.row, col: reply.to.col } : p
+              );
+            const botRec: MoveRecord = {
+              ply: 1,
+              piece: { ...botPiece },
+              from: reply.from,
+              to: reply.to,
+              captured: botCap ? { ...botCap } : undefined,
+              notation: reply.notation,
+              evalScore: evaluateBoardScore(afterBot),
+              quality: '优',
+              piecesSnapshot: afterBot,
+            };
+            playWoodClackSound(!!botCap, reply.to.row, reply.to.col, soundEnabled);
+            setImpactEffect({
+              id: Date.now(),
+              row: reply.to.row,
+              col: reply.to.col,
+              camp: 'black',
+              isCapture: !!botCap,
+            });
+            setPieces(afterBot);
+            setMainMoves([botRec]);
+            setCurrentPly(1);
+            setTurn('red');
+            if (activeClockPreset.incrementMs > 0) {
+              setClockBlackMs((ms) => ms + activeClockPreset.incrementMs);
+            }
+          }
+        }
+        setIsBotThinking(false);
+      }, 480);
+    },
+    [clearBotReplyTimer, soundEnabled, activeClockPreset.incrementMs]
   );
 
   const handleSwitchWorkspace = useCallback(
@@ -1006,8 +1183,12 @@ export default function App() {
       setCheckSealEffect(null);
       setIllegalMoveWarning(null);
       setTerminalDismissed(false);
+      setManualTerminalOutcome(null);
+      setDismissedDrawClaimKey(null);
+      setPlayActionNotice(null);
 
       if (nextWs === 'study') {
+        resetClocksForPreset();
         const stored = readStoredStudySession();
         if (stored) {
           setStudyBasePieces(stored.basePieces || createInitialPieces('even'));
@@ -1055,6 +1236,7 @@ export default function App() {
         setChallengeStatusBanner(`破局目标：${ch.objective}`);
         setIsAnalyzing(false);
       } else if (nextWs === 'play') {
+        resetClocksForPreset();
         const initP = createInitialPieces(handicap);
         setPieces(initP);
         setMainMoves([]);
@@ -1062,13 +1244,25 @@ export default function App() {
         setCurrentPly(0);
         setTurn(handicap === 'move-first' ? 'black' : 'red');
         setIsAnalyzing(false);
+        if (handicap === 'move-first') {
+          scheduleBotFirstMoveForBlack(initP);
+        }
       } else if (nextWs === 'setup') {
         setSetupTurn(turn);
         setSidebarCollapsed(false);
         setIsAnalyzing(false);
       }
     },
-    [clearDrillTimer, clearBotReplyTimer, workspace, flushStudyPersistence, handicap, turn]
+    [
+      clearDrillTimer,
+      clearBotReplyTimer,
+      workspace,
+      flushStudyPersistence,
+      resetClocksForPreset,
+      handicap,
+      turn,
+      scheduleBotFirstMoveForBlack,
+    ]
   );
 
   const handleSelectChallenge = useCallback(
@@ -1086,6 +1280,8 @@ export default function App() {
       setCheckSealEffect(null);
       setIllegalMoveWarning(null);
       setTerminalDismissed(false);
+      setManualTerminalOutcome(null);
+      setDismissedDrawClaimKey(null);
       setChallengeStatusBanner(`破局目标：${ch.objective}`);
     },
     [clearBotReplyTimer]
@@ -1106,8 +1302,15 @@ export default function App() {
       setCheckSealEffect(null);
       setIllegalMoveWarning(null);
       setTerminalDismissed(false);
+      setManualTerminalOutcome(null);
+      setDismissedDrawClaimKey(null);
+      setPlayActionNotice(null);
+      resetClocksForPreset();
+      if (newHandicap === 'move-first') {
+        scheduleBotFirstMoveForBlack(initP);
+      }
     },
-    [clearBotReplyTimer]
+    [clearBotReplyTimer, resetClocksForPreset, scheduleBotFirstMoveForBlack]
   );
 
   const recordDrillCompletion = useCallback(
@@ -1268,6 +1471,8 @@ export default function App() {
       setCheckSealEffect(null);
       setIllegalMoveWarning(null);
       setTerminalDismissed(false);
+      setManualTerminalOutcome(null);
+      setDismissedDrawClaimKey(null);
 
       if (clamped === 0) {
         const baseInit =
@@ -1437,11 +1642,29 @@ export default function App() {
       setHintArrow(null);
       setTurn(nextTurn);
       setCurrentPly(nextPly);
+      setPlayActionNotice(null);
+
+      if (
+        activeClockPreset.incrementMs > 0 &&
+        workspace === 'play' &&
+        !terminalAfterPlayer
+      ) {
+        if (moving.camp === 'red') {
+          setClockRedMs((ms) => ms + activeClockPreset.incrementMs);
+        } else {
+          setClockBlackMs((ms) => ms + activeClockPreset.incrementMs);
+        }
+      }
 
       if (terminalAfterPlayer && workspace === 'study' && metadata.result === '进行中') {
         setMetadata((prev) => ({
           ...prev,
-          result: terminalAfterPlayer.winner === 'red' ? '红胜' : '黑胜',
+          result:
+            terminalAfterPlayer.winner === 'red'
+              ? '红胜'
+              : terminalAfterPlayer.winner === 'black'
+              ? '黑胜'
+              : '和棋',
         }));
       }
 
@@ -1558,6 +1781,13 @@ export default function App() {
               setMainMoves((prev) => [...prev.slice(0, nextPly), botRec]);
               setCurrentPly(nextPly + 1);
               setTurn('red');
+              if (
+                activeClockPreset.incrementMs > 0 &&
+                workspace === 'play' &&
+                !botTerminal
+              ) {
+                setClockBlackMs((ms) => ms + activeClockPreset.incrementMs);
+              }
               if (botTerminal && workspace === 'challenge') {
                 setChallengeStatusBanner(
                   botTerminal.kind === 'checkmate'
@@ -1584,6 +1814,7 @@ export default function App() {
       drillState.mistakes,
       turn,
       soundEnabled,
+      activeClockPreset.incrementMs,
       retryMistakePly,
       retryTargetMove,
       workspace,
@@ -1597,6 +1828,220 @@ export default function App() {
       triggerMoveSoundAndCheckEffects,
     ]
   );
+
+  const handleEnsureSelectedPiece = useCallback((pieceId: string) => {
+    setSelectedPieceId(pieceId);
+  }, []);
+
+  const handleDropMove = useCallback(
+    (from: Position, to: Position) => {
+      if (isBotThinking || workspace === 'setup' || terminalOutcome) return;
+      const moving = getPieceAtGrid(boardGrid, from.row, from.col);
+      if (!moving || moving.camp !== turn) return;
+
+      const safeMoves = getSafeLegalMovesForPiece(moving, pieces, boardGrid);
+      if (safeMoves.some((m) => m.row === to.row && m.col === to.col)) {
+        executeMoveOnBoard(from, to);
+        return;
+      }
+
+      const pseudoLegal = getLegalMovesForPiece(moving, pieces, boardGrid);
+      if (pseudoLegal.some((m) => m.row === to.row && m.col === to.col)) {
+        const currentlyInCheck = checkPositions.inCheckCamp === turn;
+        playInvalidWarningSound(soundEnabled);
+        setIllegalCheckCamp(turn);
+        setIllegalMoveWarning(
+          currentlyInCheck
+            ? '当前受将 · 此着未能解除将军危机'
+            : '此着会造成送将或将帅照面，不可落子'
+        );
+        return;
+      }
+
+      setSelectedPieceId(moving.id);
+    },
+    [
+      isBotThinking,
+      workspace,
+      terminalOutcome,
+      boardGrid,
+      turn,
+      pieces,
+      executeMoveOnBoard,
+      checkPositions.inCheckCamp,
+      soundEnabled,
+    ]
+  );
+
+  const handleAcceptDrawClaim = useCallback(() => {
+    if (!drawClaimPrompt) return;
+    clearBotReplyTimer();
+    playCheckmateGongSound(soundEnabled);
+    setTerminalDismissed(false);
+    setSelectedPieceId(null);
+    setManualTerminalOutcome({
+      kind: drawClaimPrompt.kind === 'repetition' ? 'draw-repetition' : 'draw-60moves',
+      reasonText: drawClaimPrompt.detail,
+    });
+    if (workspace === 'study' && metadata.result === '进行中') {
+      setMetadata((prev) => ({ ...prev, result: '和棋' }));
+    }
+  }, [drawClaimPrompt, clearBotReplyTimer, soundEnabled, workspace, metadata.result]);
+
+  const handleDismissDrawClaim = useCallback(() => {
+    if (!drawClaimPrompt) return;
+    setDismissedDrawClaimKey(drawClaimPrompt.claimKey);
+  }, [drawClaimPrompt]);
+
+  const handlePlayResign = useCallback(() => {
+    if (workspace !== 'play' || terminalOutcome || isBotThinking) return;
+    clearBotReplyTimer();
+    playCheckmateGongSound(soundEnabled);
+    setSelectedPieceId(null);
+    setTerminalDismissed(false);
+    setPlayActionNotice(null);
+    setManualTerminalOutcome({
+      kind: 'resign',
+      winner: 'black',
+      loser: 'red',
+      reasonText: '玩家（红方）主动认输，黑方获胜',
+    });
+  }, [workspace, terminalOutcome, isBotThinking, clearBotReplyTimer, soundEnabled]);
+
+  const handlePlayOfferDraw = useCallback(() => {
+    if (workspace !== 'play' || terminalOutcome || isBotThinking) return;
+    const isNearDrawRule =
+      !!drawRuleStatus &&
+      (drawRuleStatus.canClaim60MoveDraw ||
+        drawRuleStatus.canClaimRepetitionDraw ||
+        drawRuleStatus.noCaptureRounds >= 35 ||
+        drawRuleStatus.repetitionCount >= 2);
+    if (!isNearDrawRule && mainMoves.length < 6) {
+      setPlayActionNotice('开局尚不足 3 回合，电脑暂不受理提和');
+      return;
+    }
+    if (!isNearDrawRule && currentEvalScore < -1.2) {
+      playInvalidWarningSound(soundEnabled);
+      setPlayActionNotice('电脑评估黑方优势较大，婉拒本次提和');
+      return;
+    }
+    clearBotReplyTimer();
+    playCheckmateGongSound(soundEnabled);
+    setSelectedPieceId(null);
+    setTerminalDismissed(false);
+    setPlayActionNotice(null);
+    setManualTerminalOutcome({
+      kind: 'draw-agreement',
+      reasonText: isNearDrawRule
+        ? '双方局面胶着，电脑同意协议和棋'
+        : '电脑评估局势平稳，双方握手言和',
+    });
+  }, [
+    workspace,
+    terminalOutcome,
+    isBotThinking,
+    drawRuleStatus,
+    mainMoves.length,
+    currentEvalScore,
+    soundEnabled,
+    clearBotReplyTimer,
+  ]);
+
+  const handleChangeClockPreset = useCallback(
+    (nextPresetId: ChessClockPresetId) => {
+      setClockPresetId(nextPresetId);
+      resetClocksForPreset(nextPresetId);
+      setPlayActionNotice(null);
+      setManualTerminalOutcome((prev) => (prev?.kind === 'timeout' ? null : prev));
+    },
+    [resetClocksForPreset]
+  );
+
+  const handleToggleClockPaused = useCallback(() => {
+    setClockPaused((prev) => !prev);
+  }, []);
+
+  const handleUpdateMoveAnnotation = useCallback(
+    (ply: number, isVariation: boolean, nag: MoveNag | undefined, comment: string) => {
+      const cleanComment = comment.trim();
+      const applyUpdate = (list: MoveRecord[]) =>
+        list.map((m) =>
+          m.ply === ply
+            ? {
+                ...m,
+                nag: nag || undefined,
+                comment: cleanComment ? cleanComment : undefined,
+              }
+            : m
+        );
+      if (isVariation) {
+        setVariationMoves((prev) => (prev ? applyUpdate(prev) : prev));
+      } else {
+        setMainMoves((prev) => applyUpdate(prev));
+      }
+    },
+    []
+  );
+
+  const isClockWorkspaceActive =
+    clockPresetId !== 'none' &&
+    workspace === 'play' &&
+    mainMoves.length > 0;
+
+  useEffect(() => {
+    if (!isClockWorkspaceActive || clockPaused || terminalOutcome || activeModal) {
+      return;
+    }
+    let lastTick = performance.now();
+    const timer = window.setInterval(() => {
+      const now = performance.now();
+      const delta = Math.max(0, now - lastTick);
+      lastTick = now;
+
+      if (turn === 'red') {
+        setClockRedMs((prev) => {
+          const next = Math.max(0, prev - delta);
+          if (next === 0 && prev > 0) {
+            clearBotReplyTimer();
+            playCheckmateGongSound(soundEnabled);
+            setTerminalDismissed(false);
+            setManualTerminalOutcome({
+              kind: 'timeout',
+              winner: 'black',
+              loser: 'red',
+              reasonText: '红方包干加秒用尽，按超时判负',
+            });
+          }
+          return next;
+        });
+      } else {
+        setClockBlackMs((prev) => {
+          const next = Math.max(0, prev - delta);
+          if (next === 0 && prev > 0) {
+            clearBotReplyTimer();
+            playCheckmateGongSound(soundEnabled);
+            setTerminalDismissed(false);
+            setManualTerminalOutcome({
+              kind: 'timeout',
+              winner: 'red',
+              loser: 'black',
+              reasonText: '黑方包干加秒用尽，按超时判负',
+            });
+          }
+          return next;
+        });
+      }
+    }, 100);
+    return () => window.clearInterval(timer);
+  }, [
+    isClockWorkspaceActive,
+    clockPaused,
+    terminalOutcome,
+    activeModal,
+    turn,
+    clearBotReplyTimer,
+    soundEnabled,
+  ]);
 
   const handleSelectIntersection = useCallback(
     (row: number, col: number) => {
@@ -1702,7 +2147,7 @@ export default function App() {
 
   // ==================== 6. 锦囊支招 (Hint) 与 自动回放 ====================
   const handleTriggerHint = useCallback(() => {
-    if (workspace === 'setup' || isBotThinking) return;
+    if (workspace === 'setup' || isBotThinking || terminalOutcome) return;
     if (!hasAnyLegalMoves(pieces, turn, boardGrid)) return;
     if (workspace === 'study' && primaryEngine.status !== 'ready') return;
     if (
@@ -1754,6 +2199,7 @@ export default function App() {
   }, [
     workspace,
     isBotThinking,
+    terminalOutcome,
     pieces,
     turn,
     boardGrid,
@@ -1870,6 +2316,8 @@ export default function App() {
         to: { ...m.to },
         evalScore: m.evalScore,
         quality: m.quality,
+        ...(m.nag ? { nag: m.nag } : {}),
+        ...(m.comment ? { comment: m.comment } : {}),
       }));
       const redMoves = activeMovesList.filter((m) => m.piece.camp === 'red');
       const blackMoves = activeMovesList.filter((m) => m.piece.camp === 'black');
@@ -1985,10 +2433,19 @@ export default function App() {
   const handleToggleAnalysis = useCallback(() => setIsAnalyzing((prev) => !prev), []);
   const handleToggleThreatRadar = useCallback(() => setThreatRadarEnabled((prev) => !prev), []);
   const handleFlipBoard = useCallback(() => setFlipped((prev) => !prev), []);
-  const handleUndoMove = useCallback(
-    () => handleJumpPly(Math.max(0, currentPly - 1)),
-    [handleJumpPly, currentPly]
+  const handleClearBoardAnnotations = useCallback(
+    () => setClearAnnotationsNonce((n) => n + 1),
+    []
   );
+  const handleUndoMove = useCallback(() => {
+    const minPlayPly = workspace === 'play' && handicap === 'move-first' ? 1 : 0;
+    if ((workspace === 'play' || workspace === 'challenge') && turn === 'red') {
+      const step = currentPly - minPlayPly >= 2 ? 2 : 1;
+      handleJumpPly(Math.max(minPlayPly, currentPly - step));
+      return;
+    }
+    handleJumpPly(Math.max(0, currentPly - 1));
+  }, [workspace, handicap, turn, currentPly, handleJumpPly]);
   const handleToggleReplay = useCallback(() => {
     if (isReplaying) {
       setIsReplaying(false);
@@ -2193,6 +2650,8 @@ export default function App() {
       setCheckSealEffect(null);
       setIllegalMoveWarning(null);
       setTerminalDismissed(false);
+      setManualTerminalOutcome(null);
+      setDismissedDrawClaimKey(null);
       setFlipped(camp === 'black');
       setPieces(fresh);
       setMainMoves([]);
@@ -2274,6 +2733,8 @@ export default function App() {
       setCheckSealEffect(null);
       setIllegalMoveWarning(null);
       setTerminalDismissed(false);
+      setManualTerminalOutcome(null);
+      setDismissedDrawClaimKey(null);
       setFlipped(false);
       setPieces(replayed.finalPieces);
       setTurn(replayed.finalTurn);
@@ -2305,7 +2766,13 @@ export default function App() {
         blackPlayer: currentChallenge.sourceBook,
         event: `残局研习 · ${currentChallenge.difficulty}`,
         opening: currentChallenge.title,
-        result: terminalOutcome ? (terminalOutcome.winner === 'red' ? '红胜' : '黑胜') : '进行中',
+        result: terminalOutcome
+          ? terminalOutcome.winner === 'red'
+            ? '红胜'
+            : terminalOutcome.winner === 'black'
+            ? '黑胜'
+            : '和棋'
+          : '进行中',
         isFavorite: false,
       },
     });
@@ -2340,7 +2807,13 @@ export default function App() {
         blackPlayer: `电脑引擎（${tierLabel}）`,
         event: `人机对弈 · ${handicapLabel}`,
         opening: `人机实战 (${handicapLabel})`,
-        result: terminalOutcome ? (terminalOutcome.winner === 'red' ? '红胜' : '黑胜') : '进行中',
+        result: terminalOutcome
+          ? terminalOutcome.winner === 'red'
+            ? '红胜'
+            : terminalOutcome.winner === 'black'
+            ? '黑胜'
+            : '和棋'
+          : '进行中',
         isFavorite: false,
       },
     });
@@ -2488,12 +2961,13 @@ export default function App() {
       }
     }
 
+    const minUndoPly = workspace === 'play' && handicap === 'move-first' ? 1 : 0;
     let nextCanUndo = true;
     let nextUndoReason = '';
     if (isBotThinking) {
       nextCanUndo = false;
       nextUndoReason = '电脑正在思考应手，请稍候';
-    } else if (currentPly <= 0) {
+    } else if (currentPly <= minUndoPly) {
       nextCanUndo = false;
       nextUndoReason = '当前处于起始步，暂无可悔着法';
     }
@@ -2503,9 +2977,9 @@ export default function App() {
     if (isBotThinking) {
       nextCanHint = false;
       nextHintReason = '电脑正在思考应手，请稍候';
-    } else if (!hasLegalMovesCurrentTurn) {
+    } else if (terminalOutcome || !hasLegalMovesCurrentTurn) {
       nextCanHint = false;
-      nextHintReason = '当前局面已终局（绝杀/困毙），无可支着法';
+      nextHintReason = '当前局面已终局，无可支着法';
     } else if (workspace === 'study' && primaryEngine.status !== 'ready') {
       nextCanHint = false;
       nextHintReason =
@@ -2538,7 +3012,9 @@ export default function App() {
     openingSubMode,
     drillState.status,
     currentPly,
+    handicap,
     isBotThinking,
+    terminalOutcome,
     hasLegalMovesCurrentTurn,
     primaryEngine.status,
   ]);
@@ -2771,6 +3247,17 @@ export default function App() {
                     ? -materialStats.netAdvantageRed
                     : materialStats.netAdvantageRed
                 }
+                clockMs={
+                  clockPresetId !== 'none' && workspace === 'play'
+                    ? topCamp === 'red'
+                      ? clockRedMs
+                      : clockBlackMs
+                    : null
+                }
+                clockActive={
+                  isClockWorkspaceActive && !clockPaused && !terminalOutcome && turn === topCamp
+                }
+                clockPaused={clockPaused}
                 onEditGameInfo={workspace === 'study' ? handleOpenGameInfo : undefined}
               />
             )}
@@ -2793,6 +3280,7 @@ export default function App() {
 
               <Board
                 pieces={pieces}
+                turn={turn}
                 selectedPieceId={selectedPieceId}
                 legalMoves={legalMoves}
                 lastMove={lastMove}
@@ -2831,6 +3319,9 @@ export default function App() {
                     ? '再来一局'
                     : '新开一局'
                 }
+                drawClaimPrompt={drawClaimPrompt}
+                onAcceptDrawClaim={handleAcceptDrawClaim}
+                onDismissDrawClaim={handleDismissDrawClaim}
                 boardTheme={boardTheme}
                 appTheme={appTheme}
                 craftStyle={craftStyle}
@@ -2839,7 +3330,13 @@ export default function App() {
                 flipped={flipped}
                 workspace={workspace}
                 isVariationActive={!!variationMoves}
+                isBotThinking={isBotThinking}
+                annotationResetKey={`${workspace}-${currentPly}-${activeMovesList.length}-${variationMoves ? 'v' : 'm'}`}
+                clearAnnotationsNonce={clearAnnotationsNonce}
+                onUserAnnotationsChange={setHasBoardAnnotations}
                 onSelectIntersection={handleSelectIntersection}
+                onEnsureSelectedPiece={handleEnsureSelectedPiece}
+                onDropMove={handleDropMove}
               />
             </div>
 
@@ -2878,6 +3375,17 @@ export default function App() {
                     ? materialStats.netAdvantageRed
                     : -materialStats.netAdvantageRed
                 }
+                clockMs={
+                  clockPresetId !== 'none' && workspace === 'play'
+                    ? bottomCamp === 'red'
+                      ? clockRedMs
+                      : clockBlackMs
+                    : null
+                }
+                clockActive={
+                  isClockWorkspaceActive && !clockPaused && !terminalOutcome && turn === bottomCamp
+                }
+                clockPaused={clockPaused}
                 onEditGameInfo={workspace === 'study' ? handleOpenGameInfo : undefined}
               />
             )}
@@ -2890,6 +3398,8 @@ export default function App() {
               isReplaying={isReplaying}
               disabled={workspace === 'setup'}
               hideReplay={isOpeningDrillSpoilerFree}
+              hasBoardAnnotations={hasBoardAnnotations}
+              onClearBoardAnnotations={handleClearBoardAnnotations}
               canNewGame={canBoardNewGame}
               newGameDisabledReason={newGameDisabledReason}
               canUndo={canBoardUndo}
@@ -3079,6 +3589,78 @@ export default function App() {
                     </div>
                   </div>
 
+                  {/* 棋钟赛制与暂停/认输/提和操控 */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="xq-text-secondary font-medium flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-[var(--xq-accent-gold)]" />
+                        <span>3. 棋钟赛制（包干加秒）</span>
+                      </label>
+                      {clockPresetId !== 'none' && (
+                        <button
+                          type="button"
+                          onClick={handleToggleClockPaused}
+                          className="px-2 py-0.5 rounded border xq-border xq-elevated hover:bg-[var(--xq-bg-hover)] text-xs flex items-center gap-1 cursor-pointer"
+                        >
+                          {clockPaused ? (
+                            <>
+                              <Play className="w-3 h-3 text-[var(--xq-accent-jade)]" />
+                              <span>继续计时</span>
+                            </>
+                          ) : (
+                            <>
+                              <Pause className="w-3 h-3 text-[var(--xq-accent-gold)]" />
+                              <span>暂停</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {CHESS_CLOCK_PRESETS.map((preset) => (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() => handleChangeClockPreset(preset.id)}
+                          title={preset.label}
+                          className={`py-1.5 rounded-md text-center font-mono-tabular cursor-pointer ${
+                            clockPresetId === preset.id ? 'xq-btn-option-active' : 'xq-btn-option'
+                          }`}
+                        >
+                          {preset.shortLabel}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 对局裁决：认输与提和 */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      disabled={!!terminalOutcome || isBotThinking}
+                      onClick={handlePlayOfferDraw}
+                      className="py-1.5 px-2.5 rounded-lg border xq-border xq-elevated hover:bg-[var(--xq-bg-hover)] disabled:opacity-45 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 text-xs font-medium cursor-pointer"
+                    >
+                      <Scale className="w-3.5 h-3.5 text-[var(--xq-accent-gold)]" />
+                      <span>向电脑提和</span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!!terminalOutcome || isBotThinking}
+                      onClick={handlePlayResign}
+                      className="py-1.5 px-2.5 rounded-lg border border-[var(--xq-accent-crimson)]/40 text-[var(--xq-accent-crimson)] hover:bg-[var(--xq-accent-crimson)]/10 disabled:opacity-45 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 text-xs font-medium cursor-pointer"
+                    >
+                      <Flag className="w-3.5 h-3.5" />
+                      <span>认输</span>
+                    </button>
+                  </div>
+
+                  {playActionNotice && (
+                    <div className="px-2.5 py-1.5 rounded border border-[var(--xq-accent-gold)]/45 bg-[var(--xq-accent-gold)]/10 text-xs text-[var(--xq-accent-gold)]">
+                      {playActionNotice}
+                    </div>
+                  )}
+
                   {/* 当前人机实战着法记录 */}
                   <div className="p-2.5 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] space-y-2">
                     <div className="flex items-center justify-between text-xs xq-text-secondary">
@@ -3089,10 +3671,10 @@ export default function App() {
                         </span>
                       )}
                     </div>
-                    <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto no-scrollbar">
+                    <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto no-scrollbar">
                       {mainMoves.length === 0 ? (
                         <span className="text-xs xq-text-muted">
-                          请在左侧棋盘点击红方棋子走棋
+                          请在左侧棋盘点击或拖拽红方棋子走棋
                         </span>
                       ) : (
                         mainMoves.map((m) => (
@@ -3234,6 +3816,7 @@ export default function App() {
                     onPromoteVariationToMain={handlePromoteVariationToMain}
                     onDiscardVariation={handleDiscardVariation}
                     onOpenGameInfo={handleOpenGameInfo}
+                    onUpdateMoveAnnotation={handleUpdateMoveAnnotation}
                     onToggleFavorite={handleToggleCurrentFavorite}
                     onSaveToLibrary={handleSaveCurrentGameToLibrary}
                     canSaveToLibrary={canSaveCurrentGame}
@@ -3304,6 +3887,7 @@ export default function App() {
         totalPlies={activeMovesList.length}
         inCheckCamp={checkPositions.inCheckCamp}
         terminalOutcome={terminalOutcome}
+        drawRuleStatus={drawRuleStatus}
         illegalMoveWarning={illegalMoveWarning}
         isVariationActive={!!variationMoves}
         isOpeningDrillActive={isOpeningDrillSpoilerFree}

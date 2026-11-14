@@ -1,8 +1,11 @@
-import React, { useMemo } from 'react';
-import { ArrowRightCircle, RotateCcw, X } from 'lucide-react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { ArrowRightCircle, RotateCcw, Scale, X } from 'lucide-react';
 import {
   AppTheme,
+  BoardAnnotationColor,
   BoardTheme,
+  BoardUserArrow,
+  BoardUserCircle,
   Camp,
   CheckAttackLine,
   CheckSealEffect,
@@ -26,6 +29,7 @@ import { XiangqiPiece } from './XiangqiPiece';
 
 interface BoardProps {
   pieces: Piece[];
+  turn?: Camp;
   selectedPieceId: string | null;
   legalMoves: Position[];
   lastMove: MoveRecord | null;
@@ -48,6 +52,13 @@ interface BoardProps {
   terminalPrimaryLabel?: string;
   onTerminalRestartAction?: () => void;
   terminalRestartLabel?: string;
+  drawClaimPrompt?: {
+    kind: '60moves' | 'repetition';
+    label: string;
+    detail: string;
+  } | null;
+  onAcceptDrawClaim?: () => void;
+  onDismissDrawClaim?: () => void;
   boardTheme: BoardTheme;
   appTheme?: AppTheme;
   craftStyle: PieceCraftStyle;
@@ -56,12 +67,89 @@ interface BoardProps {
   flipped: boolean;
   workspace: WorkspaceMode;
   isVariationActive?: boolean;
+  isBotThinking?: boolean;
+  annotationResetKey?: string | number;
+  clearAnnotationsNonce?: number;
+  onUserAnnotationsChange?: (hasAnnotations: boolean) => void;
   onSelectIntersection: (row: number, col: number) => void;
+  onEnsureSelectedPiece?: (pieceId: string) => void;
+  onDropMove?: (from: Position, to: Position) => void;
 }
 
 const STEP = 95;
 const OFFSET_X = 70;
 const OFFSET_Y = 72;
+// 棋盘交叉格占宽比 (STEP / 900) 与单元格宽比 (9.4%) 之比，用于 FLIP 合成器平移动画
+const CELL_STEP_PCT = (STEP / (900 * 0.094)) * 100;
+
+const USER_ANNOTATION_HEX: Record<BoardAnnotationColor, string> = {
+  gold: '#E0B048',
+  jade: '#2B9B74',
+  crimson: '#D9483B',
+  azure: '#5B8FD9',
+};
+
+function getTerminalCopy(outcome: GameTerminalState) {
+  switch (outcome.kind) {
+    case 'checkmate':
+      return {
+        seal: '絕殺',
+        badge: `絕殺 · ${outcome.winner === 'red' ? '紅勝' : '黑勝'}`,
+        title: outcome.winner === 'red' ? '红方获胜' : '黑方获胜',
+        desc:
+          outcome.reasonText ||
+          `${outcome.loser === 'red' ? '红帅' : '黑将'}已无着可应，棋局告终`,
+      };
+    case 'stalemate':
+      return {
+        seal: '困斃',
+        badge: `困斃 · ${outcome.winner === 'red' ? '紅勝' : '黑勝'}`,
+        title: outcome.winner === 'red' ? '红方获胜' : '黑方获胜',
+        desc:
+          outcome.reasonText ||
+          `${outcome.loser === 'red' ? '红方' : '黑方'}无子可动，按象棋规例判负`,
+      };
+    case 'draw-60moves':
+      return {
+        seal: '限著和',
+        badge: '限著 · 和棋',
+        title: '双方和棋',
+        desc: outcome.reasonText || '连续 60 回合无吃子，按自然限着裁定和棋',
+      };
+    case 'draw-repetition':
+      return {
+        seal: '重複和',
+        badge: '重複 · 和棋',
+        title: '双方和棋',
+        desc: outcome.reasonText || '同一局面第三次重复出现，按棋规判和',
+      };
+    case 'draw-agreement':
+      return {
+        seal: '協議和',
+        badge: '議和 · 和棋',
+        title: '双方和棋',
+        desc: outcome.reasonText || '双方协议达成和棋',
+      };
+    case 'resign':
+      return {
+        seal: '認輸',
+        badge: `認輸 · ${outcome.winner === 'red' ? '紅勝' : '黑勝'}`,
+        title: outcome.winner === 'red' ? '红方获胜' : '黑方获胜',
+        desc:
+          outcome.reasonText ||
+          `${outcome.loser === 'red' ? '红方' : '黑方'}主动认输，棋局结束`,
+      };
+    case 'timeout':
+      return {
+        seal: '超時',
+        badge: `超時 · ${outcome.winner === 'red' ? '紅勝' : '黑勝'}`,
+        title: outcome.winner === 'red' ? '红方获胜' : '黑方获胜',
+        desc:
+          outcome.reasonText ||
+          `${outcome.loser === 'red' ? '红方' : '黑方'}棋钟超时，判对方获胜`,
+      };
+  }
+}
 
 interface BoardSurfacePalette {
   surfaceStart: string;
@@ -569,6 +657,9 @@ const DynamicArrowLayer: React.FC<{
   threatArrow: MultiPVArrow | null;
   hoveredArrow: MultiPVArrow | null;
   hintArrow: MultiPVArrow | null;
+  userArrows: BoardUserArrow[];
+  userCircles: BoardUserCircle[];
+  previewUserArrow: { from: Position; to: Position; color: BoardAnnotationColor } | null;
 }> = React.memo(
   ({
     flipped,
@@ -579,6 +670,9 @@ const DynamicArrowLayer: React.FC<{
     threatArrow,
     hoveredArrow,
     hintArrow,
+    userArrows,
+    userCircles,
+    previewUserArrow,
   }) => {
     const toVisualCoord = (row: number, col: number) => ({
       vRow: flipped ? 9 - row : row,
@@ -644,6 +738,38 @@ const DynamicArrowLayer: React.FC<{
       );
     };
 
+    const renderUserArrow = (
+      from: Position,
+      to: Position,
+      color: BoardAnnotationColor,
+      key: string,
+      isPreview = false
+    ) => {
+      if (from.row === to.row && from.col === to.col) return null;
+      const vf = toVisualCoord(from.row, from.col);
+      const vt = toVisualCoord(to.row, to.col);
+      const x1 = OFFSET_X + vf.vCol * STEP;
+      const y1 = OFFSET_Y + vf.vRow * STEP;
+      const x2 = OFFSET_X + vt.vCol * STEP;
+      const y2 = OFFSET_Y + vt.vRow * STEP;
+      return (
+        <line
+          key={key}
+          x1={x1}
+          y1={y1}
+          x2={x2}
+          y2={y2}
+          stroke={USER_ANNOTATION_HEX[color]}
+          strokeWidth="11"
+          strokeLinecap="round"
+          strokeOpacity={isPreview ? '0.52' : '0.84'}
+          strokeDasharray={isPreview ? '10 6' : undefined}
+          markerEnd={`url(#user-arrow-${color})`}
+          className="pointer-events-none"
+        />
+      );
+    };
+
     return (
       <svg
         viewBox="0 0 900 1000"
@@ -706,6 +832,20 @@ const DynamicArrowLayer: React.FC<{
           >
             <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="var(--xq-accent-azure)" fillOpacity="0.92" />
           </marker>
+          {(['gold', 'jade', 'crimson', 'azure'] as BoardAnnotationColor[]).map((c) => (
+            <marker
+              key={c}
+              id={`user-arrow-${c}`}
+              viewBox="0 0 10 10"
+              refX="6.5"
+              refY="5"
+              markerWidth="4.6"
+              markerHeight="4.6"
+              orient="auto-start-reverse"
+            >
+              <path d="M 0 1.2 L 8.8 5 L 0 8.8 z" fill={USER_ANNOTATION_HEX[c]} fillOpacity="0.92" />
+            </marker>
+          ))}
         </defs>
 
         {/* 照将（将军）攻击线脉动：从照将子连向受将帅/将 */}
@@ -818,6 +958,37 @@ const DynamicArrowLayer: React.FC<{
         {/* 悬停幽灵预览箭头 */}
         {hoveredArrow &&
           renderSvgArrow(hoveredArrow, 'hovered-arrow', '#CFA952', 'arrow-ghost', false, '14')}
+
+        {/* 右键手绘交点标注圆环 */}
+        {userCircles.map((circle) => {
+          const vc = toVisualCoord(circle.pos.row, circle.pos.col);
+          const cx = OFFSET_X + vc.vCol * STEP;
+          const cy = OFFSET_Y + vc.vRow * STEP;
+          return (
+            <circle
+              key={circle.id}
+              cx={cx}
+              cy={cy}
+              r="43"
+              fill="none"
+              stroke={USER_ANNOTATION_HEX[circle.color]}
+              strokeWidth="4.5"
+              strokeOpacity="0.88"
+              className="pointer-events-none"
+            />
+          );
+        })}
+
+        {/* 右键手绘战术箭头与拖动预览 */}
+        {userArrows.map((ua) => renderUserArrow(ua.from, ua.to, ua.color, ua.id, false))}
+        {previewUserArrow &&
+          renderUserArrow(
+            previewUserArrow.from,
+            previewUserArrow.to,
+            previewUserArrow.color,
+            'user-arrow-preview',
+            true
+          )}
       </svg>
     );
   }
@@ -832,6 +1003,11 @@ const IntersectionCell: React.FC<{
   piece: Piece | null;
   isSelected: boolean;
   isLegalTarget: boolean;
+  isDragTargetHover: boolean;
+  isBeingDragged: boolean;
+  isDraggablePiece: boolean;
+  glideOffset?: { dxPct: number; dyPct: number };
+  glideSettling?: boolean;
   isLastMoveDest: boolean;
   impactCamp: Camp | null;
   impactIsCapture: boolean;
@@ -851,6 +1027,11 @@ const IntersectionCell: React.FC<{
     piece,
     isSelected,
     isLegalTarget,
+    isDragTargetHover,
+    isBeingDragged,
+    isDraggablePiece,
+    glideOffset,
+    glideSettling = false,
     isLastMoveDest,
     impactCamp,
     impactIsCapture,
@@ -870,13 +1051,22 @@ const IntersectionCell: React.FC<{
           width: '9.4%',
           height: '8.46%',
         }}
-        className="absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-center"
+        className={`absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-center ${
+          glideOffset ? 'z-30' : ''
+        }`}
       >
         {impactId !== null && impactCamp && (
           <ImpactDustBurst
             camp={impactCamp}
             isCapture={impactIsCapture}
             effectId={impactId}
+          />
+        )}
+
+        {isDragTargetHover && (
+          <span
+            aria-hidden="true"
+            className="absolute -inset-1.5 rounded-full border-2 border-[#CFA952] bg-[#CFA952]/18 shadow-[0_0_12px_rgba(207,169,82,0.55)] pointer-events-none z-20"
           />
         )}
 
@@ -899,33 +1089,52 @@ const IntersectionCell: React.FC<{
 
         {piece && (
           <div
-            key={impactId !== null ? `piece-land-${impactId}` : piece.id}
+            style={
+              glideOffset
+                ? {
+                    transform: glideSettling
+                      ? 'translate3d(0, 0, 0)'
+                      : `translate3d(${glideOffset.dxPct}%, ${glideOffset.dyPct}%, 0)`,
+                    transition: glideSettling
+                      ? 'transform 180ms cubic-bezier(0.22, 1, 0.36, 1)'
+                      : 'none',
+                    willChange: 'transform',
+                  }
+                : undefined
+            }
             className={`relative w-full h-full flex items-center justify-center ${
-              impactId !== null ? 'animate-piece-land' : ''
-            }`}
+              isBeingDragged ? 'opacity-25' : ''
+            } ${isDraggablePiece ? 'touch-none' : ''}`}
           >
-            <XiangqiPiece
-              piece={piece}
-              isSelected={isSelected}
-              isLastMove={isLastMoveDest}
-              isInCheck={isPieceInCheck}
-              isAlertShaking={isAlertShaking}
-              craftStyle={craftStyle}
-              fontScheme={fontScheme}
-              useTraditionalChar={useTraditionalChar}
-              onSelectIntersection={onSelectIntersection}
-            />
+            <div
+              key={impactId !== null && !glideOffset ? `piece-land-${impactId}` : piece.id}
+              className={`relative w-full h-full flex items-center justify-center ${
+                impactId !== null && !glideOffset ? 'animate-piece-land' : ''
+              }`}
+            >
+              <XiangqiPiece
+                piece={piece}
+                isSelected={isSelected}
+                isLastMove={isLastMoveDest}
+                isInCheck={isPieceInCheck}
+                isAlertShaking={isAlertShaking}
+                craftStyle={craftStyle}
+                fontScheme={fontScheme}
+                useTraditionalChar={useTraditionalChar}
+                onSelectIntersection={onSelectIntersection}
+              />
 
-            {isLegalTarget && (
-              <button
-                type="button"
-                onClick={() => onSelectIntersection(row, col)}
-                aria-label={`吃掉${piece.camp === 'red' ? '红' : '黑'}子`}
-                className="absolute -inset-1 z-40 cursor-pointer pointer-events-auto flex items-center justify-center"
-              >
-                <span className="w-full h-full rounded-full border-2 border-[#C8372D] shadow-[0_0_12px_rgba(200,55,45,0.85)]" />
-              </button>
-            )}
+              {isLegalTarget && (
+                <button
+                  type="button"
+                  onClick={() => onSelectIntersection(row, col)}
+                  aria-label={`吃掉${piece.camp === 'red' ? '红' : '黑'}子`}
+                  className="absolute -inset-1 z-40 cursor-pointer pointer-events-auto flex items-center justify-center"
+                >
+                  <span className="w-full h-full rounded-full border-2 border-[#C8372D] shadow-[0_0_12px_rgba(200,55,45,0.85)]" />
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -936,6 +1145,7 @@ const IntersectionCell: React.FC<{
 export const Board: React.FC<BoardProps> = React.memo(
   ({
     pieces,
+    turn,
     selectedPieceId,
     legalMoves,
     lastMove,
@@ -958,6 +1168,9 @@ export const Board: React.FC<BoardProps> = React.memo(
     terminalPrimaryLabel = '复盘分析',
     onTerminalRestartAction,
     terminalRestartLabel = '重开一局',
+    drawClaimPrompt = null,
+    onAcceptDrawClaim,
+    onDismissDrawClaim,
     boardTheme,
     appTheme = 'dark',
     craftStyle,
@@ -966,9 +1179,16 @@ export const Board: React.FC<BoardProps> = React.memo(
     flipped,
     workspace,
     isVariationActive = false,
+    isBotThinking = false,
+    annotationResetKey,
+    clearAnnotationsNonce = 0,
+    onUserAnnotationsChange,
     onSelectIntersection,
+    onEnsureSelectedPiece,
+    onDropMove,
   }) => {
     const themeColors = getBoardSurfacePalette(boardTheme, appTheme);
+    const canvasRef = useRef<HTMLDivElement | null>(null);
 
     const boardGrid = useMemo(() => buildBoardGrid(pieces), [pieces]);
 
@@ -994,6 +1214,384 @@ export const Board: React.FC<BoardProps> = React.memo(
     }, [propRedCheckPos, propBlackCheckPos, pieces, boardGrid]);
 
     const anyCheckPos = redCheckPos || blackCheckPos;
+    const terminalCopy = terminalOutcome ? getTerminalCopy(terminalOutcome) : null;
+
+    // ==================== FLIP 平滑滑移状态 ====================
+    const prevPositionsRef = useRef<Map<string, Position>>(new Map());
+    const prevFlippedRef = useRef<boolean>(flipped);
+    const justDraggedRef = useRef<{ id: string; at: number } | null>(null);
+    const [glideOffsets, setGlideOffsets] = useState<
+      Record<string, { dxPct: number; dyPct: number }>
+    >({});
+    const [glideSettling, setGlideSettling] = useState(false);
+
+    useLayoutEffect(() => {
+      const nextMap = new Map<string, Position>();
+      for (let i = 0; i < pieces.length; i++) {
+        const p = pieces[i];
+        nextMap.set(p.id, { row: p.row, col: p.col });
+      }
+
+      const flippedChanged = prevFlippedRef.current !== flipped;
+      const hadPrev = prevPositionsRef.current.size > 0;
+      const reducedMotion =
+        typeof window !== 'undefined' &&
+        window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+      const computed: Record<string, { dxPct: number; dyPct: number }> = {};
+
+      if (hadPrev && !flippedChanged && !reducedMotion) {
+        for (let i = 0; i < pieces.length; i++) {
+          const p = pieces[i];
+          const prev = prevPositionsRef.current.get(p.id);
+          if (!prev || (prev.row === p.row && prev.col === p.col)) continue;
+          if (
+            justDraggedRef.current &&
+            justDraggedRef.current.id === p.id &&
+            Date.now() - justDraggedRef.current.at < 320
+          ) {
+            continue;
+          }
+          const vPrevRow = flipped ? 9 - prev.row : prev.row;
+          const vPrevCol = flipped ? 8 - prev.col : prev.col;
+          const vCurrRow = flipped ? 9 - p.row : p.row;
+          const vCurrCol = flipped ? 8 - p.col : p.col;
+          computed[p.id] = {
+            dxPct: (vPrevCol - vCurrCol) * CELL_STEP_PCT,
+            dyPct: (vPrevRow - vCurrRow) * CELL_STEP_PCT,
+          };
+        }
+      }
+
+      prevPositionsRef.current = nextMap;
+      prevFlippedRef.current = flipped;
+
+      if (Object.keys(computed).length === 0) {
+        setGlideOffsets({});
+        setGlideSettling(false);
+        return;
+      }
+
+      setGlideOffsets(computed);
+      setGlideSettling(false);
+
+      let raf2 = 0;
+      const raf1 = window.requestAnimationFrame(() => {
+        raf2 = window.requestAnimationFrame(() => {
+          setGlideSettling(true);
+        });
+      });
+      const clearTimer = window.setTimeout(() => {
+        setGlideOffsets({});
+        setGlideSettling(false);
+      }, 210);
+
+      return () => {
+        window.cancelAnimationFrame(raf1);
+        if (raf2) window.cancelAnimationFrame(raf2);
+        window.clearTimeout(clearTimer);
+      };
+    }, [pieces, flipped]);
+
+    // ==================== 右键战术标注（箭头 & 圆环） ====================
+    const [userArrows, setUserArrows] = useState<BoardUserArrow[]>([]);
+    const [userCircles, setUserCircles] = useState<BoardUserCircle[]>([]);
+    const [previewUserArrow, setPreviewUserArrow] = useState<{
+      from: Position;
+      to: Position;
+      color: BoardAnnotationColor;
+    } | null>(null);
+
+    useEffect(() => {
+      setUserArrows([]);
+      setUserCircles([]);
+      setPreviewUserArrow(null);
+    }, [annotationResetKey, clearAnnotationsNonce]);
+
+    const clearUserAnnotations = useCallback(() => {
+      setUserArrows([]);
+      setUserCircles([]);
+      setPreviewUserArrow(null);
+    }, []);
+
+    // ==================== 拖拽走子 & 右键绘制 Pointer 状态机 ====================
+    const canDragPieces =
+      workspace !== 'setup' && !terminalOutcome && !isBotThinking && !!turn;
+
+    const dragCandidateRef = useRef<{
+      pointerId: number;
+      piece: Piece;
+      startX: number;
+      startY: number;
+      active: boolean;
+    } | null>(null);
+
+    const rightDrawRef = useRef<{
+      pointerId: number;
+      startRow: number;
+      startCol: number;
+      color: BoardAnnotationColor;
+    } | null>(null);
+
+    const suppressNextClickRef = useRef(false);
+    const [dragVisual, setDragVisual] = useState<{
+      piece: Piece;
+      xPct: number;
+      yPct: number;
+      hoverRow: number;
+      hoverCol: number;
+    } | null>(null);
+
+    const getBoardCoordsFromClient = useCallback(
+      (clientX: number, clientY: number) => {
+        const el = canvasRef.current;
+        if (!el) return null;
+        const rect = el.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return null;
+        const relX = (clientX - rect.left) / rect.width;
+        const relY = (clientY - rect.top) / rect.height;
+        const xNorm = relX * 900;
+        const yNorm = relY * 1000;
+        const vCol = Math.max(0, Math.min(8, Math.round((xNorm - OFFSET_X) / STEP)));
+        const vRow = Math.max(0, Math.min(9, Math.round((yNorm - OFFSET_Y) / STEP)));
+        const row = flipped ? 9 - vRow : vRow;
+        const col = flipped ? 8 - vCol : vCol;
+        return {
+          row,
+          col,
+          xPct: Math.max(0, Math.min(100, relX * 100)),
+          yPct: Math.max(0, Math.min(100, relY * 100)),
+        };
+      },
+      [flipped]
+    );
+
+    const handleCanvasPointerDown = useCallback(
+      (e: React.PointerEvent<HTMLDivElement>) => {
+        const coords = getBoardCoordsFromClient(e.clientX, e.clientY);
+        if (!coords) return;
+
+        if (e.button === 2) {
+          e.preventDefault();
+          const color: BoardAnnotationColor =
+            e.altKey && e.shiftKey
+              ? 'azure'
+              : e.altKey
+              ? 'jade'
+              : e.shiftKey
+              ? 'crimson'
+              : 'gold';
+          rightDrawRef.current = {
+            pointerId: e.pointerId,
+            startRow: coords.row,
+            startCol: coords.col,
+            color,
+          };
+          setPreviewUserArrow({
+            from: { row: coords.row, col: coords.col },
+            to: { row: coords.row, col: coords.col },
+            color,
+          });
+          try {
+            canvasRef.current?.setPointerCapture(e.pointerId);
+          } catch {
+            // Ignore pointer capture restriction
+          }
+          return;
+        }
+
+        if (e.button === 0 && canDragPieces) {
+          const piece = boardGrid[coords.row * 9 + coords.col];
+          if (piece && piece.camp === turn) {
+            dragCandidateRef.current = {
+              pointerId: e.pointerId,
+              piece,
+              startX: e.clientX,
+              startY: e.clientY,
+              active: false,
+            };
+          }
+        }
+      },
+      [getBoardCoordsFromClient, canDragPieces, boardGrid, turn]
+    );
+
+    const handleCanvasPointerMove = useCallback(
+      (e: React.PointerEvent<HTMLDivElement>) => {
+        if (rightDrawRef.current && rightDrawRef.current.pointerId === e.pointerId) {
+          const coords = getBoardCoordsFromClient(e.clientX, e.clientY);
+          if (coords) {
+            const { startRow, startCol, color } = rightDrawRef.current;
+            setPreviewUserArrow((prev) =>
+              prev && prev.to.row === coords.row && prev.to.col === coords.col
+                ? prev
+                : {
+                    from: { row: startRow, col: startCol },
+                    to: { row: coords.row, col: coords.col },
+                    color,
+                  }
+            );
+          }
+          return;
+        }
+
+        const cand = dragCandidateRef.current;
+        if (cand && cand.pointerId === e.pointerId) {
+          if (!cand.active) {
+            const dist = Math.hypot(e.clientX - cand.startX, e.clientY - cand.startY);
+            if (dist < 6) return;
+            cand.active = true;
+            try {
+              canvasRef.current?.setPointerCapture(e.pointerId);
+            } catch {
+              // Ignore pointer capture restriction
+            }
+            onEnsureSelectedPiece?.(cand.piece.id);
+          }
+          const coords = getBoardCoordsFromClient(e.clientX, e.clientY);
+          if (coords) {
+            setDragVisual({
+              piece: cand.piece,
+              xPct: coords.xPct,
+              yPct: coords.yPct,
+              hoverRow: coords.row,
+              hoverCol: coords.col,
+            });
+          }
+        }
+      },
+      [getBoardCoordsFromClient, onEnsureSelectedPiece]
+    );
+
+    const handleCanvasPointerEnd = useCallback(
+      (e: React.PointerEvent<HTMLDivElement>) => {
+        if (rightDrawRef.current && rightDrawRef.current.pointerId === e.pointerId) {
+          const { startRow, startCol, color } = rightDrawRef.current;
+          rightDrawRef.current = null;
+          setPreviewUserArrow(null);
+          try {
+            if (canvasRef.current?.hasPointerCapture(e.pointerId)) {
+              canvasRef.current.releasePointerCapture(e.pointerId);
+            }
+          } catch {
+            // Ignore release error
+          }
+
+          if (e.type === 'pointerup') {
+            const coords = getBoardCoordsFromClient(e.clientX, e.clientY);
+            if (coords) {
+              if (coords.row === startRow && coords.col === startCol) {
+                setUserCircles((prev) => {
+                  const idx = prev.findIndex(
+                    (c) => c.pos.row === startRow && c.pos.col === startCol
+                  );
+                  if (idx >= 0) {
+                    if (prev[idx].color === color) {
+                      return prev.filter((_, i) => i !== idx);
+                    }
+                    return prev.map((c, i) => (i === idx ? { ...c, color } : c));
+                  }
+                  return [
+                    ...prev,
+                    {
+                      id: `uc-${startRow}-${startCol}-${Date.now()}`,
+                      pos: { row: startRow, col: startCol },
+                      color,
+                    },
+                  ];
+                });
+              } else {
+                setUserArrows((prev) => {
+                  const idx = prev.findIndex(
+                    (a) =>
+                      a.from.row === startRow &&
+                      a.from.col === startCol &&
+                      a.to.row === coords.row &&
+                      a.to.col === coords.col
+                  );
+                  if (idx >= 0) {
+                    if (prev[idx].color === color) {
+                      return prev.filter((_, i) => i !== idx);
+                    }
+                    return prev.map((a, i) => (i === idx ? { ...a, color } : a));
+                  }
+                  return [
+                    ...prev,
+                    {
+                      id: `ua-${startRow}-${startCol}-${coords.row}-${coords.col}-${Date.now()}`,
+                      from: { row: startRow, col: startCol },
+                      to: { row: coords.row, col: coords.col },
+                      color,
+                    },
+                  ];
+                });
+              }
+            }
+          }
+          return;
+        }
+
+        const cand = dragCandidateRef.current;
+        if (cand && cand.pointerId === e.pointerId) {
+          const wasActive = cand.active;
+          const dragPiece = cand.piece;
+          dragCandidateRef.current = null;
+          setDragVisual(null);
+          try {
+            if (canvasRef.current?.hasPointerCapture(e.pointerId)) {
+              canvasRef.current.releasePointerCapture(e.pointerId);
+            }
+          } catch {
+            // Ignore release error
+          }
+
+          if (wasActive) {
+            suppressNextClickRef.current = true;
+            window.setTimeout(() => {
+              suppressNextClickRef.current = false;
+            }, 60);
+
+            if (e.type === 'pointerup') {
+              const coords = getBoardCoordsFromClient(e.clientX, e.clientY);
+              if (
+                coords &&
+                (coords.row !== dragPiece.row || coords.col !== dragPiece.col)
+              ) {
+                justDraggedRef.current = { id: dragPiece.id, at: Date.now() };
+                onDropMove?.(
+                  { row: dragPiece.row, col: dragPiece.col },
+                  { row: coords.row, col: coords.col }
+                );
+              }
+            }
+          }
+        }
+      },
+      [getBoardCoordsFromClient, onDropMove]
+    );
+
+    const handleIntersectionSelectWrapped = useCallback(
+      (row: number, col: number) => {
+        if (suppressNextClickRef.current) return;
+        const targetPiece = boardGrid[row * 9 + col];
+        if (
+          !targetPiece &&
+          !legalTargetSet.has(row * 9 + col) &&
+          (userArrows.length > 0 || userCircles.length > 0)
+        ) {
+          clearUserAnnotations();
+        }
+        onSelectIntersection(row, col);
+      },
+      [
+        boardGrid,
+        legalTargetSet,
+        userArrows.length,
+        userCircles.length,
+        clearUserAnnotations,
+        onSelectIntersection,
+      ]
+    );
 
     const modeRimClass = isVariationActive
       ? 'ring-2 ring-[#CFA952] shadow-[0_0_18px_rgba(207,169,82,0.22)]'
@@ -1005,6 +1603,11 @@ export const Board: React.FC<BoardProps> = React.memo(
 
     const verticalReserve = workspace === 'setup' ? '4.75rem' : '8.5rem';
     const horizontalReserve = workspace === 'study' ? '5.75rem' : '2.25rem';
+    const hasUserAnnotations = userArrows.length > 0 || userCircles.length > 0;
+
+    useEffect(() => {
+      onUserAnnotationsChange?.(hasUserAnnotations);
+    }, [hasUserAnnotations, onUserAnnotationsChange]);
 
     return (
       <div className="relative flex items-center justify-center gap-3 select-none">
@@ -1024,16 +1627,15 @@ export const Board: React.FC<BoardProps> = React.memo(
             <span className="absolute bottom-1.5 left-1.5 w-4 h-4 border-b-2 border-l-2 border-[#CFA952]/45 pointer-events-none" />
             <span className="absolute bottom-1.5 right-1.5 w-4 h-4 border-b-2 border-r-2 border-[#CFA952]/45 pointer-events-none" />
 
-            {/* 终局或将军角标（绝杀收起后可点按再现） */}
-            {terminalOutcome ? (
+            {/* 终局或将军角标（终局印章收起后可点按再现） */}
+            {terminalCopy ? (
               <button
                 type="button"
                 onClick={onRestoreTerminal}
                 title="点击查看终局结果卡片"
                 className="absolute top-3 right-4 z-40 px-2.5 py-0.5 rounded bg-[#962B28] text-[#F4EFE2] text-xs font-serif-sc font-bold tracking-widest shadow-md border border-[#CFA952]/65 cursor-pointer hover:bg-[#AA332E] transition-colors"
               >
-                {terminalOutcome.kind === 'checkmate' ? '絕殺' : '困斃'} ·{' '}
-                {terminalOutcome.winner === 'red' ? '紅勝' : '黑勝'}
+                {terminalCopy.badge}
               </button>
             ) : (
               anyCheckPos && (
@@ -1050,8 +1652,18 @@ export const Board: React.FC<BoardProps> = React.memo(
               </div>
             )}
 
-            {/* 内部盘面画布 (宽高比 9:10，提供 inline-size 容器以供棋子刻字等比缩放) */}
-            <div className="relative w-full aspect-[9/10] rounded-lg overflow-hidden shadow-inner [container-type:inline-size]">
+            {/* 内部盘面画布 (宽高比 9:10) */}
+            <div
+              ref={canvasRef}
+              onContextMenu={(e) => e.preventDefault()}
+              onPointerDown={handleCanvasPointerDown}
+              onPointerMove={handleCanvasPointerMove}
+              onPointerUp={handleCanvasPointerEnd}
+              onPointerCancel={handleCanvasPointerEnd}
+              className={`relative w-full aspect-[9/10] rounded-lg overflow-hidden shadow-inner ${
+                canDragPieces ? 'touch-none' : ''
+              }`}
+            >
               <StaticBoardSurface
                 boardTheme={boardTheme}
                 appTheme={appTheme}
@@ -1067,7 +1679,50 @@ export const Board: React.FC<BoardProps> = React.memo(
                 threatArrow={threatArrow}
                 hoveredArrow={hoveredArrow}
                 hintArrow={hintArrow}
+                userArrows={userArrows}
+                userCircles={userCircles}
+                previewUserArrow={previewUserArrow}
               />
+
+              {/* 60 回合自然限着 / 三次重复局面自动和棋提示卡 */}
+              {drawClaimPrompt && !terminalOutcome && (
+                <div
+                  onPointerDown={(e) => e.stopPropagation()}
+                  className="absolute top-3 left-1/2 -translate-x-1/2 z-40 w-[min(92%,23rem)] pointer-events-auto"
+                >
+                  <div className="rounded-lg border border-[#CFA952]/70 bg-[#1B1613]/94 px-3.5 py-2.5 shadow-[0_12px_28px_rgba(12,10,8,0.62)] flex items-center justify-between gap-2.5">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-[#EED38A]">
+                        <Scale className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">{drawClaimPrompt.label}</span>
+                      </div>
+                      <p className="text-xs text-[#C5A880] truncate mt-0.5">
+                        {drawClaimPrompt.detail}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {onAcceptDrawClaim && (
+                        <button
+                          type="button"
+                          onClick={onAcceptDrawClaim}
+                          className="px-2.5 py-1 rounded xq-btn-primary text-xs whitespace-nowrap cursor-pointer"
+                        >
+                          判和
+                        </button>
+                      )}
+                      {onDismissDrawClaim && (
+                        <button
+                          type="button"
+                          onClick={onDismissDrawClaim}
+                          className="px-2 py-1 rounded xq-btn-secondary text-xs whitespace-nowrap cursor-pointer"
+                        >
+                          继续
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* 将军瞬态书法朱印（全穿透点击，不遮挡落子） */}
               {checkSealEffect && !terminalOutcome && (
@@ -1087,9 +1742,12 @@ export const Board: React.FC<BoardProps> = React.memo(
                 </div>
               )}
 
-              {/* 将死 / 绝杀 / 困毙 终局印章（支持自由收起查看棋盘与一键复盘/重开） */}
-              {terminalOutcome && !terminalDismissed && (
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 w-[min(90%,21rem)] pointer-events-auto">
+              {/* 将死 / 绝杀 / 困毙 / 限着重复和棋 / 认输 / 超时 终局印章 */}
+              {terminalOutcome && terminalCopy && !terminalDismissed && (
+                <div
+                  onPointerDown={(e) => e.stopPropagation()}
+                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 w-[min(90%,21rem)] pointer-events-auto"
+                >
                   <div className="animate-endgame-seal relative rounded-xl border-2 border-[#CFA952]/75 bg-[#1B1613]/94 px-5 py-4 text-center shadow-[0_18px_42px_rgba(12,10,8,0.68)]">
                     {onDismissTerminal && (
                       <button
@@ -1103,17 +1761,13 @@ export const Board: React.FC<BoardProps> = React.memo(
                     )}
 
                     <div className="inline-flex items-center justify-center px-3 py-0.5 rounded border border-[#CFA952]/50 bg-[#962B28]/90 font-calligraphy text-2xl tracking-[0.25em] text-[#F4EFE2] mb-2">
-                      {terminalOutcome.kind === 'checkmate' ? '絕殺' : '困斃'}
+                      {terminalCopy.seal}
                     </div>
 
                     <div className="text-base font-serif-sc font-bold text-[#F4EFE2]">
-                      {terminalOutcome.winner === 'red' ? '红方获胜' : '黑方获胜'}
+                      {terminalCopy.title}
                     </div>
-                    <p className="mt-1 text-[0.8125rem] text-[#C5A880]">
-                      {terminalOutcome.kind === 'checkmate'
-                        ? `${terminalOutcome.loser === 'red' ? '红帅' : '黑将'}已无着可应，棋局告终`
-                        : `${terminalOutcome.loser === 'red' ? '红方' : '黑方'}无子可动，按象棋规例判负`}
-                    </p>
+                    <p className="mt-1 text-[0.8125rem] text-[#C5A880]">{terminalCopy.desc}</p>
 
                     <div className="mt-3.5 flex items-center justify-center gap-2 flex-wrap">
                       {onTerminalPrimaryAction && (
@@ -1154,6 +1808,15 @@ export const Board: React.FC<BoardProps> = React.memo(
                     const piece = boardGrid[idx];
                     const isSelected = piece ? piece.id === selectedPieceId : false;
                     const isLegalTarget = legalTargetSet.has(idx);
+                    const isDragTargetHover =
+                      dragVisual !== null &&
+                      dragVisual.hoverRow === row &&
+                      dragVisual.hoverCol === col &&
+                      isLegalTarget;
+                    const isBeingDragged =
+                      dragVisual !== null && piece !== null && dragVisual.piece.id === piece.id;
+                    const isDraggablePiece =
+                      canDragPieces && piece !== null && piece.camp === turn;
                     const isLastMoveDest =
                       lastMove?.to.row === row && lastMove?.to.col === col;
                     const isImpactHere =
@@ -1180,6 +1843,11 @@ export const Board: React.FC<BoardProps> = React.memo(
                         piece={piece}
                         isSelected={isSelected}
                         isLegalTarget={isLegalTarget}
+                        isDragTargetHover={isDragTargetHover}
+                        isBeingDragged={isBeingDragged}
+                        isDraggablePiece={isDraggablePiece}
+                        glideOffset={piece ? glideOffsets[piece.id] : undefined}
+                        glideSettling={glideSettling}
                         isLastMoveDest={isLastMoveDest}
                         impactCamp={isImpactHere ? impactEffect.camp : null}
                         impactIsCapture={isImpactHere ? impactEffect.isCapture : false}
@@ -1189,12 +1857,34 @@ export const Board: React.FC<BoardProps> = React.memo(
                         craftStyle={craftStyle}
                         fontScheme={fontScheme}
                         useTraditionalChar={useTraditionalChar}
-                        onSelectIntersection={onSelectIntersection}
+                        onSelectIntersection={handleIntersectionSelectWrapped}
                       />
                     );
                   })
                 )}
               </div>
+
+              {/* 第四层：拖拽中的悬浮实体棋子（跟随指针零延迟） */}
+              {dragVisual && (
+                <div
+                  aria-hidden="true"
+                  style={{
+                    left: `${dragVisual.xPct}%`,
+                    top: `${dragVisual.yPct}%`,
+                    width: '9.4%',
+                    height: '8.46%',
+                  }}
+                  className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none z-50 scale-110 drop-shadow-[0_14px_20px_rgba(0,0,0,0.55)]"
+                >
+                  <XiangqiPiece
+                    piece={dragVisual.piece}
+                    isSelected
+                    craftStyle={craftStyle}
+                    fontScheme={fontScheme}
+                    useTraditionalChar={useTraditionalChar}
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>

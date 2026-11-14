@@ -4,6 +4,7 @@ import {
   AppTheme,
   BoardTheme,
   Camp,
+  ChessClockPresetId,
   FontScale,
   GameMetadata,
   LibraryGameItem,
@@ -47,6 +48,7 @@ export interface StoredPrefs {
   engineDepth?: 18 | 24 | 30;
   engineThreads?: 4 | 8 | 16;
   engineHashMb?: 256 | 512 | 1024;
+  clockPresetId?: ChessClockPresetId;
 }
 
 function safeSetLocalStorage(key: string, value: unknown): void {

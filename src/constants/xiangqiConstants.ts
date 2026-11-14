@@ -1,7 +1,9 @@
 import {
   Camp,
+  ChessClockPreset,
   EngineProfile,
   GameMetadata,
+  MoveNag,
   MoveQuality,
   PieceType,
 } from '../types/xiangqi';
@@ -139,4 +141,20 @@ export const DEFAULT_ENGINE_PROFILES: EngineProfile[] = [
     status: 'missing',
     installProgress: 0,
   },
+];
+
+export const MOVE_NAG_OPTIONS: { id: MoveNag; label: string; desc: string }[] = [
+  { id: '!!', label: '!!', desc: '妙手' },
+  { id: '!', label: '!', desc: '好棋' },
+  { id: '!?', label: '!?', desc: '趣味' },
+  { id: '?!', label: '?!', desc: '缓着' },
+  { id: '?', label: '?', desc: '疑问' },
+  { id: '??', label: '??', desc: '漏着' },
+];
+
+export const CHESS_CLOCK_PRESETS: ChessClockPreset[] = [
+  { id: 'none', label: '不限时', shortLabel: '不限时', initialMs: 0, incrementMs: 0 },
+  { id: 'blitz-5-3', label: '快棋 5分+3秒', shortLabel: '5+3', initialMs: 5 * 60_000, incrementMs: 3_000 },
+  { id: 'rapid-10-5', label: '常规 10分+5秒', shortLabel: '10+5', initialMs: 10 * 60_000, incrementMs: 5_000 },
+  { id: 'classical-20-10', label: '慢棋 20分+10秒', shortLabel: '20+10', initialMs: 20 * 60_000, incrementMs: 10_000 },
 ];

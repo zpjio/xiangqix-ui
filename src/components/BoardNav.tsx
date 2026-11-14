@@ -5,6 +5,7 @@ import {
   ChevronLast,
   ChevronLeft,
   ChevronRight,
+  Eraser,
   Lightbulb,
   Pause,
   Play,
@@ -20,6 +21,8 @@ interface BoardNavProps {
   isReplaying: boolean;
   disabled?: boolean;
   hideReplay?: boolean;
+  hasBoardAnnotations?: boolean;
+  onClearBoardAnnotations?: () => void;
   canNewGame?: boolean;
   newGameDisabledReason?: string;
   canUndo?: boolean;
@@ -41,6 +44,8 @@ export const BoardNav: React.FC<BoardNavProps> = React.memo(({
   isReplaying,
   disabled = false,
   hideReplay = false,
+  hasBoardAnnotations = false,
+  onClearBoardAnnotations,
   canNewGame,
   newGameDisabledReason,
   canUndo,
@@ -147,8 +152,20 @@ export const BoardNav: React.FC<BoardNavProps> = React.memo(({
         </button>
       </div>
 
-      {/* 右侧常用操作：新局/重开 · 翻转 · 悔棋 · 支招 */}
+      {/* 右侧常用操作：清除标注（按需） · 新局/重开 · 翻转 · 悔棋 · 支招 */}
       <div className="flex flex-wrap items-center gap-1.5">
+        {hasBoardAnnotations && onClearBoardAnnotations && (
+          <button
+            type="button"
+            onClick={onClearBoardAnnotations}
+            title="清空右键手绘箭头与标圈（或左键点击空位自动清空）"
+            className="px-2 py-1 rounded-md xq-btn-option-active text-[0.8125rem] flex items-center gap-1 whitespace-nowrap cursor-pointer"
+          >
+            <Eraser className="w-3.5 h-3.5" />
+            <span>清标注</span>
+          </button>
+        )}
+
         <button
           type="button"
           disabled={isNewGameDisabled}

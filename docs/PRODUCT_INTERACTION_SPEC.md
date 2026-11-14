@@ -14,10 +14,10 @@
    - **中区**：五大核心工作空间导航（按「核心枢纽 → 开残专项 → 对战 → 工具」排布）——`复盘分析 (study)`、`开局研习 (opening)`、`残局题库 (challenge)`、`人机对弈 (play)`、`摆子编辑 (setup)`，支持 `⌘K` 面板快捷键 `1 ~ 5` 快速切换。
    - **右区（业务分组 | 系统工具）**：左侧业务组按数据生命流排布——`导入 / 导出`（双页签弹窗：`导入至复盘` 支持 FEN、完整中文纵线 PGN 还原与图片识盘，导入统一进入 `复盘分析`；`导出当前对局` 支持下载 `.pgn` / `.fen`、一键复制标准 PGN / 微信纯中文棋谱 / 当前局面 FEN，并可选附带引擎评分与批注）、`棋谱库 (含实时总谱数统计)`、`连线`（连接成功自动切入 `复盘分析`）；以 `1px` 竖线分隔右侧系统组——`命令面板 (⌘K，含 F 导入 / E 导出 / T 循环切主题 / Y 直达温润护眼快捷键)`、`音效开关`、`三态护眼主题循环（深色夜案 → 清朗浅色 → 温润护眼）`、`设置中心`（支持三态分段切换）。
 2. **主工作台（Main Stage + Right Sidebar）**
-   - **左侧主画布区（~62% 黄金比例主视角，启用 `container-type: size`）**：上方极简无边框棋手条（`PlayerSeatBar`，摆子模式隐藏）+ 胜率评估柱（`EvalBar`，仅复盘分析模式显示）+ 9×10 容器自适应棋盘（`Board`，放宽至最高 `820px` 并保留微距呼吸边，棋子刻字随 `cqw` 等比放大）+ 下方极简无边框棋手条 + 棋盘操控底栏（`BoardNav`）。
+   - **左侧主画布区（~62% 黄金比例主视角，启用 `container-type: size`）**：上方极简无边框棋手条（`PlayerSeatBar`，摆子模式隐藏，在 `play` 对弈且启用包干加秒时右对齐展示红/黑包干倒计时与超时警戒）+ 胜率评估柱（`EvalBar`，仅复盘分析模式显示）+ 9×10 容器自适应棋盘（`Board`，放宽至最高 `820px` 并保留微距呼吸边，支持点选与拖拽走子、FLIP 棋子平滑滑移、右键 4 色战术画线/标圈、非阻塞 60 回合/三次重复判和提示条及 7 类终局卡片）+ 下方极简无边框棋手条 + 棋盘操控底栏（`BoardNav`，存在手绘箭头/标圈时动态呈现 `清标注` 按钮，避免棋盘内浮层遮挡边角棋子）。
    - **右侧工作台（约 `37.5%~39.5%` 黄金比例，`390px ~ 600px` 随全局字号自适应微调，支持折叠/展开）**：根据当前工作空间动态渲染对应模块；UI 层全面采用基于根字号（标准 `100% / 16px`、大 `112.5% / 18px`、特大 `125% / 20px`）的 `rem` 排版体系（次要说明下限 `12px`，棋谱/引擎候选正文 `13px~14px`）。
 3. **底部状态栏（StatusBar）**
-   - 实时展示当前工作空间任务提示（含开局变例对练实时步序提示）、非法应将/送将瞬时警告、子力净分差、当前行棋方、步数（`当前手/总手数`）、将军告警（`红帅受将 / 黑将受将`）及终局徽章（`红胜 · 绝杀 / 黑胜 · 困毙`）。
+   - 实时展示当前工作空间任务提示（含开局变例对练实时步序提示）、非法应将/送将瞬时警告、子力净分差、当前行棋方、步数（`当前手/总手数`）、长捉/限着预警指标（当连续无吃子接近或达到 `60` 回合时显示 `无吃子 X/60`，同一局面重复 `>= 2` 次时显示 `重复 X/3`）、将军告警（`红帅受将 / 黑将受将`）及 7 类终局徽章（`红胜 · 绝杀 / 黑胜 · 困毙 / 和棋 · 60回合 / 和棋 · 三次重复 / 双方协议和棋 / 认负 / 超时判负`）。
 
 ### 五大工作空间职责与组件可见性矩阵
 
@@ -25,12 +25,12 @@
 | :--- | :---: | :---: | :---: | :---: | :---: |
 | **引擎分析舱 (`EnginePanel`)** | **显示** | 隐藏（纯净研习防剧透） | 隐藏 | 隐藏 | 隐藏 |
 | **左侧胜率评估柱 (`EvalBar`)** | **显示** | 隐藏（纯净研习防剧透） | 隐藏（防剧透） | 隐藏（沉浸对局） | 隐藏 |
-| **上下棋手席位条 (`PlayerSeatBar`)** | **显示** | **显示** | **显示** | **显示** | 隐藏 |
+| **上下棋手席位条 (`PlayerSeatBar`)** | **显示（无棋钟）** | **显示（无棋钟）** | **显示（无棋钟）** | **显示（含包干加秒棋钟）** | 隐藏 |
 | **底栏步进 `<< < > >>`** | 可用 | 可用（定式树模式） | 可用 | 可用 | 禁用 |
-| **底栏 `自动播放`** | **仅总手数 > 0 时显示** | **定式树且总手数 > 0 时显示**（对练中隐藏） | 隐藏 | 隐藏 | 隐藏 |
+| **底栏 `自动播放` / `清标注`** | 自动播放 `total>0`；有画线显示 `清标注` | 定式树 `total>0`；有画线显示 `清标注` | 仅 `清标注`（有画线时） | 仅 `清标注`（有画线时） | 仅 `清标注`（有画线时） |
 | **底栏 `新局/重开/重摆`** | `新局`（非净空初始可用） | `重开`（有着法/对练中可用） | `重摆`（已走子可用） | `重开`（已走子可用） | 禁用 |
 | **底栏 `翻转`** | 可用 | 可用 | 可用 | 可用 | **可用** |
-| **底栏 `悔棋` / `支招`** | 有步可悔 / 引擎就绪且未终局 | 悔棋需 `ply>0` / 支招需未终局且未通关 | 悔棋需 `ply>0` / 支招需未终局 | 悔棋/支招需空闲且未终局 | 禁用 |
+| **底栏 `悔棋` / `支招`** | 有步可悔 / 引擎就绪且未终局 | 悔棋需 `ply>0` / 支招需未终局且未通关 | 悔棋需 `ply>minPlayPly` / 支招需未终局 | 空闲且超过起手后可 **2 步连悔回玩家回合** / 支招需空闲且未终局 | 禁用 |
 | **快捷键 `Space` / `C`** | **可用** | 禁用 | 禁用 | 禁用 | 禁用 |
 
 ---
@@ -45,10 +45,10 @@
      - `导入 FEN / 识盘`（打开导入/图片识别弹窗）；
      - `打开棋谱库`（浏览历史、现代名局、古谱与自存对局）。
 2. **本地持久化（`localStorage`）**
-   - **复盘会话 (`xiangqix_study_session_v1`)**：仅当 `workspace === 'study'` 时自动保存，包含当前盘面 `pieces`、基准起点盘面 `basePieces`、基准先行方 `baseTurn`、主谱 `mainMoves`、支线 `variationMoves`、分叉点 `branchOriginPly`、当前手数 `currentPly`、当前行棋方 `turn`、对局元数据 `metadata`、关联棋谱库 ID `activeLibraryGameId`、棋盘翻转状态 `flipped`。为避免快速步进或自动回放期间频繁同步序列化阻塞主线程，写入采用 **`350ms` 防抖调度**，并在切换离开 `study` 工作台、触发 `pagehide` / `beforeunload` 或组件卸载时立即同步落盘。
-   - **本地棋谱库 (`xiangqix_library_v1`)**：保存预置名局、古谱及用户通过「存局」写入的 `LibraryGameItem[]`（含 `baseFen` 与紧凑着法数组 `movesData`，支持完整步进回放），采用 `300ms` 防抖落盘。
+   - **复盘会话 (`xiangqix_study_session_v1`)**：仅当 `workspace === 'study'` 时自动保存，包含当前盘面 `pieces`、基准起点盘面 `basePieces`、基准先行方 `baseTurn`、主谱 `mainMoves`（含每手 `nag` 棋评符号与 `comment` 手写批注）、支线 `variationMoves`、分叉点 `branchOriginPly`、当前手数 `currentPly`、当前行棋方 `turn`、对局元数据 `metadata`、关联棋谱库 ID `activeLibraryGameId`、棋盘翻转状态 `flipped`。为避免快速步进或自动回放期间频繁同步序列化阻塞主线程，写入采用 **`350ms` 防抖调度**，并在切换离开 `study` 工作台、触发 `pagehide` / `beforeunload` 或组件卸载时立即同步落盘。
+   - **本地棋谱库 (`xiangqix_library_v1`)**：保存预置名局、古谱及用户通过「存局」写入的 `LibraryGameItem[]`（含 `baseFen` 与紧凑着法数组 `movesData: CompactLibraryMove[]`，完整保留每手 `nag` 与 `comment`），采用 `300ms` 防抖落盘。
    - **残局破关进度 (`xiangqix_challenges_solved_v1`)**：持久化用户已破关的 `challengeId[]`，支撑顶栏总进度与「仅看未破」筛选。
-   - **全局偏好 (`xiangqix_prefs_v1`)**：保存主题、字号、音效、棋盘/棋子工艺、简繁字形、主/副引擎 ID、双擎对比开关、MultiPV 条数、深度、线程数、Hash 内存等配置。
+   - **全局偏好 (`xiangqix_prefs_v1`)**：保存主题、字号、音效、棋盘/棋子工艺、简繁字形、主/副引擎 ID、双擎对比开关、MultiPV 条数、深度、线程数、Hash 内存及人机棋钟赛制 `clockPresetId` 等配置。
    - **按需延迟初始化**：示范名局棋谱、开局库盘面指纹索引图与当前盘面 FEN/PGN 导出字符串均采用惰性按需生成，不在冷启动或无弹窗常规走子渲染期间预先计算。
 
 ---
@@ -66,11 +66,17 @@
   - **多主变（MultiPV）与威胁雷达**：
     - 悬停候选着法行，棋盘渲染金色半透明幽灵预览箭头；点击候选着法直接在棋盘上试走并进入分支。
     - 开启「威胁」按钮后，棋盘以红色虚线箭头标出对方下一步最具威胁的攻着。
-- **连续双栏棋谱（`MoveList`）与存局入库**：
-  - 按回合（红方 + 黑方）双栏展示着法、质量角标（`妙/优/良/缓/败`）与红方视角分值（`+0.45` / `-1.20`）。
-  - 对局信息头提供主次分明的 **「存局 / 更新存局」**、**「★ 星标收藏」** 与 **「导出」** 快捷操作：「存局」为主保存入口（拦截「32 子标准开局 0 手」空盘存局，将当前起始盘面 `baseFen` 与全部实走着法 `movesData` 写入或原地更新「自存对局」）；「★」定位为**独立收藏状态开关**，仅当对局已关联棋谱库记录（载入名局或点击「存局」入库后）才可切换星标，不再隐式替代「存局」；点击「导出（出框上箭头）」直达「导出当前对局」页签。
-  - 在任意历史手（`currentPly < mainMoves.length`）直接走棋或点击引擎候选着，若与主谱下一步不同，立即从该手分叉生成 **内联推演支线**（棋盘框呈现金边高亮并标出「推演分支中」）。
+- **连续双栏棋谱（`MoveList`）、单手棋评批注与存局导出**：
+  - 按回合（红方 + 黑方）双栏展示着法、棋评符号（`!! / ! / !? / ?! / ? / ??`）、质量角标（`妙/优/良/缓/败`）、红方视角分值（`+0.45` / `-1.20`）及批注气泡图标；导出 PGN / 微信纯中文棋谱时 **手写 `nag` 与 `{comment}` 默认永久保留**（仅将注释内容中的 `{`/`}` 清洗为 `(`/`)` 防语法截断），勾选「附带引擎评分与评级」时同步追加引擎 `{评:...}` 信息。
+  - 棋谱列表下方（`currentPly > 0` 时）内嵌 **单手批注编辑条**：点击快捷开关即可为当前着法（支持主谱或超支线回退兜底）点选 `!!` ~ `??` 棋评符号（再次点击取消）并撰写文字批注，支持 `Ctrl/⌘+Enter` 快捷保存或清除。
+  - 对局信息头提供主次分明的 **「存局 / 更新存局」**、**「★ 星标收藏」** 与 **「导出」** 快捷操作：「存局」为主保存入口（拦截「32 子标准开局 0 手」空盘存局，将 `baseFen` 与含 `nag / comment` 的完整着法写入或原地更新「自存对局」）；「★」定位为**独立收藏状态开关**；对局双方姓名支持点击直达「编辑对局信息」并附带显式编辑徽标与 Tooltip 引导。
+  - 在任意历史手（`currentPly < mainMoves.length`）直接走棋或点击引擎候选着，若与主谱下一步不同，立即从该手分叉生成 **内联推演支线**（棋盘框呈现金边高亮并标出「推演分支中」，支线芯片亦透出自身 `nag` 与批注角标）。
   - 支线顶部内嵌操作条支持：**「升为主线」**（替换主谱后续着法）或 **「返回主谱」**（丢弃支线回到分叉手）。
+- **棋盘操作质感与战术画线标注（全工作空间通用）**：
+  - **点选 + 鼠标/触控板拖拽走子**：按住己方棋子移动超过 `6px` 进入流畅跟随拖拽状态并点亮合法落点（启用 `touch-none` 防止触控滚动抢占）；拖拽落子后通过 `justDraggedRef` 短暂抑制释放后的重复 click 触发。
+  - **FLIP 平滑滑移（`transform` GPU 合成）**：无论点选、拖拽、AI 应手还是步进跳手，位置变化均通过前帧→后帧坐标差计算实现约 `185ms` `cubic-bezier(0.22, 1, 0.36, 1)` 棋子滑移；正在拖拽释放的一手直接跳过二次滑移防回弹；棋盘翻转或换局切换自动重置快照不乱飞。
+  - **右键四色战术画线与标圈**：在盘面右键单击交点切换高亮圆圈，右键拖拽至另一交点切换战术箭头；默认金色（`gold`），支持 `Shift`（翡翠绿 `jade`）、`Alt`（天青蓝 `azure`）与 `Shift+Alt`（朱红 `crimson`）切换四色方案；在棋盘空白交点（无箭头与标圈）或新局面/点击底栏 `清标注` 时干净清空，不在棋盘四角叠加会遮挡边车/底士卒的悬浮按钮。
+  - **60 回合无吃子 & 三次重复局面自动判和提示**：由 `computeDrawRuleStatus` 实时跟踪无吃子半步数（`>=120` 即 60 回合）与盘面循环次数（`>=3` 次），达到阈值后在棋盘顶部弹出**非阻塞「限着/重复判和」浮动条**（内设 `e.stopPropagation()` 防穿透落子），支持「立即判和」或「暂不判和继续」。
 - **整局复盘报告（`GameReviewPanel`）**：
   - 红黑双方精准度百分比基于当前主谱各手 `quality` 标签实时加权计算（`妙=99, 优=95, 良=88, 缓=74, 败=48`），不再写死固定数值。
   - 内嵌局势演化曲线（`EvalGraph`），支持点击任意手跳步。
@@ -107,10 +113,12 @@
 - **底部主按钮**：固定展示 **「转入复盘分析」**（若已试走着法，文案自动显示为 `携带 N 手试走转入复盘分析`）。
 
 ### 4. 人机对弈 (`play`) — 沉浸实战对抗
-- **纯净实战布局**：隐藏引擎分析舱与左侧评估柱；席位条展示「玩家（红方）」vs「电脑引擎（含让子标签）」。
+- **纯净实战布局**：隐藏引擎分析舱与左侧评估柱；席位条展示「玩家（红方）」vs「电脑引擎（含让子标签）」，当棋钟启用时右上角/右下角席位条同步显示剩余用时（不足 `30s` 琥珀/朱红警戒闪烁）。
 - **右侧对弈面板**：
-  - **开局让子**：`分先`（双方满子红先）、`让先`（双方满子黑先）、`让左马`（撤去黑方左马，红先）、`让双马`（撤去黑方双马，红先）。切换让子立即重开对局。
+  - **包干加秒棋钟赛制 (`CHESS_CLOCK_PRESETS`)**：支持 **`不限时 (none)`**、**`快棋 5+3 (blitz-5-3)`**、**`常规 10+5 (rapid-10-5)`**、**`慢棋 20+10 (classical-20-10)`** 四档包干加秒，配置持久化至全局偏好；首步落子后计时器自动起表，每次双方合法走子后为走子方加秒（`+incrementMs`），并支持「暂停/继续计时」及超时自动按 `timeout` 判负。**注：棋钟倒计时仅作用域收敛在 `play` 工作台，不在 `study` 复盘研习时倒计时误判超时。**
+  - **开局让子与先手**：`分先`（双方满子红先）、`让先`（双方满子黑先——切换至该模式或重开时由 `scheduleBotFirstMoveForBlack` 自动触发电脑首手黑棋开局应手）、`让左马`（撤去黑方左马，红先）、`让双马`（撤去黑方双马，红先）。
   - **电脑棋力档位**：`初级`、`中级`、`高级`、`大师` 四档。
+  - **对局操作（提和 / 认输 / 2 步悔棋）**：提供 **「向电脑提和」**（结合 `drawRuleStatus` 与当前评估分值：开局不足 3 回合暂不受理，电脑明显占优 `< -1.2` 婉拒，满足接近判和规则或局势平稳时握手达成 `draw-agreement`）与 **「认输」**（立即判定 `resign` 终局）；点击底栏 **「悔棋」** 在玩家执红对弈中一次性回退黑红 2 步直达玩家上一决策回合（保证回到红方可落子状态）。
   - **实战着法记录**：实时流式展示已走手数与每手中文纵线记谱，电脑思考时显示「电脑思考中…」。
   - **底部主按钮**：固定展示 **「转入复盘分析」**（有对局着法时显示为 `携带 N 手实战转入复盘分析`）。
 
@@ -160,40 +168,49 @@
 
 ### 2. 核心类型契约（见 `src/types/xiangqi.ts`）
 - **`Piece`**：`{ id, type: 'general'|'advisor'|'elephant'|'horse'|'chariot'|'cannon'|'soldier', camp: 'red'|'black', row, col }`
-- **`MoveRecord`**：记录每半步（ply）的 `from`、`to`、`captured`、中文记谱 `notation`、红方视角分值 `evalScore`（单位：**兵/子力值**，如 `+1.25`；杀棋用 `mateIn`）、着法评级 `quality ('妙'|'优'|'良'|'缓'|'败')`、失误正着建议 `bestAlternative / bestFrom / bestTo`，以及落子后的 `piecesSnapshot`（用于前端 O(1) 跳手回放）。
+- **`MoveNag` & `MoveRecord`**：`MoveNag = '!!' | '!' | '!?' | '?!' | '?' | '??'`；`MoveRecord` 记录每半步（ply）的 `from`、`to`、`captured`、中文记谱 `notation`、红方视角分值 `evalScore`（单位：**兵/子力值**，如 `+1.25`；杀棋用 `mateIn`）、着法评级 `quality ('妙'|'优'|'良'|'缓'|'败')`、人工棋评符号 `nag?: MoveNag`、手写文字批注 `comment?: string`、失误正着建议 `bestAlternative / bestFrom / bestTo`，以及落子后的 `piecesSnapshot`（用于前端 O(1) 跳手回放）。
+  - **PGN / 文本批注序列化约定**：标准 PGN 导出内联附带 `MoveNag`（可选 `$1/$2/$3/$4/$5/$6` 标准 PGN NAG 码或内联符号 `!!..!`）与 `{comment}` 花括号注释块；当导出勾选「附带引擎评分与评级」时输出 `{评:quality score | comment}`，未勾选时仅保留纯手写 `{comment}` 与 `nag`；注释正文中的 `{`/`}` 统一转义清洗为 `(`/`)`。
 - **`MultiPVLine`**：单条引擎候选主变，含 `multipv`、`depth`、`scoreCp`（**当前前端约定为红方视角分值，单位为分/百分兵折算后的浮点值，如 `+0.45`；若后端引擎返回红黑当前行棋方视角的 centipawn，需统一转换为红方视角并除以 `100` 传入**）、`mate`、`nps (kN/s)`、`hashfull (‰)`、`pvMoves`（中文着法数组）、`firstMove`、`summaryText`。
 - **`EngineProfile`**：引擎档案，含 `id`、`name`、`shortName`、`protocol ('UCI'|'UCCI')`、`styleLabel`、`nnueFile`、`sizeMb`、`status ('missing'|'installing'|'ready')`、`installProgress (0..100)`。
-
-- **`LibraryGameItem` 与 `CompactLibraryMove`**：棋谱库记录除基本元数据外，新增 `category ('master' | 'ancient' | 'user' | 'recent')`、`baseFen` 与压缩步法数组 `movesData: { from, to, evalScore?, quality? }[]`，加载时通过 `replayCompactMoves` 全量还原每手历史快照；棋谱库弹窗按分类实时统计数量，支持关键词搜索、胜负筛选（`全部 / 红胜 / 黑胜 / 和棋`）、多维排序（`默认 / 最新日期 / 手数最多 / 精准度最高`）、命中局数与胜和分布摘要、「保存当前对局入库」及单局 **一键下载 `.pgn` 棋谱文件**。
+- **`GameTerminalState` & `DrawRuleStatus`**：
+  - `GameTerminalKind`: `'checkmate' | 'stalemate' | 'draw-60moves' | 'draw-repetition' | 'draw-agreement' | 'resign' | 'timeout'`，配合 `winner?: Camp`、`loser?: Camp` 与 `reasonText?: string` 覆盖全部 7 类自然/协议/超时/认输终局。
+  - `DrawRuleStatus`: `{ halfmoveNoCapture, noCaptureRounds, repetitionCount, canClaim60MoveDraw, canClaimRepetitionDraw }`，其中无吃子半步数 `>= 120`（60 回合）或同一 `positionKey` 重复 `>= 3` 次时触发前端判和引导条。
+- **`BoardUserArrow` & `BoardUserCircle`**：盘面手绘战术标注结构，支持 `BoardAnnotationColor ('gold' | 'jade' | 'crimson' | 'azure')` 配色及起止坐标。
+- **`ChessClockPresetId` & `ChessClockPreset`**：支持 `'none' | 'blitz-5-3' | 'rapid-10-5' | 'classical-20-10'`，携带 `initialMs` 与 `incrementMs`。
+- **`LibraryGameItem` 与 `CompactLibraryMove`**：棋谱库记录除基本元数据外，包含 `category ('master' | 'ancient' | 'user' | 'recent')`、`baseFen` 与压缩步法数组 `movesData: { from, to, evalScore?, quality?, nag?, comment? }[]`，加载时通过 `replayCompactMoves` 全量还原每手历史快照与人工批注；棋谱库弹窗支持分类统计、关键词检索、胜负筛选、4 维排序、「保存当前对局入库」及单局 **一键下载 `.pgn` 棋谱文件**。
 - **`OpeningBookNode`、`OpeningMoveStat` 与 `OpeningDrillProgress`**：开局库节点以标准 FEN 盘面+行棋方核心串（`getPositionKeyFromPieces`）作为键名，包含 `openingName`、`category`、`matchKeyword`（用于棋谱库同开局名局精准检索）、`plyDepth`、`totalGames`、`comment` 及流行后续列表 `nextMoves[]`（`notation`、`from`、`to`、`frequencyPct`、`redWinPct`、`drawPct`、`blackWinPct`、`targetOpeningName`、`badge?: '主流' | '稳健' | '激烈' | '古谱' | '陷阱'`）；对练进度通过 `OpeningDrillProgress` 记录 `completedCount`、`bestAccuracyPct` 与 `lastPracticedAt`。
 
 ---
 
 ## 六、 后端 / 原生客户端接口对接清单
 
-当前纯前端版本内置了规则校验、FEN/PGN 编解码、模拟引擎算力输出、模拟识图、本地棋谱库/破关持久化与常见定式开局库；对接真实后端或桌面端（Tauri/Electron）时，按以下 7 类接口逐一替换即可：
+当前纯前端版本内置了规则校验、FEN/PGN 编解码、模拟引擎算力输出、模拟识图、棋钟计秒与本地棋谱库/破关持久化；对接真实后端或桌面端（Tauri/Electron）时，按以下 7 类接口逐一替换即可：
 
 | 模块 | 前端当前逻辑 / 触发点 | 后端 / 原生对接目标 | 请求入参 (Request) | 返回 / 推送数据结构 (Response / Stream) |
 | :--- | :--- | :--- | :--- | :--- |
 | **1. 引擎库管理与安装** | `engines` 初始态 + `handleInstallEngine` + `handleAddCustomEngine` | 扫描本地引擎目录、下载引擎与 NNUE 权重、校验自定义可执行文件 | `{ engineId }` 或 `{ filePath, protocol }` | 初始列表 `EngineProfile[]`；安装进度事件 `{ engineId, progress: 0..100, stage, status }` |
 | **2. 实时多主变分析** | `multiPvData` / `secondaryMultiPvData` (`generateSimulatedMultiPV`) | 调用真实 Pikafish / Cyclone / XQMS 进程执行 `position fen ...` + `go depth ...`（支持双擎并行） | `{ engineId, fen, depth, multiPv, threads, hashMb }` | 流式推送或按深度返回 `MultiPVLine[]`（含 `firstMove.from/to`、`pvMoves`、`scoreCp` 红方视角） |
 | **3. 威胁雷达分析** | `threatArrow` (`generateOpponentThreatArrow`) | 对当前局面交换行棋方执行 `null-move` 浅层搜索（如 depth 12~14）获取对方最大威胁着 | `{ engineId, fenFlippedTurn }` | `{ from: Position, to: Position, notation: string, scoreCp: number } \| null` |
-| **4. 人机对弈应手** | `executeMoveOnBoard` 中 `workspace === 'play'` 自动应手 | 根据棋力档位 (`scholar`/`strategist`/`grandmaster`/`deity`) 限制引擎思考深度/时间/Skill Level 返回黑方应手 | `{ fen, skillTier, movesHistory }` | `{ from: Position, to: Position, notation: string, evalScore: number }` |
+| **4. 人机对弈应手与裁决** | `play` 工作台电脑首手/自动应手、`handlePlayOfferDraw`、`handlePlayResign`、超时判负 | 1) 按棋力档位执行 UCI/UCCI `go wtime {redTimeMs} btime {blackTimeMs} winc {redIncMs} binc {blackIncMs}`（`none` 赛制传固定深度/movetime）；<br>2) **AI 提和评估**：结合引擎静态/动态评分与 `drawRuleStatus` 返回是否接受和棋；<br>3) 对战日志上报终局（含 `terminalOutcome.kind` 与剩余用时） | 应手：`{ fen, skillTier, movesHistoryIccs, clock?: { redTimeMs, blackTimeMs, redIncMs, blackIncMs } }`<br>提和：`{ fen, evalCp, drawRuleStatus, pliesCount }` | 应手：`{ from: Position, to: Position, notation: string, evalScore: number, engineSpentMs?: number }`<br>提和：`{ accept: boolean, reasonText: string }` |
 | **5. 截图识图转 FEN** | `DialogsModalSuite` 中 `importMode === 'image'` | 接收上传或粘贴的图片 `File / Blob`，调用棋盘识别模型推理返回 FEN | `FormData (image)` + `{ turn: 'red' \| 'black' }` | `{ fen: string, confidence: number, summary: string }` |
-| **6. 外部平台连线与云谱库** | `connectState`、`handleSyncNextExternalMove`、`libraryGames`、`handleSaveCurrentGameToLibrary` | 桌面端窗口抓图监听外部平台落子推送；棋谱库分组统计、筛选排序、自存对局持久化与残局破关进度云同步 | `{ platform, autoAnalyze }` / `{ category, result, sortBy, q }` / `LibraryGameItem` | 外部落子事件 `{ from, to }`；`LibraryGameItem[]` + 分类计数 + `solvedChallengeIds[]` |
+| **6. 外部平台连线与云谱库** | `connectState`、`handleSyncNextExternalMove`、`libraryGames`、`handleSaveCurrentGameToLibrary` | 桌面端窗口抓图监听外部平台落子推送；云谱库持久化同步每手 `nag`（对应 PGN `$1..$6`）与 `{comment}` 批注及对局结果、残局破关状态 | `{ platform, autoAnalyze }` / `{ category, result, sortBy, q }` / `LibraryGameItem`（含 `movesData[].nag/comment`） | 外部落子事件 `{ from, to }`；`LibraryGameItem[]` + 分类计数 + `solvedChallengeIds[]` |
 | **7. 云端百万局开局库查询** | `lookupOpeningBookNode` (`src/data/openingBook.ts`) | 对接服务端 Zobrist / FEN 盘面指纹云开局库（如万局大师库），返回当前局面统计与流行着法 | `{ positionKey: string, minGames?: number }` | `OpeningBookNode \| null`（含 `openingName`, `totalGames`, `nextMoves: OpeningMoveStat[]`） |
 
-> **规则与合法性备注**：前端 `src/utils/xiangqiRules.ts` 已实现严格的中国象棋走子合法性（`getSafeLegalMovesForPiece` 全面过滤送将、将帅照面与未应将着法；`getCheckingAttackers` 支持单/双将攻击射线反探；含蹩马腿、塞象眼、炮隔子）及 FEN/PGN 互转（含 `parsePgnTextToSession` 中文纵线着法逆向解析，兼容繁简体、`前/中/后` 消歧与 `[FEN]` 标签；`formatGameToPgn` 始终以对局真实起点 `baseFen` 生成 `[FEN]` 头并支持可选 `{评:...}` 批注；新增 `formatGameToWechatText` 微信纯中文棋谱排版与 `downloadTextFile` 本地 `.pgn` / `.fen` 下载）；内部采用 90 格扁平数组 `buildBoardGrid` 实现 O(1) 棋盘格查询，并通过“将/帅为中心向外射线/日字反探”完成 O(1) 将军校验；新增 `getPositionKeyFromPieces` 与 `replayCompactMoves` 用于开局库 O(1) 同形识别及存局完整重演。若后端同时保存 PGN/ICCS 走法，建议统一以 **标准象棋 FEN + ICCS 坐标串（如 `h2e2`）** 作为前后端传输基准格式。
+> **规则、限着与长将/长捉裁决边界（后端对接必读）**：
+> 1. **基础走子与编解码**：前端 `src/utils/xiangqiRules.ts` 已实现严格的中国象棋走子合法性（`getSafeLegalMovesForPiece` 过滤送将、将帅照面与未应将；`getCheckingAttackers` 支持单/双将攻击射线反探；含蹩马腿、塞象眼、炮隔子）及 FEN/PGN 互转（`parsePgnTextToSession` 支持中文纵线着法逆向解析、繁简体、`前/中/后` 消歧与 `[FEN]` 头；`formatGameToPgn` 以 `baseFen` 生成 `[FEN]` 头并保留 `nag` 与 `{comment}`）。前后端交互推荐统一以 **标准象棋 FEN + ICCS 坐标串（如 `h2e2`）** 为基准，后端入库兼容 PGN 标准 `$1 ~ $6`（分别对应前端 `!! / ! / !? / ?! / ? / ??`）与 `{...}` 注释块，并在入库前过滤未成对大括号。
+> 2. **60 回合无吃子（自然限着）与三次重复不变着裁决差异**：当前纯前端 `computeDrawRuleStatus` 对 `halfmoveNoCapture >= 120`（不含红黑连续将军拍子计步扣减）及同一 `positionKey` 重复 `>= 3` 次统一弹出非阻塞判和建议条；**接入真实赛事规则引擎或服务端裁判时**，须在服务端进一步区分中国象棋《亚洲象棋规则》/《中国象棋竞赛规则》的 **长将、长捉（如连续无根车/马/炮捉子循环）与一将一杀违例判负逻辑**：仅双方均为允许着法（或互不让步的“长兑/长拦/长跟/一将一闲允许”循环）达 3 次时允许判和，长将/长捉违规方应由服务端裁判下发违例判负终局通知。
+> 3. **包干加秒时钟权威性**：前端当前采用本地 `100ms` 高精计时轮询，仅在 `play` 工作台激活；对接真人在线对弈或服务端裁判时，应以服务端发回的每手时间戳增量 `redTimeMs / blackTimeMs` 校准前端本地倒计时，并在 AI 思考耗尽时触发 `timeout` 终局结算。
 
-### 将军、应将与绝杀终局视听交互契约
+### 将军、应将、滑移反馈与 7 类终局视听交互契约
 1. **将帅受将与照将射线**：当任一方受将时，受将方将/帅底盘渲染朱红脉冲警戒环，并由 `getCheckingAttackers` 计算所有照将棋子坐标，在动态矢层绘制朱红/鎏金脉动虚线攻击射线（完整支持双将）。
 2. **「將軍」非阻塞瞬时书法印章**：触发将军时，棋盘中央浮现约 `1.3s` 朱砂书法印章（`pointer-events: none`，不阻断应将选子），并触发 Web Audio API 中式铜磬双音合成（`playCheckChimeSound`：D5 + A5 金属泛音）。
 3. **「应将」严格校验与克制化险反馈**：受将时棋盘仅高亮并允许可解除将军的合法着法；若尝试机械可行但未能应将或自杀送将的落子，触发哑木双叩（`playInvalidWarningSound`）、受将将帅轻摇动画（`animate-illegal-shake`）及 `StatusBar` 短暂提示；成功应将化险后静默收起警示，恢复清脆木音与常规行棋，无多余干扰弹窗。
-4. **「絕殺 / 困斃」终局印章与自由查看**：检测到当前行棋方无任何合法应手（`!hasAnyLegalMoves`）时，播放中式响铜大锣与金磬收煞合成音效（`playCheckmateGongSound`），在楚河汉界呈现可收起的「絕殺 / 困斃」终局卡片（支持「收起查看棋盘」并由右上角角标随时恢复、底栏步进回顾历史手、以及一键「复盘报告 / 转入复盘分析」与「再来一局 / 重摆此关」）；「人机对弈 / 残局题库」终局时立即跳过 AI 应手并自动结算破关或对局胜负。
+4. **「絕殺 / 困斃 / 和棋 / 认负 / 超时」7 类终局印章与自由查看**：检测到当前行棋方无合法应手（`checkmate / stalemate`）或玩家/裁判触发 `draw-60moves / draw-repetition / draw-agreement / resign / timeout` 时，播放中式响铜大锣与金磬收煞合成音效（`playCheckmateGongSound`），在楚河汉界呈现可收起的终局卡片（支持「收起查看棋盘」并由右上角角标随时恢复、底栏步进回顾历史手、以及一键「复盘报告 / 转入复盘分析」与「再来一局 / 重摆此关」）；触发后立即清空 AI 思考定时器并停止计时器。
+5. **交互手势与动画防干扰契约**：棋子 FLIP 平滑滑移基于稳定的 `piece.id` 计算前后坐标位移，仅作用于 `transform` 以避免重排；拖拽释放落子瞬间主动跳过该棋子二次 FLIP 补间防回弹闪跳，且交互层所有非棋盘浮动卡片（判和提示条、终局印章卡片）均阻断鼠标/指针事件向棋盘交点热区冒泡。
 
 ### 引擎分析调度与前端渲染防阻塞契约（对接真实引擎时保持一致）
 - **快速步进防抖与过渡调度**：在连续键盘翻步（`← / →`）或 `850ms` 自动回放期间，引擎分析任务（MultiPV 与威胁雷达）经过 **`120ms` 防抖** + React `useDeferredValue` 低优先级队列调度；当分析目标尚未追平当前最新盘面时，棋盘隐藏旧手推荐箭头以免误导，`EvalBar` 立即回退展示当前着法记录分值（或即时静态分值），保证 60fps 交互响应；真实后端/原生进程对接时同样建议在连续跳步窗口内取消或去抖 `stop` / `go` 指令。
-- **三层隔离与精细化 Memo**：棋盘划分为「静态纹理与网格层（含 SVG `feTurbulence` 宣纸肌理与 `contain: layout paint style` 合成隔离）」、「动态箭矢层」、「交互落子与 90 格热区层」，配合全工作台组件 `React.memo` 与稳定回调引用，避免单步落子或悬停预览触发整盘与底纹重绘。
+- **三层隔离与精细化 Memo**：棋盘划分为「静态纹理与网格层（含 SVG `feTurbulence` 宣纸肌理与 `contain: layout paint style` 合成隔离）」、「动态箭矢与用户手绘标注层」、「交互落子与 90 格拖拽/右键热区层」，配合全工作台组件 `React.memo` 与稳定回调引用，避免单步落子、右键画线或悬停预览触发整盘与底纹重绘。
 
 ---
 
@@ -201,6 +218,7 @@
 
 | 日期 | 变更摘要 | 涉及模块 / 文档章节 |
 | :--- | :--- | :--- |
+| **2026-11-13 (v12)** | **六大商业级实战与研棋功能落地 + 实际交互审查优化 + 后端对接规范完善**：<br>1. **拖拽走子、FLIP 平滑滑移与四色右键标注**：支持鼠标/触控板流畅拖拽走子（开启 `touch-none` 防触控冲突与 `justDraggedRef` 防重落），配合前→后帧 `transform` FLIP `185ms` 滑移；支持右键画箭头/标圈（`Gold / Jade / Azure / Crimson` 随 `Shift/Alt` 切换），并将「清标注」收敛至棋盘操控底栏以防遮挡底角车位；<br>2. **单手批注编辑与存库/导出完整持久化**：`MoveList` 内嵌单手 `!! ~ ??` 棋评符号与文字批注编辑器（含支线芯片标识与超支线回退修正）；扩充 `CompactLibraryMove` 字段确保存局重载与 PGN/微信文本导出默认完整保留手写批注及 `nag` 符号；<br>3. **60 回合/三次重复自动判和提示与 7 类终局闭环**：实时统计无吃子回合数与同形重复次数并弹出非阻塞顶部判和提示条；人机对弈新增「向电脑提和」与「认输」交互，统一收口至 7 类终局印章与状态栏徽章；<br>4. **包干加秒棋钟与人机体验闭环修正**：新增 `不限时 / 5+3 / 10+5 / 20+10` 棋钟赛制与暂停/继续/超时判负，严格收口仅在 `play` 对弈工作台倒计时防复盘误超时；同步修复「让先」电脑首手自动应手、`play` 模式 2 步连悔回玩家回合及对局信息可点击提示；<br>5. **后端对接契约升级**：明确 UCI/UCCI `wtime/btime/winc/binc` 时钟同步、AI 提和评估协议、PGN `$1..$6` / `{comment}` 入库防截断与亚洲规则长将/长捉裁决服务端边界。 | 第 1、2、3、5、6、7 节全面同步更新 |
 | **2026-11-13 (v11)** | **专业护眼三态配色体系与棋盘/棋子防疲劳柔化方案**：<br>1. **三态低蓝光护眼矩阵（`dark` / `light` / `eyecare`）**：全面校准 **深色夜案 (`dark`)**（暖炭底 `#161514` + 柔象牙 `#E5E1D8`，消除青灰偏冷与高反差光晕）与 **清朗浅色 (`light`)**（柔日光底 `#EAECE8` + 暖米白 `#F7F7F4`，零 `#FFFFFF` 刺眼纯白），并新增第三态 **温润护眼 (`eyecare`)**（低蓝光羊皮纸 `#E5DEC9` / `#EDE7D6` + 深褐墨字 `#2D2821`）；<br>2. **棋盘与立体棋子协同柔化**：按当前 `appTheme` 动态校准九路十线棋盘木纹/青瓷/黑金渐层亮度峰值、边框阴影及棋子高光斜边、阴刻朱砂 (`#962B28`) / 磨砂铜金 (`#CFA952`) 字色与战术指示色，长时研棋不刺眼；<br>3. **无缝切换交互闭环**：顶栏主题按钮升级为三态无缝循环（`Moon` / `Sun` / `Eye` + 显式下一态提示），设置中心升级为三态分段选择器（`深色夜案 \| 清朗浅色 \| 温润护眼`），`⌘K` 命令面板同步支持 `T` 循环切换与 `Y` 直达温润护眼。 | 第 1、2、7 节同步更新 |
 | **2026-11-13 (v10)** | **主视角棋盘黄金比例重构与棋手条极简轻量化**：<br>1. **黄金比例空间分配（~62% : 38%）**：将左侧棋盘画布与右侧工作台校准为约 `62% : 38%` 黄金比例（右侧栏按 `37.5vw ~ 39.5vw` 随字号档位弹性适配，`390px ~ 600px` 封顶），既保障右侧棋谱/定式空间，又确立棋盘的绝对主视角；<br>2. **容器级自适应棋盘放大与微距呼吸边**：左侧画布启用 `container-type: size`，`Board` 取消原有 `590px` 窄上限、放宽至最高 `820px`，同时兼顾可用高度 `cqh` 与宽度 `cqw` 自动撑满视口并保留微距呼吸边；棋子刻字改用盘面相对单位 `4.5cqw`，随棋盘放大保持居中锐利且不与根字号 `rem` 冲突；<br>3. **红/黑棋手条去边框轻量化**：移除上下 `PlayerSeatBar` 的卡片底色与外框，改为贴合棋盘边缘的极简扁平条并将「行棋」状态去胶囊化，把省出的垂直高度直接让渡给棋盘主体。 | 第 1、7 节同步更新 |
 | **2026-11-13 (v9)** | **全局字号层级抬升与全量 `rem` 等比缩放适配**：<br>1. **标准档可读性抬升**：彻底清理侧栏与弹窗中的 `9px~11px` 极小字，次要元数据与角标下限提升至 `12px (0.75rem)`，右侧栏棋谱中文记谱、引擎主变首步、开局树着法与对弈/题库正文全面提升至 `13px~14px (0.8125rem~0.875rem)`；<br>2. **全量 `rem` 化与拉开档距**：根元素 `html[data-font-scale]` 缩放梯度调整为 **标准 100% (`16px`) / 大 112.5% (`18px`) / 特大 125% (`20px`)**，并将全站按钮、页签、列表、输入框与弹窗统一切换为 `rem` 尺寸，设置中心切换立即全局实时生效；<br>3. **棋盘文字免疫保护与侧栏自适应加宽**：棋子刻字固定 `px` 尺寸以免大字号下溢出木盘圆心；右侧工作台随字号档位自动扩宽至 `420px~540px`（受 `vw` 上限保护主盘面），关键操作栏与弹窗增设 `flex-wrap` 及 `max-h-[90vh] overflow-y-auto` 防截断。 | 第 1、7 节同步更新 |

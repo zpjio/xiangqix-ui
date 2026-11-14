@@ -8,7 +8,9 @@ import {
 import {
   Camp,
   CompactLibraryMove,
+  DrawRuleStatus,
   HandicapType,
+  MoveNag,
   MoveQuality,
   MoveRecord,
   MultiPVArrow,
@@ -715,10 +717,56 @@ export function piecesToFen(pieces: Piece[], turn: Camp = 'red'): string {
   return `${rows.join('/')} ${turn === 'red' ? 'w' : 'b'} - - 0 1`;
 }
 
+const positionSigWeakCache = new WeakMap<Piece[], { red?: string; black?: string }>();
+
 export function getPositionKeyFromPieces(pieces: Piece[], turn: Camp = 'red'): string {
+  const cached = positionSigWeakCache.get(pieces);
+  if (cached && cached[turn] !== undefined) {
+    return cached[turn]!;
+  }
   const fullFen = piecesToFen(pieces, turn);
   const parts = fullFen.split(' ');
-  return `${parts[0]} ${parts[1] || 'w'}`;
+  const key = `${parts[0]} ${parts[1] || 'w'}`;
+  const entry = cached || {};
+  entry[turn] = key;
+  positionSigWeakCache.set(pieces, entry);
+  return key;
+}
+
+export function computeDrawRuleStatus(
+  basePieces: Piece[],
+  baseTurn: Camp,
+  moves: MoveRecord[],
+  currentPly: number
+): DrawRuleStatus {
+  const clampedPly = Math.max(0, Math.min(moves.length, currentPly));
+
+  let halfmoveNoCapture = 0;
+  for (let i = clampedPly - 1; i >= 0; i--) {
+    if (moves[i].captured) break;
+    halfmoveNoCapture++;
+  }
+
+  const rootSig = getPositionKeyFromPieces(basePieces, baseTurn);
+  const counts = new Map<string, number>();
+  counts.set(rootSig, 1);
+
+  let currentSig = rootSig;
+  for (let i = 0; i < clampedPly; i++) {
+    const m = moves[i];
+    const nextTurn: Camp = m.piece.camp === 'red' ? 'black' : 'red';
+    currentSig = getPositionKeyFromPieces(m.piecesSnapshot, nextTurn);
+    counts.set(currentSig, (counts.get(currentSig) || 0) + 1);
+  }
+
+  const repetitionCount = counts.get(currentSig) || 1;
+  return {
+    halfmoveNoCapture,
+    noCaptureRounds: Math.floor(halfmoveNoCapture / 2),
+    repetitionCount,
+    canClaim60MoveDraw: halfmoveNoCapture >= 120,
+    canClaimRepetitionDraw: repetitionCount >= 3,
+  };
 }
 
 export function replayCompactMoves(
@@ -756,6 +804,8 @@ export function replayCompactMoves(
       notation,
       evalScore,
       quality,
+      ...(step.nag ? { nag: step.nag } : {}),
+      ...(step.comment ? { comment: step.comment } : {}),
       piecesSnapshot: current.map((p) => ({ ...p })),
     });
     currentTurn = moving.camp === 'red' ? 'black' : 'red';
@@ -853,11 +903,15 @@ export function formatGameToPgn(
 
   const formatSingleMove = (m?: MoveRecord) => {
     if (!m) return '';
-    if (!includeAnnotations) return m.notation;
+    const nagStr = m.nag || '';
+    const safeComment = m.comment ? m.comment.replace(/[{}]/g, (ch) => (ch === '{' ? '(' : ')')).trim() : '';
+    if (!includeAnnotations) {
+      return `${m.notation}${nagStr}${safeComment ? ` {${safeComment}}` : ''}`;
+    }
     const scoreStr = `${m.evalScore >= 0 ? '+' : ''}${m.evalScore.toFixed(2)}`;
     const tagParts = [m.quality ? `评:${m.quality}` : '', scoreStr].filter(Boolean).join(' ');
-    const noteBody = m.comment ? `${tagParts} | ${m.comment}` : tagParts;
-    return `${m.notation} {${noteBody}}`;
+    const noteBody = safeComment ? `${tagParts} | ${safeComment}` : tagParts;
+    return `${m.notation}${nagStr} {${noteBody}}`;
   };
 
   const moveLines: string[] = [];
@@ -903,22 +957,25 @@ export function formatGameToWechatText(
     const roundNo = Math.floor(i / 2) + 1;
     const r = moves[i];
     const b = moves[i + 1];
-    const rText = r ? r.notation : '';
-    const bText = b ? b.notation : '';
+    const rText = r ? `${r.notation}${r.nag || ''}` : '';
+    const bText = b ? `${b.notation}${b.nag || ''}` : '';
     let row = `${roundNo}. ${rText}${bText ? `  ${bText}` : ''}`;
+    const notes: string[] = [];
     if (includeAnnotations) {
-      const notes: string[] = [];
-      if (r && (r.quality || r.comment)) {
+      if (r && (r.quality || r.nag || r.comment)) {
         const sc = `${r.evalScore >= 0 ? '+' : ''}${r.evalScore.toFixed(1)}`;
         notes.push(`红(${r.quality || '良'} ${sc}${r.comment ? `: ${r.comment}` : ''})`);
       }
-      if (b && (b.quality || b.comment)) {
+      if (b && (b.quality || b.nag || b.comment)) {
         const sc = `${b.evalScore >= 0 ? '+' : ''}${b.evalScore.toFixed(1)}`;
         notes.push(`黑(${b.quality || '良'} ${sc}${b.comment ? `: ${b.comment}` : ''})`);
       }
-      if (notes.length > 0) {
-        row += `  [${notes.join('；')}]`;
-      }
+    } else {
+      if (r?.comment) notes.push(`红: ${r.comment}`);
+      if (b?.comment) notes.push(`黑: ${b.comment}`);
+    }
+    if (notes.length > 0) {
+      row += `  [${notes.join('；')}]`;
     }
     lines.push(row);
   }
@@ -1105,28 +1162,79 @@ export function parsePgnTextToSession(
   const parsedBase = parseFenToPieces(rawFen);
   if (!parsedBase) return null;
 
-  // Strip header tags, comments {...}, parentheses (...), round markers, and result tokens
+  // Strip header tags and parenthetical variations, while preserving {...} comments and NAGs
   const body = trimmed
     .replace(/\[[^\]]*\]/g, ' ')
-    .replace(/\{[^}]*\}/g, ' ')
-    .replace(/\([^)]*\)/g, ' ')
-    .replace(/\b\d+\s*\./g, ' ')
-    .replace(/(?:1-0|0-1|1\/2-1\/2|\*|红胜|黑胜|和棋)/g, ' ');
+    .replace(/\([^)]*\)/g, ' ');
 
-  const rawTokens = body
-    .split(/[\s,，;；]+/)
-    .map((t) => normalizePgnMoveToken(t))
-    .filter((t) => /^[前中后帅将仕士相象马车炮兵卒][^\s]{2,3}$/.test(t));
+  const PGN_DOLLAR_NAG: Record<string, MoveNag> = {
+    $1: '!',
+    $2: '?',
+    $3: '!!',
+    $4: '??',
+    $5: '!?',
+    $6: '?!',
+  };
 
   let current = parsedBase.pieces.map((p) => ({ ...p }));
   let currentTurn: Camp = parsedBase.turn;
   const moves: MoveRecord[] = [];
 
-  for (let i = 0; i < rawTokens.length; i++) {
-    const token = rawTokens[i];
+  const tokenRegex = /\{([^}]*)\}|([^\s,，;；{}]+)/g;
+  let tokMatch: RegExpExecArray | null;
+  let stopParsingMoves = false;
+
+  while ((tokMatch = tokenRegex.exec(body)) !== null) {
+    if (tokMatch[1] !== undefined) {
+      if (moves.length > 0) {
+        const lastRec = moves[moves.length - 1];
+        const rawNote = tokMatch[1].trim();
+        const exportedMatch = rawNote.match(
+          /^评:(妙|优|良|缓|败)\s+([+-]?\d+(?:\.\d+)?)(?:\s*\|\s*([\s\S]*))?$/
+        );
+        if (exportedMatch) {
+          lastRec.quality = exportedMatch[1] as MoveQuality;
+          const parsedScore = parseFloat(exportedMatch[2]);
+          if (Number.isFinite(parsedScore)) {
+            lastRec.evalScore = parsedScore;
+          }
+          if (exportedMatch[3]?.trim()) {
+            lastRec.comment = exportedMatch[3].trim();
+          }
+        } else if (rawNote) {
+          lastRec.comment = lastRec.comment ? `${lastRec.comment}；${rawNote}` : rawNote;
+        }
+      }
+      continue;
+    }
+
+    if (stopParsingMoves) continue;
+    const rawPart = tokMatch[2];
+    if (/^\d+\.$/.test(rawPart)) continue;
+    if (/^(?:1-0|0-1|1\/2-1\/2|\*|红胜|黑胜|和棋)$/.test(rawPart)) continue;
+
+    if (PGN_DOLLAR_NAG[rawPart]) {
+      if (moves.length > 0) {
+        moves[moves.length - 1].nag = PGN_DOLLAR_NAG[rawPart];
+      }
+      continue;
+    }
+
+    const strippedNumPrefix = rawPart.replace(/^\d+\./, '');
+    const nagSuffixMatch = strippedNumPrefix.match(/(!!|\?\?|!\?|\?!|!|\?)$/);
+    const inlineNag = nagSuffixMatch ? (nagSuffixMatch[1] as MoveNag) : undefined;
+    const moveWord = inlineNag
+      ? strippedNumPrefix.slice(0, -inlineNag.length)
+      : strippedNumPrefix;
+    const norm = normalizePgnMoveToken(moveWord);
+    if (!/^[前中后帅将仕士相象马车炮兵卒][^\s]{2,3}$/.test(norm)) continue;
+
     const grid = buildBoardGrid(current);
-    const matched = matchPieceCandidatesForChineseToken(token, currentTurn, current, grid);
-    if (!matched) break;
+    const matched = matchPieceCandidatesForChineseToken(norm, currentTurn, current, grid);
+    if (!matched) {
+      stopParsingMoves = true;
+      continue;
+    }
 
     const { piece: moving, to } = matched;
     const from = { row: moving.row, col: moving.col };
@@ -1139,7 +1247,7 @@ export function parsePgnTextToSession(
 
     const evalScore = evaluateBoardScore(current);
     moves.push({
-      ply: i + 1,
+      ply: moves.length + 1,
       piece: { ...moving },
       from,
       to,
@@ -1147,6 +1255,7 @@ export function parsePgnTextToSession(
       notation,
       evalScore,
       quality: '良',
+      ...(inlineNag ? { nag: inlineNag } : {}),
       piecesSnapshot: current.map((p) => ({ ...p })),
     });
     currentTurn = currentTurn === 'red' ? 'black' : 'red';

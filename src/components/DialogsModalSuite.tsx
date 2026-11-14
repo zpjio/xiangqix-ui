@@ -999,7 +999,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
                         onChange={(e) => setExportIncludeNotes(e.target.checked)}
                         className="w-3.5 h-3.5 accent-[var(--xq-accent-primary)] cursor-pointer"
                       />
-                      <span>附带引擎评分与战术批注</span>
+                      <span>附带引擎评分与评级（手写批注默认保留）</span>
                     </label>
                   </div>
 
