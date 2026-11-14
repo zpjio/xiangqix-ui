@@ -37,6 +37,10 @@ function formatTerminalLabel(outcome: GameTerminalState): string {
       return '和棋 · 三次重复';
     case 'draw-agreement':
       return '和棋 · 双方议和';
+    case 'draw-insufficient':
+      return '和棋 · 死和';
+    case 'perpetual-check':
+      return `${outcome.winner === 'red' ? '红胜' : '黑胜'} · 长将判负`;
   }
 }
 
@@ -125,13 +129,23 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({
             <span aria-hidden="true">·</span>
             <span
               className={
-                drawRuleStatus.canClaimRepetitionDraw
+                drawRuleStatus.perpetualCheckCamp
+                  ? 'text-[var(--xq-accent-crimson)] font-semibold'
+                  : drawRuleStatus.canClaimRepetitionDraw
                   ? 'text-[var(--xq-accent-amber)] font-semibold'
                   : ''
               }
             >
-              重复 {drawRuleStatus.repetitionCount}/3
+              {drawRuleStatus.perpetualCheckCamp
+                ? `${drawRuleStatus.perpetualCheckCamp === 'red' ? '红方' : '黑方'}长将禁止`
+                : `重复 ${drawRuleStatus.repetitionCount}/3`}
             </span>
+          </>
+        )}
+        {drawRuleStatus?.canClaimInsufficientDraw && !terminalOutcome && (
+          <>
+            <span aria-hidden="true">·</span>
+            <span className="text-[var(--xq-accent-amber)] font-semibold">双方无进攻子力</span>
           </>
         )}
         {terminalOutcome ? (

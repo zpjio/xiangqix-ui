@@ -269,6 +269,8 @@ export type GameTerminalKind =
   | 'draw-60moves'
   | 'draw-repetition'
   | 'draw-agreement'
+  | 'draw-insufficient'
+  | 'perpetual-check'
   | 'resign'
   | 'timeout';
 
@@ -285,6 +287,21 @@ export interface DrawRuleStatus {
   repetitionCount: number;
   canClaim60MoveDraw: boolean;
   canClaimRepetitionDraw: boolean;
+  perpetualCheckCamp: Camp | null;
+  canClaimInsufficientDraw: boolean;
+}
+
+export interface SetupValidationResult {
+  isValid: boolean;
+  reason: string | null;
+  hasBothGenerals: boolean;
+  generalsFacing: boolean;
+  inactiveCampInCheck: Camp | null;
+}
+
+export interface MaterialAdvantagePiece {
+  type: PieceType;
+  count: number;
 }
 
 export type BoardAnnotationColor = 'gold' | 'jade' | 'crimson' | 'azure';

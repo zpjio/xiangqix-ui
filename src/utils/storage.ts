@@ -49,6 +49,7 @@ export interface StoredPrefs {
   engineThreads?: 4 | 8 | 16;
   engineHashMb?: 256 | 512 | 1024;
   clockPresetId?: ChessClockPresetId;
+  showBoardCoordinates?: boolean;
 }
 
 function safeSetLocalStorage(key: string, value: unknown): void {

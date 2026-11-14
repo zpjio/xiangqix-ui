@@ -1,6 +1,7 @@
 import React from 'react';
 import { Clock, Pencil } from 'lucide-react';
-import { Camp } from '../types/xiangqi';
+import { PIECE_LABELS } from '../constants/xiangqiConstants';
+import { Camp, MaterialAdvantagePiece } from '../types/xiangqi';
 
 interface PlayerSeatBarProps {
   camp: Camp;
@@ -9,6 +10,8 @@ interface PlayerSeatBarProps {
   isTurn: boolean;
   isInCheck: boolean;
   materialDiff: number; // 该方净子力分差（大于 0.4 时显示）
+  advantagePieces?: MaterialAdvantagePiece[];
+  useTraditionalChar?: boolean;
   clockMs?: number | null;
   clockActive?: boolean;
   clockPaused?: boolean;
@@ -35,6 +38,8 @@ export const PlayerSeatBar: React.FC<PlayerSeatBarProps> = React.memo(({
   isTurn,
   isInCheck,
   materialDiff,
+  advantagePieces = [],
+  useTraditionalChar = true,
   clockMs = null,
   clockActive = false,
   clockPaused = false,
@@ -42,6 +47,18 @@ export const PlayerSeatBar: React.FC<PlayerSeatBarProps> = React.memo(({
 }) => {
   const isRed = camp === 'red';
   const isLowClock = clockMs !== null && clockMs <= 30_000;
+
+  const advantageTitle =
+    advantagePieces.length > 0
+      ? `净多子力：${advantagePieces
+          .map((item) => {
+            const lbl = useTraditionalChar
+              ? PIECE_LABELS[camp][item.type].traditional
+              : PIECE_LABELS[camp][item.type].simplified;
+            return item.count > 1 ? `${lbl}×${item.count}` : lbl;
+          })
+          .join(' ')}`
+      : undefined;
 
   return (
     <div className="w-full px-1 py-0.5 flex items-center justify-between gap-3 select-none">
@@ -90,11 +107,45 @@ export const PlayerSeatBar: React.FC<PlayerSeatBarProps> = React.memo(({
         )}
       </div>
 
-      {/* 右侧：行棋态 · 将军提示 · 净子力分差 · 棋钟倒计时 */}
-      <div className="flex items-center gap-2.5 shrink-0 text-xs">
+      {/* 右侧：净多子力构成 · 子力分差 · 行棋态 · 将军提示 · 棋钟倒计时 */}
+      <div className="flex items-center gap-2 shrink-0 text-xs">
+        {advantagePieces.length > 0 && (
+          <div
+            title={advantageTitle}
+            className="hidden sm:flex items-center gap-1 shrink-0"
+          >
+            {advantagePieces.map((item) => {
+              const char = useTraditionalChar
+                ? PIECE_LABELS[camp][item.type].traditional
+                : PIECE_LABELS[camp][item.type].simplified;
+              return (
+                <span
+                  key={`${camp}-${item.type}`}
+                  className="inline-flex items-center gap-0.5"
+                >
+                  <span
+                    className={`w-[1.125rem] h-[1.125rem] rounded-full flex items-center justify-center text-[0.6875rem] font-serif-sc font-bold border leading-none ${
+                      isRed
+                        ? 'bg-[var(--xq-piece-boxwood-2)]/70 text-[var(--xq-engraved-red)] border-[var(--xq-engraved-red)]/45'
+                        : 'bg-[var(--xq-piece-ebony-2)]/85 text-[var(--xq-engraved-gold)] border-[var(--xq-engraved-gold)]/45'
+                    }`}
+                  >
+                    {char}
+                  </span>
+                  {item.count > 1 && (
+                    <span className="font-mono-tabular text-[0.6875rem] xq-text-muted">
+                      ×{item.count}
+                    </span>
+                  )}
+                </span>
+              );
+            })}
+          </div>
+        )}
+
         {materialDiff > 0.4 && (
           <span className="font-mono-tabular text-xs font-medium xq-text-secondary">
-            子力 +{materialDiff.toFixed(1)}
+            +{materialDiff.toFixed(1)}
           </span>
         )}
 

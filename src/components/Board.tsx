@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRightCircle, RotateCcw, Scale, X } from 'lucide-react';
+import { AlertTriangle, ArrowRightCircle, RotateCcw, Scale, X } from 'lucide-react';
 import {
   AppTheme,
   BoardAnnotationColor,
@@ -16,6 +16,7 @@ import {
   MultiPVArrow,
   Piece,
   PieceCraftStyle,
+  PieceType,
   Position,
   WorkspaceMode,
 } from '../types/xiangqi';
@@ -24,6 +25,7 @@ import {
   RED_ROAD_NUMERALS,
   buildBoardGrid,
   isCampInCheck,
+  isSetupPiecePlacementAllowed,
 } from '../utils/xiangqiRules';
 import { XiangqiPiece } from './XiangqiPiece';
 
@@ -53,19 +55,23 @@ interface BoardProps {
   onTerminalRestartAction?: () => void;
   terminalRestartLabel?: string;
   drawClaimPrompt?: {
-    kind: '60moves' | 'repetition';
+    kind: '60moves' | 'repetition' | 'insufficient' | 'perpetual-check';
     label: string;
     detail: string;
+    isViolationAlert?: boolean;
   } | null;
   onAcceptDrawClaim?: () => void;
   onDismissDrawClaim?: () => void;
+  onStepBackFromViolation?: () => void;
   boardTheme: BoardTheme;
   appTheme?: AppTheme;
   craftStyle: PieceCraftStyle;
   fontScheme: FontScheme;
   useTraditionalChar: boolean;
+  showCoordinates?: boolean;
   flipped: boolean;
   workspace: WorkspaceMode;
+  setupTemplate?: { camp: Camp; type: PieceType } | null;
   isVariationActive?: boolean;
   isBotThinking?: boolean;
   annotationResetKey?: string | number;
@@ -129,6 +135,22 @@ function getTerminalCopy(outcome: GameTerminalState) {
         badge: '議和 · 和棋',
         title: '双方和棋',
         desc: outcome.reasonText || '双方协议达成和棋',
+      };
+    case 'draw-insufficient':
+      return {
+        seal: '死和',
+        badge: '死和 · 和棋',
+        title: '双方和棋',
+        desc: outcome.reasonText || '双方均无有效进攻子力，按死和判和',
+      };
+    case 'perpetual-check':
+      return {
+        seal: '長將負',
+        badge: `長將 · ${outcome.winner === 'red' ? '紅勝' : '黑勝'}`,
+        title: outcome.winner === 'red' ? '红方获胜' : '黑方获胜',
+        desc:
+          outcome.reasonText ||
+          `${outcome.loser === 'red' ? '红方' : '黑方'}单方连续长将违例不变，判对方获胜`,
       };
     case 'resign':
       return {
@@ -355,7 +377,8 @@ const StaticBoardSurface: React.FC<{
   boardTheme: BoardTheme;
   appTheme: AppTheme;
   flipped: boolean;
-}> = React.memo(({ boardTheme, appTheme, flipped }) => {
+  showCoordinates: boolean;
+}> = React.memo(({ boardTheme, appTheme, flipped, showCoordinates }) => {
   const themeColors = getBoardSurfacePalette(boardTheme, appTheme);
     const topNumerals = flipped ? [...RED_ROAD_NUMERALS].reverse() : BLACK_ROAD_NUMERALS;
     const bottomNumerals = flipped ? [...BLACK_ROAD_NUMERALS].reverse() : RED_ROAD_NUMERALS;
@@ -438,28 +461,30 @@ const StaticBoardSurface: React.FC<{
           filter="url(#xuanPaperNoise)"
         />
 
-        {/* 盘内顶部与底部路数坐标 */}
-        <g className="font-serif-sc text-[22px] font-bold select-none" opacity="0.72">
-          {Array.from({ length: 9 }).map((_, col) => {
-            const x = OFFSET_X + col * STEP;
-            return (
-              <React.Fragment key={`coord-${col}`}>
-                <text
-                  x={x}
-                  y={38}
-                  textAnchor="middle"
-                  fill={themeColors.inkLine}
-                  className="font-mono-tabular"
-                >
-                  {topNumerals[col]}
-                </text>
-                <text x={x} y={978} textAnchor="middle" fill={themeColors.inkLine}>
-                  {bottomNumerals[col]}
-                </text>
-              </React.Fragment>
-            );
-          })}
-        </g>
+        {/* 盘内顶部与底部路数坐标（可在设置中心开关） */}
+        {showCoordinates && (
+          <g className="font-serif-sc text-[22px] font-bold select-none" opacity="0.78">
+            {Array.from({ length: 9 }).map((_, col) => {
+              const x = OFFSET_X + col * STEP;
+              return (
+                <React.Fragment key={`coord-${col}`}>
+                  <text
+                    x={x}
+                    y={38}
+                    textAnchor="middle"
+                    fill={themeColors.inkLine}
+                    className="font-mono-tabular"
+                  >
+                    {topNumerals[col]}
+                  </text>
+                  <text x={x} y={978} textAnchor="middle" fill={themeColors.inkLine}>
+                    {bottomNumerals[col]}
+                  </text>
+                </React.Fragment>
+              );
+            })}
+          </g>
+        )}
 
         {/* 外围双层重框 */}
         <rect
@@ -1014,6 +1039,8 @@ const IntersectionCell: React.FC<{
   impactId: number | null;
   isPieceInCheck: boolean;
   isAlertShaking: boolean;
+  setupValidEmpty?: boolean;
+  setupInvalidEmpty?: boolean;
   craftStyle: PieceCraftStyle;
   fontScheme: FontScheme;
   useTraditionalChar: boolean;
@@ -1038,6 +1065,8 @@ const IntersectionCell: React.FC<{
     impactId,
     isPieceInCheck,
     isAlertShaking,
+    setupValidEmpty = false,
+    setupInvalidEmpty = false,
     craftStyle,
     fontScheme,
     useTraditionalChar,
@@ -1075,12 +1104,18 @@ const IntersectionCell: React.FC<{
             type="button"
             onClick={() => onSelectIntersection(row, col)}
             aria-label={`交叉点 第${row + 1}横 第${col + 1}路`}
-            className="w-full h-full rounded-full flex items-center justify-center cursor-pointer group focus:outline-none"
+            className={`w-full h-full rounded-full flex items-center justify-center group focus:outline-none ${
+              setupInvalidEmpty ? 'cursor-not-allowed' : 'cursor-pointer'
+            }`}
           >
             {isLegalTarget ? (
               <span className="relative flex items-center justify-center w-5 h-5">
                 <span className="w-3.5 h-3.5 rounded-full bg-[#3A684F] border border-[#CFA952] shadow-[0_0_6px_rgba(58,104,79,0.68)] transition-transform group-hover:scale-125" />
               </span>
+            ) : setupValidEmpty ? (
+              <span className="w-3 h-3 rounded-full bg-[#2B9B74]/35 border border-[#2B9B74]/75 transition-transform group-hover:scale-125" />
+            ) : setupInvalidEmpty ? (
+              <span className="w-2.5 h-2.5 rounded-full bg-transparent group-hover:bg-[#C8372D]/35 transition-colors" />
             ) : (
               <span className="w-2 h-2 rounded-full bg-transparent group-hover:bg-[#962B28]/25 transition-colors" />
             )}
@@ -1171,13 +1206,16 @@ export const Board: React.FC<BoardProps> = React.memo(
     drawClaimPrompt = null,
     onAcceptDrawClaim,
     onDismissDrawClaim,
+    onStepBackFromViolation,
     boardTheme,
     appTheme = 'dark',
     craftStyle,
     fontScheme,
     useTraditionalChar,
+    showCoordinates = true,
     flipped,
     workspace,
+    setupTemplate = null,
     isVariationActive = false,
     isBotThinking = false,
     annotationResetKey,
@@ -1668,6 +1706,7 @@ export const Board: React.FC<BoardProps> = React.memo(
                 boardTheme={boardTheme}
                 appTheme={appTheme}
                 flipped={flipped}
+                showCoordinates={showCoordinates}
               />
 
               <DynamicArrowLayer
@@ -1684,31 +1723,65 @@ export const Board: React.FC<BoardProps> = React.memo(
                 previewUserArrow={previewUserArrow}
               />
 
-              {/* 60 回合自然限着 / 三次重复局面自动和棋提示卡 */}
+              {/* 60 回合自然限着 / 三次重复 / 死和 / 单方长将违例 提示卡 */}
               {drawClaimPrompt && !terminalOutcome && (
                 <div
                   onPointerDown={(e) => e.stopPropagation()}
-                  className="absolute top-3 left-1/2 -translate-x-1/2 z-40 w-[min(92%,23rem)] pointer-events-auto"
+                  className="absolute top-3 left-1/2 -translate-x-1/2 z-40 w-[min(94%,25rem)] pointer-events-auto"
                 >
-                  <div className="rounded-lg border border-[#CFA952]/70 bg-[#1B1613]/94 px-3.5 py-2.5 shadow-[0_12px_28px_rgba(12,10,8,0.62)] flex items-center justify-between gap-2.5">
+                  <div
+                    className={`rounded-lg border px-3.5 py-2.5 shadow-[0_12px_28px_rgba(12,10,8,0.62)] flex items-center justify-between gap-2.5 ${
+                      drawClaimPrompt.isViolationAlert
+                        ? 'border-[#C8372D]/85 bg-[#241312]/95'
+                        : 'border-[#CFA952]/70 bg-[#1B1613]/94'
+                    }`}
+                  >
                     <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 text-xs font-semibold text-[#EED38A]">
-                        <Scale className="w-3.5 h-3.5 shrink-0" />
+                      <div
+                        className={`flex items-center gap-1.5 text-xs font-semibold ${
+                          drawClaimPrompt.isViolationAlert
+                            ? 'text-[#F5B0A8]'
+                            : 'text-[#EED38A]'
+                        }`}
+                      >
+                        {drawClaimPrompt.isViolationAlert ? (
+                          <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-[#E05347]" />
+                        ) : (
+                          <Scale className="w-3.5 h-3.5 shrink-0" />
+                        )}
                         <span className="truncate">{drawClaimPrompt.label}</span>
                       </div>
-                      <p className="text-xs text-[#C5A880] truncate mt-0.5">
+                      <p
+                        className={`text-xs truncate mt-0.5 ${
+                          drawClaimPrompt.isViolationAlert
+                            ? 'text-[#D99B94]'
+                            : 'text-[#C5A880]'
+                        }`}
+                      >
                         {drawClaimPrompt.detail}
                       </p>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      {onAcceptDrawClaim && (
-                        <button
-                          type="button"
-                          onClick={onAcceptDrawClaim}
-                          className="px-2.5 py-1 rounded xq-btn-primary text-xs whitespace-nowrap cursor-pointer"
-                        >
-                          判和
-                        </button>
+                      {drawClaimPrompt.isViolationAlert ? (
+                        onStepBackFromViolation && (
+                          <button
+                            type="button"
+                            onClick={onStepBackFromViolation}
+                            className="px-2.5 py-1 rounded xq-btn-primary text-xs whitespace-nowrap cursor-pointer"
+                          >
+                            退回变着
+                          </button>
+                        )
+                      ) : (
+                        onAcceptDrawClaim && (
+                          <button
+                            type="button"
+                            onClick={onAcceptDrawClaim}
+                            className="px-2.5 py-1 rounded xq-btn-primary text-xs whitespace-nowrap cursor-pointer"
+                          >
+                            判和
+                          </button>
+                        )
                       )}
                       {onDismissDrawClaim && (
                         <button
@@ -1716,7 +1789,7 @@ export const Board: React.FC<BoardProps> = React.memo(
                           onClick={onDismissDrawClaim}
                           className="px-2 py-1 rounded xq-btn-secondary text-xs whitespace-nowrap cursor-pointer"
                         >
-                          继续
+                          {drawClaimPrompt.isViolationAlert ? '忽略' : '继续'}
                         </button>
                       )}
                     </div>
@@ -1806,7 +1879,13 @@ export const Board: React.FC<BoardProps> = React.memo(
 
                     const idx = row * 9 + col;
                     const piece = boardGrid[idx];
-                    const isSelected = piece ? piece.id === selectedPieceId : false;
+                    const isSelected = piece
+                      ? piece.id === selectedPieceId ||
+                        (workspace === 'setup' &&
+                          setupTemplate?.type === 'general' &&
+                          piece.type === 'general' &&
+                          piece.camp === setupTemplate.camp)
+                      : false;
                     const isLegalTarget = legalTargetSet.has(idx);
                     const isDragTargetHover =
                       dragVisual !== null &&
@@ -1832,6 +1911,22 @@ export const Board: React.FC<BoardProps> = React.memo(
                       piece !== null &&
                       piece.type === 'general' &&
                       illegalCheckCamp === piece.camp;
+                    const isRestrictedSetupPiece =
+                      workspace === 'setup' &&
+                      !piece &&
+                      setupTemplate !== null &&
+                      (setupTemplate.type === 'general' ||
+                        setupTemplate.type === 'advisor' ||
+                        setupTemplate.type === 'elephant' ||
+                        setupTemplate.type === 'soldier');
+                    const setupAllowed = isRestrictedSetupPiece
+                      ? isSetupPiecePlacementAllowed(
+                          setupTemplate.camp,
+                          setupTemplate.type,
+                          row,
+                          col
+                        ).allowed
+                      : true;
 
                     return (
                       <IntersectionCell
@@ -1854,6 +1949,8 @@ export const Board: React.FC<BoardProps> = React.memo(
                         impactId={isImpactHere ? impactEffect.id : null}
                         isPieceInCheck={isPieceInCheck}
                         isAlertShaking={isAlertShaking}
+                        setupValidEmpty={isRestrictedSetupPiece && setupAllowed}
+                        setupInvalidEmpty={isRestrictedSetupPiece && !setupAllowed}
                         craftStyle={craftStyle}
                         fontScheme={fontScheme}
                         useTraditionalChar={useTraditionalChar}

@@ -10,7 +10,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { PIECE_LABELS, PIECE_QUOTA_LIST } from '../constants/xiangqiConstants';
-import { Camp, Piece, PieceType } from '../types/xiangqi';
+import { Camp, Piece, PieceType, SetupValidationResult } from '../types/xiangqi';
 import { piecesToFen } from '../utils/xiangqiRules';
 
 interface SetupWorkbenchProps {
@@ -18,6 +18,8 @@ interface SetupWorkbenchProps {
   useTraditionalChar: boolean;
   setupSelectedTemplate: { camp: Camp; type: PieceType } | null;
   setupTurn: Camp;
+  validation: SetupValidationResult;
+  setupPlacementError?: string | null;
   onSelectSetupTemplate: (template: { camp: Camp; type: PieceType } | null) => void;
   onChangeSetupTurn: (camp: Camp) => void;
   onClearSetupToKings: () => void;
@@ -30,6 +32,8 @@ export const SetupWorkbench: React.FC<SetupWorkbenchProps> = React.memo(({
   useTraditionalChar,
   setupSelectedTemplate,
   setupTurn,
+  validation,
+  setupPlacementError = null,
   onSelectSetupTemplate,
   onChangeSetupTurn,
   onClearSetupToKings,
@@ -43,9 +47,7 @@ export const SetupWorkbench: React.FC<SetupWorkbenchProps> = React.memo(({
     return Math.max(0, max - onBoard);
   };
 
-  const hasRedGeneral = pieces.some((p) => p.camp === 'red' && p.type === 'general');
-  const hasBlackGeneral = pieces.some((p) => p.camp === 'black' && p.type === 'general');
-  const isPositionValid = hasRedGeneral && hasBlackGeneral;
+  const isPositionValid = validation.isValid;
   const currentFen = piecesToFen(pieces, setupTurn);
 
   const handleCopyFen = () => {
@@ -75,22 +77,29 @@ export const SetupWorkbench: React.FC<SetupWorkbenchProps> = React.memo(({
               : 'border-[var(--xq-accent-crimson)]/40 bg-[var(--xq-accent-crimson)]/10 text-[var(--xq-accent-crimson)]'
           }`}
         >
-          <div className="flex items-center gap-1.5 font-medium">
+          <div className="flex items-center gap-1.5 font-medium min-w-0">
             {isPositionValid ? (
               <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
             ) : (
               <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
             )}
-            <span>
+            <span className="leading-snug">
               {isPositionValid
                 ? `局面合法（盘面共 ${pieces.length} 枚棋子）`
-                : '请确保红帅与黑将均已在盘面上'}
+                : validation.reason || '当前摆盘不符合象棋规例'}
             </span>
           </div>
           <span className="font-mono-tabular text-xs opacity-85 shrink-0">
             {setupTurn === 'red' ? '红先' : '黑先'}
           </span>
         </div>
+
+        {setupPlacementError && (
+          <div className="px-2.5 py-1.5 rounded-md border border-[var(--xq-accent-amber)]/45 bg-[var(--xq-accent-amber)]/12 text-[var(--xq-accent-amber)] flex items-center gap-1.5 text-xs font-medium">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+            <span>{setupPlacementError}</span>
+          </div>
+        )}
 
         {/* 双列棋子库存 */}
         <div className="grid grid-cols-2 gap-2.5">
@@ -108,13 +117,19 @@ export const SetupWorkbench: React.FC<SetupWorkbenchProps> = React.memo(({
                 const label = useTraditionalChar
                   ? PIECE_LABELS.red[type].traditional
                   : PIECE_LABELS.red[type].simplified;
-                const disabled = remain <= 0;
+                const isGeneralReposition = type === 'general' && remain <= 0;
+                const disabled = remain <= 0 && type !== 'general';
 
                 return (
                   <button
                     key={`setup-r-${type}`}
                     type="button"
                     disabled={disabled}
+                    title={
+                      isGeneralReposition
+                        ? '点击后点选红方九宫空位可调整红帅站位'
+                        : undefined
+                    }
                     onClick={() =>
                       onSelectSetupTemplate(
                         isSelected ? null : { camp: 'red', type }
@@ -137,7 +152,7 @@ export const SetupWorkbench: React.FC<SetupWorkbenchProps> = React.memo(({
                       </span>
                     </div>
                     <span className="font-mono-tabular text-xs xq-text-secondary">
-                      余 {remain}
+                      {isGeneralReposition ? '可调位' : `余 ${remain}`}
                     </span>
                   </button>
                 );
@@ -159,13 +174,19 @@ export const SetupWorkbench: React.FC<SetupWorkbenchProps> = React.memo(({
                 const label = useTraditionalChar
                   ? PIECE_LABELS.black[type].traditional
                   : PIECE_LABELS.black[type].simplified;
-                const disabled = remain <= 0;
+                const isGeneralReposition = type === 'general' && remain <= 0;
+                const disabled = remain <= 0 && type !== 'general';
 
                 return (
                   <button
                     key={`setup-b-${type}`}
                     type="button"
                     disabled={disabled}
+                    title={
+                      isGeneralReposition
+                        ? '点击后点选黑方九宫空位可调整黑将站位'
+                        : undefined
+                    }
                     onClick={() =>
                       onSelectSetupTemplate(
                         isSelected ? null : { camp: 'black', type }
@@ -188,7 +209,7 @@ export const SetupWorkbench: React.FC<SetupWorkbenchProps> = React.memo(({
                       </span>
                     </div>
                     <span className="font-mono-tabular text-xs xq-text-secondary">
-                      余 {remain}
+                      {isGeneralReposition ? '可调位' : `余 ${remain}`}
                     </span>
                   </button>
                 );

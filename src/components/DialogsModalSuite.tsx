@@ -53,6 +53,7 @@ interface DialogsModalSuiteProps {
   boardTheme: BoardTheme;
   craftStyle: PieceCraftStyle;
   useTraditionalChar: boolean;
+  showBoardCoordinates: boolean;
   multiPvCount: 1 | 2 | 3;
   engineDepth: 18 | 24 | 30;
   engineThreads: 4 | 8 | 16;
@@ -90,6 +91,7 @@ interface DialogsModalSuiteProps {
   onChangeBoardTheme: (theme: BoardTheme) => void;
   onChangeCraftStyle: (style: PieceCraftStyle) => void;
   onChangeUseTraditionalChar: (useTrad: boolean) => void;
+  onChangeShowBoardCoordinates: (show: boolean) => void;
   onChangeMultiPvCount: (count: 1 | 2 | 3) => void;
   onChangeEngineDepth: (depth: 18 | 24 | 30) => void;
   onChangeEngineThreads: (threads: 4 | 8 | 16) => void;
@@ -142,6 +144,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
   boardTheme,
   craftStyle,
   useTraditionalChar,
+  showBoardCoordinates,
   multiPvCount,
   engineDepth,
   engineThreads,
@@ -179,6 +182,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
   onChangeBoardTheme,
   onChangeCraftStyle,
   onChangeUseTraditionalChar,
+  onChangeShowBoardCoordinates,
   onChangeMultiPvCount,
   onChangeEngineDepth,
   onChangeEngineThreads,
@@ -430,6 +434,15 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
           onClose();
         },
       },
+      {
+        id: 'cmd-board-coords',
+        label: showBoardCoordinates ? '隐藏棋盘路数坐标 (九~一 / 1~9)' : '显示棋盘路数坐标 (九~一 / 1~9)',
+        shortcut: 'N',
+        action: () => {
+          onChangeShowBoardCoordinates(!showBoardCoordinates);
+          onClose();
+        },
+      },
     ];
     const q = cmdQuery.trim().toLowerCase();
     return q ? commands.filter((c) => c.label.toLowerCase().includes(q)) : commands;
@@ -438,6 +451,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
     cmdQuery,
     compareMode,
     appTheme,
+    showBoardCoordinates,
     onSwitchWorkspace,
     onClose,
     onOpenModal,
@@ -445,6 +459,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
     onToggleCompareMode,
     onTriggerHint,
     onChangeAppTheme,
+    onChangeShowBoardCoordinates,
   ]);
 
   const libraryStats = useMemo(() => {
@@ -1881,8 +1896,8 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
               </div>
             </div>
 
-            {/* 第三部分：字号与音效同行紧凑排列 */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* 第三部分：字号、路数坐标与音效 */}
+            <div className="space-y-2.5">
               <div className="p-2.5 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] flex items-center justify-between flex-wrap gap-2">
                 <span className="font-semibold text-xs xq-text-secondary">界面字号</span>
                 <div className="flex items-center flex-wrap gap-1.5">
@@ -1907,15 +1922,29 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
                 </div>
               </div>
 
-              <label className="p-2.5 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] flex items-center justify-between cursor-pointer">
-                <span className="font-semibold text-xs xq-text-secondary">落子木纹音效</span>
-                <input
-                  type="checkbox"
-                  checked={soundEnabled}
-                  onChange={(e) => onChangeSoundEnabled(e.target.checked)}
-                  className="w-4 h-4 accent-[var(--xq-accent-primary)]"
-                />
-              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className="p-2.5 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] flex items-center justify-between cursor-pointer">
+                  <span className="font-semibold text-xs xq-text-secondary">
+                    棋盘路数坐标 (九~一 / 1~9)
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={showBoardCoordinates}
+                    onChange={(e) => onChangeShowBoardCoordinates(e.target.checked)}
+                    className="w-4 h-4 accent-[var(--xq-accent-primary)]"
+                  />
+                </label>
+
+                <label className="p-2.5 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] flex items-center justify-between cursor-pointer">
+                  <span className="font-semibold text-xs xq-text-secondary">落子木纹音效</span>
+                  <input
+                    type="checkbox"
+                    checked={soundEnabled}
+                    onChange={(e) => onChangeSoundEnabled(e.target.checked)}
+                    className="w-4 h-4 accent-[var(--xq-accent-primary)]"
+                  />
+                </label>
+              </div>
             </div>
 
             {/* 底部内嵌关于栏 + 完成按钮 */}

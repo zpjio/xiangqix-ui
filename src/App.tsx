@@ -114,11 +114,13 @@ import {
   getSafeLegalMovesForPiece,
   hasAnyLegalMoves,
   isCampInCheck,
+  isSetupPiecePlacementAllowed,
   parseFenToPieces,
   parsePgnTextToSession,
   piecesToFen,
   replayCompactMoves,
   sanitizeExportFilename,
+  validateSetupPosition,
 } from './utils/xiangqiRules';
 
 export default function App() {
@@ -146,6 +148,9 @@ export default function App() {
   const [fontScheme] = useState<FontScheme>('kaiti-serif');
   const [useTraditionalChar, setUseTraditionalChar] = useState<boolean>(
     initialPrefs.useTraditionalChar ?? false
+  );
+  const [showBoardCoordinates, setShowBoardCoordinates] = useState<boolean>(
+    initialPrefs.showBoardCoordinates ?? true
   );
 
   useEffect(() => {
@@ -413,6 +418,7 @@ export default function App() {
     type: PieceType;
   } | null>({ camp: 'red', type: 'chariot' });
   const [setupTurn, setSetupTurn] = useState<Camp>('red');
+  const [setupPlacementError, setSetupPlacementError] = useState<string | null>(null);
 
   // 对局名录与弹窗状态
   const [metadata, setMetadata] = useState<GameMetadata>(
@@ -537,6 +543,7 @@ export default function App() {
       boardTheme,
       craftStyle,
       useTraditionalChar,
+      showBoardCoordinates,
       primaryEngineId,
       secondaryEngineId,
       compareMode,
@@ -553,6 +560,7 @@ export default function App() {
     boardTheme,
     craftStyle,
     useTraditionalChar,
+    showBoardCoordinates,
     primaryEngineId,
     secondaryEngineId,
     compareMode,
@@ -900,25 +908,59 @@ export default function App() {
     if (!drawRuleStatus || terminalOutcome || isOpeningDrillSpoilerFree || workspace === 'setup') {
       return null;
     }
-    if (!drawRuleStatus.canClaimRepetitionDraw && !drawRuleStatus.canClaim60MoveDraw) {
-      return null;
+
+    if (drawRuleStatus.perpetualCheckCamp && workspace !== 'play') {
+      const claimKey = `${workspace}-${currentPly}-perpetual-check`;
+      if (dismissedDrawClaimKey === claimKey) {
+        return null;
+      }
+      const offenderLabel = drawRuleStatus.perpetualCheckCamp === 'red' ? '红方' : '黑方';
+      return {
+        claimKey,
+        kind: 'perpetual-check' as const,
+        isViolationAlert: true,
+        label: `单方长将禁止 · ${offenderLabel}须变着`,
+        detail: `三次重复循环内${offenderLabel}每步连续将军，按棋规不变判负（请勿按和棋结算）`,
+      };
     }
-    const kind: '60moves' | 'repetition' = drawRuleStatus.canClaimRepetitionDraw
-      ? 'repetition'
-      : '60moves';
-    const claimKey = `${workspace}-${currentPly}-${kind}`;
-    if (dismissedDrawClaimKey === claimKey) {
-      return null;
+
+    if (drawRuleStatus.canClaimRepetitionDraw) {
+      const claimKey = `${workspace}-${currentPly}-repetition`;
+      if (dismissedDrawClaimKey === claimKey) return null;
+      return {
+        claimKey,
+        kind: 'repetition' as const,
+        isViolationAlert: false,
+        label: '三次重复局面 · 可判和',
+        detail: `当前相同局面已累计出现 ${drawRuleStatus.repetitionCount} 次（非单方长将）`,
+      };
     }
-    return {
-      claimKey,
-      kind,
-      label: kind === 'repetition' ? '三次重复局面 · 可判和' : '60 回合无吃子 · 可判和',
-      detail:
-        kind === 'repetition'
-          ? `当前相同局面已累计出现 ${drawRuleStatus.repetitionCount} 次`
-          : `已连续 ${drawRuleStatus.noCaptureRounds} 回合无吃子，达到自然限着`,
-    };
+
+    if (drawRuleStatus.canClaim60MoveDraw) {
+      const claimKey = `${workspace}-${currentPly}-60moves`;
+      if (dismissedDrawClaimKey === claimKey) return null;
+      return {
+        claimKey,
+        kind: '60moves' as const,
+        isViolationAlert: false,
+        label: '60 回合无吃子 · 可判和',
+        detail: `已连续 ${drawRuleStatus.noCaptureRounds} 回合无吃子（已扣除将军手数），达到自然限着`,
+      };
+    }
+
+    if (drawRuleStatus.canClaimInsufficientDraw) {
+      const claimKey = `${workspace}-${currentPly}-insufficient`;
+      if (dismissedDrawClaimKey === claimKey) return null;
+      return {
+        claimKey,
+        kind: 'insufficient' as const,
+        isViolationAlert: false,
+        label: '双方无进攻子力 · 死和',
+        detail: '场上均无车马炮兵卒，按象棋规例可一键判和',
+      };
+    }
+
+    return null;
   }, [
     drawRuleStatus,
     terminalOutcome,
@@ -927,6 +969,20 @@ export default function App() {
     currentPly,
     dismissedDrawClaimKey,
   ]);
+
+  const setupValidation = useMemo(
+    () =>
+      workspace === 'setup'
+        ? validateSetupPosition(pieces, setupTurn)
+        : {
+            isValid: true,
+            reason: null,
+            hasBothGenerals: true,
+            generalsFacing: false,
+            inactiveCampInCheck: null,
+          },
+    [workspace, pieces, setupTurn]
+  );
 
   const matchedOpeningNode = useMemo(
     () => (isOpeningContext ? lookupOpeningBookNode(pieces, turn) : null),
@@ -1249,6 +1305,7 @@ export default function App() {
         }
       } else if (nextWs === 'setup') {
         setSetupTurn(turn);
+        setSetupPlacementError(null);
         setSidebarCollapsed(false);
         setIsAnalyzing(false);
       }
@@ -1644,18 +1701,6 @@ export default function App() {
       setCurrentPly(nextPly);
       setPlayActionNotice(null);
 
-      if (
-        activeClockPreset.incrementMs > 0 &&
-        workspace === 'play' &&
-        !terminalAfterPlayer
-      ) {
-        if (moving.camp === 'red') {
-          setClockRedMs((ms) => ms + activeClockPreset.incrementMs);
-        } else {
-          setClockBlackMs((ms) => ms + activeClockPreset.incrementMs);
-        }
-      }
-
       if (terminalAfterPlayer && workspace === 'study' && metadata.result === '进行中') {
         setMetadata((prev) => ({
           ...prev,
@@ -1689,6 +1734,7 @@ export default function App() {
       }
 
       // 在「复盘分析」或「开局研习（定式树）」模式下：若在中途历史手走了不同于主谱的棋，自动生成无感内联推演支线
+      let recordsAfterPlayerMove: MoveRecord[] = [];
       if (workspace === 'study' || workspace === 'opening') {
         const existingMainMove = mainMoves[currentPly];
         const isSameAsMain =
@@ -1699,17 +1745,53 @@ export default function App() {
           existingMainMove.to.col === to.col;
 
         if (isSameAsMain && !variationMoves) {
-          // 沿主线继续前进
+          recordsAfterPlayerMove = mainMoves.slice(0, nextPly);
         } else if (currentPly < mainMoves.length || variationMoves) {
           const baseList = variationMoves || mainMoves;
           const origin = branchOriginPly ?? currentPly;
+          const nextVar = [...baseList.slice(0, currentPly), newRecord];
           setBranchOriginPly(origin);
-          setVariationMoves([...baseList.slice(0, currentPly), newRecord]);
+          setVariationMoves(nextVar);
+          recordsAfterPlayerMove = nextVar;
         } else {
-          setMainMoves([...mainMoves, newRecord]);
+          const nextMain = [...mainMoves, newRecord];
+          setMainMoves(nextMain);
+          recordsAfterPlayerMove = nextMain;
         }
       } else {
-        setMainMoves((prev) => [...prev.slice(0, currentPly), newRecord]);
+        const nextMain = [...mainMoves.slice(0, currentPly), newRecord];
+        setMainMoves(nextMain);
+        recordsAfterPlayerMove = nextMain;
+      }
+
+      // 人机对弈模式下：若玩家走后构成三次重复「单方长将」，直接按违例判负；未违例且未终局再加秒
+      if (workspace === 'play' && !terminalAfterPlayer) {
+        const playStatusAfterPlayer = computeDrawRuleStatus(
+          createInitialPieces(handicap),
+          handicap === 'move-first' ? 'black' : 'red',
+          recordsAfterPlayerMove,
+          recordsAfterPlayerMove.length
+        );
+        if (playStatusAfterPlayer.perpetualCheckCamp) {
+          const violator = playStatusAfterPlayer.perpetualCheckCamp;
+          const winner: Camp = violator === 'red' ? 'black' : 'red';
+          playCheckmateGongSound(soundEnabled);
+          setTerminalDismissed(false);
+          setManualTerminalOutcome({
+            kind: 'perpetual-check',
+            winner,
+            loser: violator,
+            reasonText: `${violator === 'red' ? '玩家（红方）' : '电脑（黑方）'}三次重复单方连续长将，按棋规违例判负`,
+          });
+          return;
+        }
+        if (activeClockPreset.incrementMs > 0) {
+          if (moving.camp === 'red') {
+            setClockRedMs((ms) => ms + activeClockPreset.incrementMs);
+          } else {
+            setClockBlackMs((ms) => ms + activeClockPreset.incrementMs);
+          }
+        }
       }
 
       // 若在「古谱闯关」或「人机对弈」模式下且轮到黑方（引擎），先判定是否已绝杀/困毙，未终局则延迟 620ms 自动应手
@@ -1777,11 +1859,32 @@ export default function App() {
                 reply.to.row,
                 reply.to.col
               );
+              const recordsAfterBot = [...recordsAfterPlayerMove, botRec];
+              let botPerpetualCamp: Camp | null = null;
+              if (workspace === 'play' && !botTerminal) {
+                const statusAfterBot = computeDrawRuleStatus(
+                  createInitialPieces(handicap),
+                  handicap === 'move-first' ? 'black' : 'red',
+                  recordsAfterBot,
+                  recordsAfterBot.length
+                );
+                botPerpetualCamp = statusAfterBot.perpetualCheckCamp;
+              }
               setPieces(afterBot);
-              setMainMoves((prev) => [...prev.slice(0, nextPly), botRec]);
+              setMainMoves(recordsAfterBot);
               setCurrentPly(nextPly + 1);
               setTurn('red');
-              if (
+              if (botPerpetualCamp) {
+                const winner: Camp = botPerpetualCamp === 'red' ? 'black' : 'red';
+                playCheckmateGongSound(soundEnabled);
+                setTerminalDismissed(false);
+                setManualTerminalOutcome({
+                  kind: 'perpetual-check',
+                  winner,
+                  loser: botPerpetualCamp,
+                  reasonText: `${botPerpetualCamp === 'red' ? '玩家（红方）' : '电脑（黑方）'}三次重复单方连续长将，按棋规违例判负`,
+                });
+              } else if (
                 activeClockPreset.incrementMs > 0 &&
                 workspace === 'play' &&
                 !botTerminal
@@ -1823,6 +1926,7 @@ export default function App() {
       variationMoves,
       branchOriginPly,
       currentChallenge,
+      handicap,
       recordDrillCompletion,
       scheduleDrillOpponentReply,
       triggerMoveSoundAndCheckEffects,
@@ -1874,19 +1978,29 @@ export default function App() {
   );
 
   const handleAcceptDrawClaim = useCallback(() => {
-    if (!drawClaimPrompt) return;
+    if (!drawClaimPrompt || drawClaimPrompt.isViolationAlert) return;
     clearBotReplyTimer();
     playCheckmateGongSound(soundEnabled);
     setTerminalDismissed(false);
     setSelectedPieceId(null);
     setManualTerminalOutcome({
-      kind: drawClaimPrompt.kind === 'repetition' ? 'draw-repetition' : 'draw-60moves',
+      kind:
+        drawClaimPrompt.kind === 'repetition'
+          ? 'draw-repetition'
+          : drawClaimPrompt.kind === 'insufficient'
+          ? 'draw-insufficient'
+          : 'draw-60moves',
       reasonText: drawClaimPrompt.detail,
     });
     if (workspace === 'study' && metadata.result === '进行中') {
       setMetadata((prev) => ({ ...prev, result: '和棋' }));
     }
   }, [drawClaimPrompt, clearBotReplyTimer, soundEnabled, workspace, metadata.result]);
+
+  const handleStepBackFromViolation = useCallback(() => {
+    if (currentPly <= 0) return;
+    handleJumpPly(currentPly - 1, !!variationMoves);
+  }, [currentPly, handleJumpPly, variationMoves]);
 
   const handleDismissDrawClaim = useCallback(() => {
     if (!drawClaimPrompt) return;
@@ -1910,10 +2024,17 @@ export default function App() {
 
   const handlePlayOfferDraw = useCallback(() => {
     if (workspace !== 'play' || terminalOutcome || isBotThinking) return;
+    if (drawRuleStatus?.perpetualCheckCamp) {
+      playInvalidWarningSound(soundEnabled);
+      setPlayActionNotice('当前存在单方长将违例循环，不可按和棋提和');
+      return;
+    }
+    const isInsufficient = !!drawRuleStatus?.canClaimInsufficientDraw;
     const isNearDrawRule =
       !!drawRuleStatus &&
       (drawRuleStatus.canClaim60MoveDraw ||
         drawRuleStatus.canClaimRepetitionDraw ||
+        isInsufficient ||
         drawRuleStatus.noCaptureRounds >= 35 ||
         drawRuleStatus.repetitionCount >= 2);
     if (!isNearDrawRule && mainMoves.length < 6) {
@@ -1931,8 +2052,10 @@ export default function App() {
     setTerminalDismissed(false);
     setPlayActionNotice(null);
     setManualTerminalOutcome({
-      kind: 'draw-agreement',
-      reasonText: isNearDrawRule
+      kind: isInsufficient ? 'draw-insufficient' : 'draw-agreement',
+      reasonText: isInsufficient
+        ? '双方均无进攻子力，电脑同意按死和结算'
+        : isNearDrawRule
         ? '双方局面胶着，电脑同意协议和棋'
         : '电脑评估局势平稳，双方握手言和',
     });
@@ -2050,17 +2173,71 @@ export default function App() {
       if (workspace === 'setup') {
         const existing = getPieceAtGrid(boardGrid, row, col);
         if (existing) {
-          if (existing.type === 'general') return;
+          if (existing.type === 'general') {
+            const alreadySelected =
+              setupSelectedTemplate?.type === 'general' &&
+              setupSelectedTemplate?.camp === existing.camp;
+            setSetupPlacementError(null);
+            setIllegalMoveWarning(null);
+            setSetupSelectedTemplate(
+              alreadySelected ? null : { camp: existing.camp, type: 'general' }
+            );
+            return;
+          }
+          setSetupPlacementError(null);
+          setIllegalMoveWarning(null);
           setPieces((prev) => prev.filter((p) => p.id !== existing.id));
         } else if (setupSelectedTemplate) {
+          const checkPlacement = isSetupPiecePlacementAllowed(
+            setupSelectedTemplate.camp,
+            setupSelectedTemplate.type,
+            row,
+            col
+          );
+          if (!checkPlacement.allowed) {
+            playInvalidWarningSound(soundEnabled);
+            const msg = checkPlacement.reason || '该交叉点不符合该棋种摆子规范';
+            setSetupPlacementError(msg);
+            setIllegalMoveWarning(msg);
+            return;
+          }
+
+          if (setupSelectedTemplate.type === 'general') {
+            const existingGeneral = pieces.find(
+              (p) => p.camp === setupSelectedTemplate.camp && p.type === 'general'
+            );
+            playWoodClackSound(false, row, col, soundEnabled);
+            setSetupPlacementError(null);
+            setIllegalMoveWarning(null);
+            if (existingGeneral) {
+              setPieces((prev) =>
+                prev.map((p) => (p.id === existingGeneral.id ? { ...p, row, col } : p))
+              );
+            } else {
+              const newGeneral: Piece = {
+                id: `${setupSelectedTemplate.camp[0]}-general`,
+                camp: setupSelectedTemplate.camp,
+                type: 'general',
+                row,
+                col,
+              };
+              setPieces((prev) => [...prev, newGeneral]);
+            }
+            return;
+          }
+
           const currentCount = pieces.filter(
             (p) =>
               p.camp === setupSelectedTemplate.camp &&
               p.type === setupSelectedTemplate.type
           ).length;
-          if (currentCount >= PIECE_QUOTA_BY_TYPE[setupSelectedTemplate.type]) {
+          const quotaMax = PIECE_QUOTA_BY_TYPE[setupSelectedTemplate.type];
+          if (currentCount >= quotaMax) {
+            playInvalidWarningSound(soundEnabled);
+            setSetupPlacementError('该棋种数量已达上限，请先移除盘面多余棋子');
             return;
           }
+
           const newPiece: Piece = {
             id: `setup-${setupSelectedTemplate.camp}-${setupSelectedTemplate.type}-${Date.now()}`,
             camp: setupSelectedTemplate.camp,
@@ -2069,7 +2246,12 @@ export default function App() {
             col,
           };
           playWoodClackSound(false, row, col, soundEnabled);
+          setSetupPlacementError(null);
+          setIllegalMoveWarning(null);
           setPieces((prev) => [...prev, newPiece]);
+          if (currentCount + 1 >= quotaMax) {
+            setSetupSelectedTemplate(null);
+          }
         }
         return;
       }
@@ -2269,6 +2451,9 @@ export default function App() {
       } else if (!e.metaKey && !e.ctrlKey && e.key.toLowerCase() === 'f') {
         e.preventDefault();
         setFlipped((prev) => !prev);
+      } else if (!e.metaKey && !e.ctrlKey && e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        setShowBoardCoordinates((prev) => !prev);
       } else if (e.key === ' ' && workspace === 'study' && !isOpeningDrillSpoilerFree) {
         e.preventDefault();
         const best = analysisMatchesCurrent
@@ -2846,9 +3031,35 @@ export default function App() {
     []
   );
 
-  const handleClearSetupToKings = useCallback(() => setPieces(createKingsOnlyPieces()), []);
-  const handleResetSetupInitial = useCallback(() => setPieces(createInitialPieces()), []);
+  const handleSelectSetupTemplate = useCallback(
+    (template: { camp: Camp; type: PieceType } | null) => {
+      setSetupSelectedTemplate(template);
+      setSetupPlacementError(null);
+    },
+    []
+  );
+  const handleChangeSetupTurn = useCallback((nextCamp: Camp) => {
+    setSetupTurn(nextCamp);
+    setSetupPlacementError(null);
+    setIllegalMoveWarning(null);
+  }, []);
+  const handleClearSetupToKings = useCallback(() => {
+    setSetupPlacementError(null);
+    setIllegalMoveWarning(null);
+    setPieces(createKingsOnlyPieces());
+  }, []);
+  const handleResetSetupInitial = useCallback(() => {
+    setSetupPlacementError(null);
+    setIllegalMoveWarning(null);
+    setPieces(createInitialPieces());
+  }, []);
   const handleFinishSetup = useCallback(() => {
+    if (!setupValidation.isValid) {
+      playInvalidWarningSound(soundEnabled);
+      setSetupPlacementError(setupValidation.reason || '当前局面存在不合法站位，请先修正');
+      return;
+    }
+    setSetupPlacementError(null);
     handleTransferToStudy({
       basePieces: pieces,
       baseTurn: setupTurn,
@@ -2865,7 +3076,7 @@ export default function App() {
         isFavorite: false,
       },
     });
-  }, [handleTransferToStudy, pieces, setupTurn]);
+  }, [setupValidation, soundEnabled, handleTransferToStudy, pieces, setupTurn]);
 
   const modalFen = useMemo(
     () =>
@@ -3247,6 +3458,12 @@ export default function App() {
                     ? -materialStats.netAdvantageRed
                     : materialStats.netAdvantageRed
                 }
+                advantagePieces={
+                  topCamp === 'red'
+                    ? materialStats.redAdvantagePieces
+                    : materialStats.blackAdvantagePieces
+                }
+                useTraditionalChar={useTraditionalChar}
                 clockMs={
                   clockPresetId !== 'none' && workspace === 'play'
                     ? topCamp === 'red'
@@ -3322,13 +3539,16 @@ export default function App() {
                 drawClaimPrompt={drawClaimPrompt}
                 onAcceptDrawClaim={handleAcceptDrawClaim}
                 onDismissDrawClaim={handleDismissDrawClaim}
+                onStepBackFromViolation={handleStepBackFromViolation}
                 boardTheme={boardTheme}
                 appTheme={appTheme}
                 craftStyle={craftStyle}
                 fontScheme={fontScheme}
                 useTraditionalChar={useTraditionalChar}
+                showCoordinates={showBoardCoordinates}
                 flipped={flipped}
                 workspace={workspace}
+                setupTemplate={workspace === 'setup' ? setupSelectedTemplate : null}
                 isVariationActive={!!variationMoves}
                 isBotThinking={isBotThinking}
                 annotationResetKey={`${workspace}-${currentPly}-${activeMovesList.length}-${variationMoves ? 'v' : 'm'}`}
@@ -3375,6 +3595,12 @@ export default function App() {
                     ? materialStats.netAdvantageRed
                     : -materialStats.netAdvantageRed
                 }
+                advantagePieces={
+                  bottomCamp === 'red'
+                    ? materialStats.redAdvantagePieces
+                    : materialStats.blackAdvantagePieces
+                }
+                useTraditionalChar={useTraditionalChar}
                 clockMs={
                   clockPresetId !== 'none' && workspace === 'play'
                     ? bottomCamp === 'red'
@@ -3713,8 +3939,10 @@ export default function App() {
                 useTraditionalChar={useTraditionalChar}
                 setupSelectedTemplate={setupSelectedTemplate}
                 setupTurn={setupTurn}
-                onSelectSetupTemplate={setSetupSelectedTemplate}
-                onChangeSetupTurn={setSetupTurn}
+                validation={setupValidation}
+                setupPlacementError={setupPlacementError}
+                onSelectSetupTemplate={handleSelectSetupTemplate}
+                onChangeSetupTurn={handleChangeSetupTurn}
                 onClearSetupToKings={handleClearSetupToKings}
                 onResetSetupInitial={handleResetSetupInitial}
                 onFinishSetup={handleFinishSetup}
@@ -3903,6 +4131,7 @@ export default function App() {
         boardTheme={boardTheme}
         craftStyle={craftStyle}
         useTraditionalChar={useTraditionalChar}
+        showBoardCoordinates={showBoardCoordinates}
         multiPvCount={multiPvCount}
         engineDepth={engineDepth}
         engineThreads={engineThreads}
@@ -3940,6 +4169,7 @@ export default function App() {
         onChangeBoardTheme={setBoardTheme}
         onChangeCraftStyle={setCraftStyle}
         onChangeUseTraditionalChar={setUseTraditionalChar}
+        onChangeShowBoardCoordinates={setShowBoardCoordinates}
         onChangeMultiPvCount={setMultiPvCount}
         onChangeEngineDepth={setEngineDepth}
         onChangeEngineThreads={setEngineThreads}

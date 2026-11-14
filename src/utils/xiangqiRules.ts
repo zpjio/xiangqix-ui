@@ -10,6 +10,7 @@ import {
   CompactLibraryMove,
   DrawRuleStatus,
   HandicapType,
+  MaterialAdvantagePiece,
   MoveNag,
   MoveQuality,
   MoveRecord,
@@ -18,6 +19,7 @@ import {
   Piece,
   PieceType,
   Position,
+  SetupValidationResult,
 } from '../types/xiangqi';
 import {
   playCheckChimeSound,
@@ -115,10 +117,12 @@ export function getPieceAt(pieces: Piece[], row: number, col: number): Piece | u
   return pieces.find((p) => p.row === row && p.col === col);
 }
 
-// 计算红黑双方子力净分差（单次遍历 O(32) 统计）
+// 计算红黑双方子力净分差与净多子力构成（单次遍历 O(32) 统计）
 export function calculateMaterialAndCaptures(pieces: Piece[]): {
   redCapturedBlack: PieceType[];
   blackCapturedRed: PieceType[];
+  redAdvantagePieces: MaterialAdvantagePiece[];
+  blackAdvantagePieces: MaterialAdvantagePiece[];
   netAdvantageRed: number;
   advantageSummary: string;
 } {
@@ -149,6 +153,8 @@ export function calculateMaterialAndCaptures(pieces: Piece[]): {
 
   const redCapturedBlack: PieceType[] = [];
   const blackCapturedRed: PieceType[] = [];
+  const redAdvantagePieces: MaterialAdvantagePiece[] = [];
+  const blackAdvantagePieces: MaterialAdvantagePiece[] = [];
   let redTotal = 0;
   let blackTotal = 0;
 
@@ -158,6 +164,12 @@ export function calculateMaterialAndCaptures(pieces: Piece[]): {
 
     redTotal += redAlive * item.weight;
     blackTotal += blackAlive * item.weight;
+
+    if (redAlive > blackAlive) {
+      redAdvantagePieces.push({ type: item.type, count: redAlive - blackAlive });
+    } else if (blackAlive > redAlive) {
+      blackAdvantagePieces.push({ type: item.type, count: blackAlive - redAlive });
+    }
 
     const missingBlack = Math.max(0, item.count - blackAlive);
     for (let i = 0; i < missingBlack; i++) {
@@ -181,6 +193,8 @@ export function calculateMaterialAndCaptures(pieces: Piece[]): {
   return {
     redCapturedBlack,
     blackCapturedRed,
+    redAdvantagePieces,
+    blackAdvantagePieces,
     netAdvantageRed,
     advantageSummary,
   };
@@ -733,6 +747,157 @@ export function getPositionKeyFromPieces(pieces: Piece[], turn: Camp = 'red'): s
   return key;
 }
 
+export function hasInsufficientAttackingMaterial(pieces: Piece[]): boolean {
+  for (let i = 0; i < pieces.length; i++) {
+    const t = pieces[i].type;
+    if (t === 'chariot' || t === 'horse' || t === 'cannon' || t === 'soldier') {
+      return false;
+    }
+  }
+  return pieces.length >= 2;
+}
+
+export function isSetupPiecePlacementAllowed(
+  camp: Camp,
+  type: PieceType,
+  row: number,
+  col: number
+): { allowed: boolean; reason?: string } {
+  if (row < 0 || row > 9 || col < 0 || col > 8) {
+    return { allowed: false, reason: '落点超出棋盘范围' };
+  }
+
+  if (type === 'general') {
+    if (!isInsidePalace(camp, row, col)) {
+      return {
+        allowed: false,
+        reason: `${camp === 'red' ? '红帅' : '黑将'}只能置于本方九宫格内`,
+      };
+    }
+    return { allowed: true };
+  }
+
+  if (type === 'advisor') {
+    const centerRow = camp === 'black' ? 1 : 8;
+    if (
+      !isInsidePalace(camp, row, col) ||
+      Math.abs(row - centerRow) !== Math.abs(col - 4)
+    ) {
+      return {
+        allowed: false,
+        reason: `${camp === 'red' ? '红仕' : '黑士'}只能置于本方九宫五个斜线眼位`,
+      };
+    }
+    return { allowed: true };
+  }
+
+  if (type === 'elephant') {
+    const validElephant =
+      camp === 'black'
+        ? (row === 0 && (col === 2 || col === 6)) ||
+          (row === 2 && (col === 0 || col === 4 || col === 8)) ||
+          (row === 4 && (col === 2 || col === 6))
+        : (row === 9 && (col === 2 || col === 6)) ||
+          (row === 7 && (col === 0 || col === 4 || col === 8)) ||
+          (row === 5 && (col === 2 || col === 6));
+    if (!validElephant) {
+      return {
+        allowed: false,
+        reason: `${camp === 'red' ? '红相' : '黑象'}不可过河，且须置于本方七处传统象位`,
+      };
+    }
+    return { allowed: true };
+  }
+
+  if (type === 'soldier') {
+    if (camp === 'black') {
+      if (row <= 2) {
+        return { allowed: false, reason: '黑卒不可倒退置于黑方底线三行（0~2行）' };
+      }
+      if ((row === 3 || row === 4) && col % 2 !== 0) {
+        return { allowed: false, reason: '未过河黑卒只能置于 1/3/5/7/9 路纵线' };
+      }
+    } else {
+      if (row >= 7) {
+        return { allowed: false, reason: '红兵不可倒退置于红方底线三行（7~9行）' };
+      }
+      if ((row === 5 || row === 6) && col % 2 !== 0) {
+        return { allowed: false, reason: '未过河红兵只能置于 九/七/五/三/一 路纵线' };
+      }
+    }
+    return { allowed: true };
+  }
+
+  return { allowed: true };
+}
+
+export function validateSetupPosition(
+  pieces: Piece[],
+  setupTurn: Camp
+): SetupValidationResult {
+  const redGen = pieces.find((p) => p.camp === 'red' && p.type === 'general');
+  const blackGen = pieces.find((p) => p.camp === 'black' && p.type === 'general');
+  const hasBothGenerals = Boolean(redGen && blackGen);
+
+  if (!hasBothGenerals || !redGen || !blackGen) {
+    return {
+      isValid: false,
+      reason: '请确保红帅与黑将均已在盘面上',
+      hasBothGenerals: false,
+      generalsFacing: false,
+      inactiveCampInCheck: null,
+    };
+  }
+
+  const grid = buildBoardGrid(pieces);
+
+  let generalsFacing = false;
+  if (redGen.col === blackGen.col) {
+    let blocked = false;
+    const minRow = Math.min(blackGen.row, redGen.row);
+    const maxRow = Math.max(blackGen.row, redGen.row);
+    for (let r = minRow + 1; r < maxRow; r++) {
+      if (grid[r * 9 + redGen.col]) {
+        blocked = true;
+        break;
+      }
+    }
+    if (!blocked) {
+      generalsFacing = true;
+    }
+  }
+
+  if (generalsFacing) {
+    return {
+      isValid: false,
+      reason: '红帅与黑将不可无阻隔直接照面',
+      hasBothGenerals: true,
+      generalsFacing: true,
+      inactiveCampInCheck: null,
+    };
+  }
+
+  const inactiveCamp: Camp = setupTurn === 'red' ? 'black' : 'red';
+  const inactiveInCheck = isCampInCheck(pieces, inactiveCamp, grid);
+  if (inactiveInCheck) {
+    return {
+      isValid: false,
+      reason: `${inactiveCamp === 'black' ? '黑方' : '红方'}未行棋却已处于被将军状态，请调整棋位或切换先行方`,
+      hasBothGenerals: true,
+      generalsFacing: false,
+      inactiveCampInCheck: inactiveCamp,
+    };
+  }
+
+  return {
+    isValid: true,
+    reason: null,
+    hasBothGenerals: true,
+    generalsFacing: false,
+    inactiveCampInCheck: null,
+  };
+}
+
 export function computeDrawRuleStatus(
   basePieces: Piece[],
   baseTurn: Camp,
@@ -740,14 +905,28 @@ export function computeDrawRuleStatus(
   currentPly: number
 ): DrawRuleStatus {
   const clampedPly = Math.max(0, Math.min(moves.length, currentPly));
+  const currentPieces =
+    clampedPly === 0 ? basePieces : moves[clampedPly - 1]?.piecesSnapshot || basePieces;
+  const canClaimInsufficientDraw = hasInsufficientAttackingMaterial(currentPieces);
+
+  // 计算连续无吃子半步数（按中规/亚规自然限着扣除将军着数）
+  const checkDeliveries: boolean[] = new Array(clampedPly).fill(false);
+  for (let i = 0; i < clampedPly; i++) {
+    const m = moves[i];
+    const nextTurn: Camp = m.piece.camp === 'red' ? 'black' : 'red';
+    checkDeliveries[i] = isCampInCheck(m.piecesSnapshot, nextTurn) !== null;
+  }
 
   let halfmoveNoCapture = 0;
   for (let i = clampedPly - 1; i >= 0; i--) {
     if (moves[i].captured) break;
-    halfmoveNoCapture++;
+    if (!checkDeliveries[i]) {
+      halfmoveNoCapture++;
+    }
   }
 
   const rootSig = getPositionKeyFromPieces(basePieces, baseTurn);
+  const sigByPly: string[] = [rootSig];
   const counts = new Map<string, number>();
   counts.set(rootSig, 1);
 
@@ -756,16 +935,56 @@ export function computeDrawRuleStatus(
     const m = moves[i];
     const nextTurn: Camp = m.piece.camp === 'red' ? 'black' : 'red';
     currentSig = getPositionKeyFromPieces(m.piecesSnapshot, nextTurn);
+    sigByPly.push(currentSig);
     counts.set(currentSig, (counts.get(currentSig) || 0) + 1);
   }
 
   const repetitionCount = counts.get(currentSig) || 1;
+  let perpetualCheckCamp: Camp | null = null;
+
+  if (repetitionCount >= 3) {
+    // 定位最近 3 次相同局面区间，识别循环过程中是否由单方每步连续将军造成
+    const indices: number[] = [];
+    for (let i = 0; i <= clampedPly; i++) {
+      if (sigByPly[i] === currentSig) indices.push(i);
+    }
+    const spanStart = indices[Math.max(0, indices.length - 3)];
+    const spanEnd = indices[indices.length - 1];
+
+    if (spanEnd > spanStart) {
+      let redCount = 0;
+      let blackCount = 0;
+      let redAllCheck = true;
+      let blackAllCheck = true;
+
+      for (let i = spanStart; i < spanEnd; i++) {
+        const mover = moves[i].piece.camp;
+        const deliveredCheck = checkDeliveries[i];
+        if (mover === 'red') {
+          redCount++;
+          if (!deliveredCheck) redAllCheck = false;
+        } else {
+          blackCount++;
+          if (!deliveredCheck) blackAllCheck = false;
+        }
+      }
+
+      if (redCount > 0 && redAllCheck && !(blackCount > 0 && blackAllCheck)) {
+        perpetualCheckCamp = 'red';
+      } else if (blackCount > 0 && blackAllCheck && !(redCount > 0 && redAllCheck)) {
+        perpetualCheckCamp = 'black';
+      }
+    }
+  }
+
   return {
     halfmoveNoCapture,
     noCaptureRounds: Math.floor(halfmoveNoCapture / 2),
     repetitionCount,
     canClaim60MoveDraw: halfmoveNoCapture >= 120,
-    canClaimRepetitionDraw: repetitionCount >= 3,
+    canClaimRepetitionDraw: repetitionCount >= 3 && perpetualCheckCamp === null,
+    perpetualCheckCamp,
+    canClaimInsufficientDraw,
   };
 }
 
