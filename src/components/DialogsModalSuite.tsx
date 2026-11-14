@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   ArrowDownToLine,
@@ -15,6 +15,7 @@ import {
   Link2,
   RefreshCw,
   Search,
+  Share2,
   Star,
   Trash2,
   X,
@@ -23,6 +24,7 @@ import { ThemeSelect } from './ThemeSelect';
 import {
   ActiveModalId,
   AppTheme,
+  BoardAnnotationSnapshot,
   BoardTheme,
   Camp,
   EngineProfile,
@@ -33,9 +35,16 @@ import {
   GameMetadata,
   LibraryGameItem,
   MoveRecord,
+  Piece,
   PieceCraftStyle,
   WorkspaceMode,
 } from '../types/xiangqi';
+import {
+  buildShareUrl,
+  copyBattleReportPngToClipboard,
+  downloadBattleReportPng,
+  exportBattleReportPngDataUrl,
+} from '../utils/shareExport';
 import {
   downloadTextFile,
   formatGameToPgn,
@@ -67,6 +76,11 @@ interface DialogsModalSuiteProps {
   currentPgn: string;
   exportBaseFen?: string;
   exportMoves?: MoveRecord[];
+  exportCurrentPieces?: Piece[];
+  exportCurrentTurn?: Camp;
+  exportCurrentPly?: number;
+  exportFlipped?: boolean;
+  exportAnnotations?: BoardAnnotationSnapshot;
   initialFenPgnTab?: 'import' | 'export';
   metadata: GameMetadata;
   libraryGames: LibraryGameItem[];
@@ -158,6 +172,11 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
   currentPgn,
   exportBaseFen,
   exportMoves = [],
+  exportCurrentPieces,
+  exportCurrentTurn = 'red',
+  exportCurrentPly,
+  exportFlipped = false,
+  exportAnnotations,
   initialFenPgnTab = 'import',
   metadata,
   libraryGames,
@@ -207,6 +226,8 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
   const [exportIncludeNotes, setExportIncludeNotes] = useState<boolean>(false);
   const [copiedFen, setCopiedFen] = useState(false);
   const [copiedExportText, setCopiedExportText] = useState(false);
+  const [copiedShareUrl, setCopiedShareUrl] = useState(false);
+  const [pngCopyStatus, setPngCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
 
   // 图片识别状态
   const [imgTurn, setImgTurn] = useState<Camp>('red');
@@ -234,6 +255,22 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
   // 关于检查更新状态
   const [updateCheckStatus, setUpdateCheckStatus] = useState<'idle' | 'checking' | 'latest'>('idle');
 
+  const feedbackTimersRef = useRef<number[]>([]);
+  useEffect(() => {
+    return () => {
+      feedbackTimersRef.current.forEach((id) => window.clearTimeout(id));
+      feedbackTimersRef.current = [];
+    };
+  }, []);
+
+  const scheduleFeedbackReset = useCallback((fn: () => void, delayMs: number) => {
+    const id = window.setTimeout(() => {
+      feedbackTimersRef.current = feedbackTimersRef.current.filter((t) => t !== id);
+      fn();
+    }, delayMs);
+    feedbackTimersRef.current.push(id);
+  }, []);
+
   useEffect(() => {
     setMetaDraft(metadata);
     if (activeModal === 'fen-pgn') {
@@ -244,6 +281,8 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
       setFenError(null);
       setCopiedFen(false);
       setCopiedExportText(false);
+      setCopiedShareUrl(false);
+      setPngCopyStatus('idle');
     }
     if (activeModal === 'library') {
       setLibSearch(initialLibrarySearch || '');
@@ -262,6 +301,12 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
   }, [activeModal, fenPgnTab, importMode, pgnDirty, pgnInput, fenInput]);
 
   const effectiveExportBaseFen = exportBaseFen || currentFen || INITIAL_FEN;
+  const effectiveExportPly = exportCurrentPly ?? exportMoves.length;
+  const effectiveAnnotations = useMemo<BoardAnnotationSnapshot>(
+    () => exportAnnotations || { arrows: [], circles: [] },
+    [exportAnnotations]
+  );
+
   const exportPreviewText = useMemo(() => {
     if (activeModal !== 'fen-pgn') return '';
     if (exportFormat === 'wechat') {
@@ -286,6 +331,68 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
     effectiveExportBaseFen,
     exportIncludeNotes,
   ]);
+
+  const shareDirectUrl = useMemo(() => {
+    if (activeModal !== 'fen-pgn' || fenPgnTab !== 'export') return '';
+    return buildShareUrl({
+      baseFen: effectiveExportBaseFen,
+      moves: exportMoves,
+      currentPly: effectiveExportPly,
+      flipped: exportFlipped,
+      metadata,
+    });
+  }, [
+    activeModal,
+    fenPgnTab,
+    effectiveExportBaseFen,
+    exportMoves,
+    effectiveExportPly,
+    exportFlipped,
+    metadata,
+  ]);
+
+  const battlePosterOptions = useMemo(() => {
+    if (activeModal !== 'fen-pgn' || fenPgnTab !== 'export' || !exportCurrentPieces) {
+      return null;
+    }
+    const lastMoveAtPly =
+      effectiveExportPly > 0 ? exportMoves[effectiveExportPly - 1] || null : null;
+    return {
+      pieces: exportCurrentPieces,
+      turn: exportCurrentTurn,
+      lastMove: lastMoveAtPly,
+      currentPly: effectiveExportPly,
+      totalPlies: exportMoves.length,
+      metadata,
+      boardTheme,
+      appTheme,
+      craftStyle,
+      useTraditionalChar,
+      showCoordinates: showBoardCoordinates,
+      flipped: exportFlipped,
+      annotations: effectiveAnnotations,
+    };
+  }, [
+    activeModal,
+    fenPgnTab,
+    exportCurrentPieces,
+    exportCurrentTurn,
+    effectiveExportPly,
+    exportMoves,
+    metadata,
+    boardTheme,
+    appTheme,
+    craftStyle,
+    useTraditionalChar,
+    showBoardCoordinates,
+    exportFlipped,
+    effectiveAnnotations,
+  ]);
+
+  const battlePosterPreviewUrl = useMemo(() => {
+    if (!battlePosterOptions) return '';
+    return exportBattleReportPngDataUrl(battlePosterOptions);
+  }, [battlePosterOptions]);
 
   const filteredCommands = useMemo(() => {
     if (activeModal !== 'command-palette') return [];
@@ -319,7 +426,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
       },
       {
         id: 'cmd-play',
-        label: '开启「人机对弈」（支持分先/让左马/让双马）',
+        label: '开启「人机 / 双人对弈」（自选执红/执黑 · 本地面对面）',
         shortcut: '4',
         action: () => {
           onSwitchWorkspace('play');
@@ -345,7 +452,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
       },
       {
         id: 'cmd-export',
-        label: '导出当前对局（下载 .pgn / .fen / 复制微信文本）',
+        label: '分享战报与导出（高清战报图 .png / 分享直链 / .pgn / .fen）',
         shortcut: 'E',
         action: () => {
           setFenPgnTab('export');
@@ -636,7 +743,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
                     onClick={() => {
                       onSaveCurrentGameToLibrary();
                       setLibSaveToast(true);
-                      window.setTimeout(() => setLibSaveToast(false), 1800);
+                      scheduleFeedbackReset(() => setLibSaveToast(false), 1800);
                     }}
                     title={
                       !canSaveCurrentGame
@@ -910,15 +1017,15 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
                           : 'xq-text-secondary hover:text-[var(--xq-text-primary)]'
                       }`}
                     >
-                      <ArrowUpFromLine className="w-3.5 h-3.5" />
-                      <span>导出当前对局</span>
+                      <Share2 className="w-3.5 h-3.5" />
+                      <span>分享与导出</span>
                     </button>
                   </div>
                 </div>
                 <p className="text-xs xq-text-muted">
                   {fenPgnTab === 'import'
                     ? '支持粘贴 FEN、中文纵线 PGN 棋谱或截图识盘，确认后自动载入「复盘分析」'
-                    : `提取当前工作台局面与 ${exportMoves.length} 手着法，支持标准 .pgn / .fen 下载及微信转发`}
+                    : `支持导出高清战报图 (.png)、生成直链还原第 ${effectiveExportPly} 手盘面，及标准 .pgn / .fen 文本`}
                 </p>
               </div>
               <button
@@ -931,105 +1038,215 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
             </div>
 
             {fenPgnTab === 'export' ? (
-              /* -------------------- 导出当前对局页签 -------------------- */
+              /* -------------------- 分享与导出当前对局页签 -------------------- */
               <div className="space-y-3.5 text-[0.8125rem]">
-                {/* 1. 当前局面 FEN 快照 */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between flex-wrap gap-1">
-                    <span className="font-semibold xq-text-secondary">
-                      1. 当前停顿盘面 FEN 编码
-                    </span>
-                    <span className="text-xs xq-text-muted font-mono-tabular">
-                      可用于分享单步残局或校验当前阵型
-                    </span>
-                  </div>
-                  <div className="flex items-center flex-wrap gap-2">
-                    <input
-                      type="text"
-                      readOnly
-                      value={currentFen}
-                      onFocus={(e) => e.currentTarget.select()}
-                      className="flex-1 min-w-[14rem] px-3 py-1.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)] font-mono-tabular text-xs xq-text-primary"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard?.writeText(currentFen).catch(() => {});
-                        setCopiedFen(true);
-                        setTimeout(() => setCopiedFen(false), 1600);
-                      }}
-                      className="px-3 py-1.5 rounded-md xq-btn-secondary flex items-center gap-1 cursor-pointer whitespace-nowrap"
-                    >
-                      {copiedFen ? (
-                        <Check className="w-3.5 h-3.5 text-[var(--xq-accent-jade)]" />
-                      ) : (
-                        <Copy className="w-3.5 h-3.5" />
-                      )}
-                      <span>{copiedFen ? '已复制' : '复制 FEN'}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const baseName = sanitizeExportFilename(
-                          `${metadata.opening || 'position'}_${metadata.date || ''}`
-                        );
-                        downloadTextFile(`${baseName}.fen`, `${currentFen}\n`);
-                      }}
-                      className="px-3 py-1.5 rounded-md xq-btn-secondary flex items-center gap-1 cursor-pointer whitespace-nowrap"
-                    >
-                      <ArrowUpFromLine className="w-3.5 h-3.5 opacity-85" />
-                      <span>下载 .fen</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* 2. 完整棋谱导出（标准 PGN / 微信纯中文文本 + 可选评分批注） */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => setExportFormat('pgn')}
-                        className={`px-2.5 py-1 rounded-md cursor-pointer whitespace-nowrap ${
-                          exportFormat === 'pgn' ? 'xq-btn-option-active' : 'xq-btn-option'
-                        }`}
-                      >
-                        标准 PGN 格式
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setExportFormat('wechat')}
-                        className={`px-2.5 py-1 rounded-md cursor-pointer whitespace-nowrap ${
-                          exportFormat === 'wechat' ? 'xq-btn-option-active' : 'xq-btn-option'
-                        }`}
-                      >
-                        微信纯中文棋谱
-                      </button>
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+                  {/* 左列：高清棋盘战报图 PNG 预览与一键下载/复制 */}
+                  <div className="md:col-span-5 p-3 rounded-lg border xq-border bg-[var(--xq-bg-canvas)] space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold xq-text-primary flex items-center gap-1.5">
+                        <ImageIcon className="w-3.5 h-3.5 text-[var(--xq-accent-gold)]" />
+                        <span>高清战报图 (.png)</span>
+                      </span>
+                      <span className="text-xs xq-text-muted font-mono-tabular">
+                        1080×1400
+                      </span>
                     </div>
 
-                    <label className="flex items-center gap-1.5 cursor-pointer xq-text-secondary select-none">
-                      <input
-                        type="checkbox"
-                        checked={exportIncludeNotes}
-                        onChange={(e) => setExportIncludeNotes(e.target.checked)}
-                        className="w-3.5 h-3.5 accent-[var(--xq-accent-primary)] cursor-pointer"
-                      />
-                      <span>附带引擎评分与评级（手写批注默认保留）</span>
-                    </label>
+                    {battlePosterPreviewUrl ? (
+                      <div className="rounded-md overflow-hidden border xq-border bg-black/20 flex items-center justify-center">
+                        <img
+                          src={battlePosterPreviewUrl}
+                          alt="棋盘高清战报预览"
+                          className="w-full max-h-[19rem] object-contain"
+                        />
+                      </div>
+                    ) : (
+                      <div className="h-56 rounded-md border xq-border flex items-center justify-center text-xs xq-text-muted">
+                        正在生成战报预览…
+                      </div>
+                    )}
+
+                    <div className="text-xs xq-text-muted leading-snug">
+                      {effectiveAnnotations.arrows.length + effectiveAnnotations.circles.length > 0
+                        ? `已收录 ${effectiveAnnotations.arrows.length + effectiveAnnotations.circles.length} 处手绘标注、路数坐标与红黑对局信息`
+                        : '含当前棋具材质、路数坐标、净多子力与红黑对局信息'}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        disabled={!battlePosterOptions}
+                        onClick={() => {
+                          if (battlePosterOptions) {
+                            downloadBattleReportPng(battlePosterOptions);
+                          }
+                        }}
+                        className="py-1.5 px-2.5 rounded-md xq-btn-primary flex items-center justify-center gap-1 text-xs cursor-pointer whitespace-nowrap disabled:opacity-45"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>下载战报图</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!battlePosterOptions}
+                        onClick={async () => {
+                          if (!battlePosterOptions) return;
+                          const ok = await copyBattleReportPngToClipboard(battlePosterOptions);
+                          setPngCopyStatus(ok ? 'copied' : 'failed');
+                          scheduleFeedbackReset(() => setPngCopyStatus('idle'), 2000);
+                        }}
+                        className="py-1.5 px-2.5 rounded-md xq-btn-secondary flex items-center justify-center gap-1 text-xs cursor-pointer whitespace-nowrap disabled:opacity-45"
+                      >
+                        {pngCopyStatus === 'copied' ? (
+                          <Check className="w-3.5 h-3.5 text-[var(--xq-accent-jade)]" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                        <span>
+                          {pngCopyStatus === 'copied'
+                            ? '已复制图片'
+                            : pngCopyStatus === 'failed'
+                            ? '请改用下载'
+                            : '复制图片'}
+                        </span>
+                      </button>
+                    </div>
                   </div>
 
-                  <textarea
-                    rows={7}
-                    readOnly
-                    value={exportPreviewText}
-                    onFocus={(e) => e.currentTarget.select()}
-                    className="w-full p-2.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)] font-mono-tabular text-xs leading-relaxed"
-                  />
+                  {/* 右列：直链分享 + FEN 快照 + PGN/微信棋谱 */}
+                  <div className="md:col-span-7 space-y-3">
+                    {/* 1. URL 直链分享 */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between flex-wrap gap-1">
+                        <span className="font-semibold xq-text-secondary flex items-center gap-1.5">
+                          <Link2 className="w-3.5 h-3.5 text-[var(--xq-accent-gold)]" />
+                          <span>1. 直链无损分享（打开即还原第 {effectiveExportPly} 手）</span>
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          readOnly
+                          value={shareDirectUrl}
+                          onFocus={(e) => e.currentTarget.select()}
+                          className="flex-1 min-w-0 px-3 py-1.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)] font-mono-tabular text-xs xq-text-primary"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard?.writeText(shareDirectUrl).catch(() => {});
+                            setCopiedShareUrl(true);
+                            scheduleFeedbackReset(() => setCopiedShareUrl(false), 1600);
+                          }}
+                          className="px-3 py-1.5 rounded-md xq-btn-primary flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
+                        >
+                          {copiedShareUrl ? (
+                            <Check className="w-3.5 h-3.5" />
+                          ) : (
+                            <Link2 className="w-3.5 h-3.5" />
+                          )}
+                          <span>{copiedShareUrl ? '已复制直链' : '复制直链'}</span>
+                        </button>
+                      </div>
+                    </div>
 
-                  <div className="text-xs xq-text-muted font-mono-tabular">
-                    {exportMoves.length > 0
-                      ? `已包含起始基准 [FEN] 与全盘 ${exportMoves.length} 手着法 · 可无损重导`
-                      : '当前尚无实走着法，导出仅含对局信息与起始 [FEN]；走子或载入名局后可导出完整着法'}
+                    {/* 2. 当前局面 FEN 快照 */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between flex-wrap gap-1">
+                        <span className="font-semibold xq-text-secondary">
+                          2. 当前盘面 FEN 编码
+                        </span>
+                      </div>
+                      <div className="flex items-center flex-wrap gap-2">
+                        <input
+                          type="text"
+                          readOnly
+                          value={currentFen}
+                          onFocus={(e) => e.currentTarget.select()}
+                          className="flex-1 min-w-[10rem] px-3 py-1.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)] font-mono-tabular text-xs xq-text-primary"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard?.writeText(currentFen).catch(() => {});
+                            setCopiedFen(true);
+                            scheduleFeedbackReset(() => setCopiedFen(false), 1600);
+                          }}
+                          className="px-2.5 py-1.5 rounded-md xq-btn-secondary flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                        >
+                          {copiedFen ? (
+                            <Check className="w-3.5 h-3.5 text-[var(--xq-accent-jade)]" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                          <span>{copiedFen ? '已复制' : '复制'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const baseName = sanitizeExportFilename(
+                              `${metadata.opening || 'position'}_${metadata.date || ''}`
+                            );
+                            downloadTextFile(`${baseName}.fen`, `${currentFen}\n`);
+                          }}
+                          className="px-2.5 py-1.5 rounded-md xq-btn-secondary flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                        >
+                          <ArrowUpFromLine className="w-3.5 h-3.5 opacity-85" />
+                          <span>.fen</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 3. 完整棋谱导出（标准 PGN / 微信纯中文文本 + 可选评分批注） */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setExportFormat('pgn')}
+                            className={`px-2.5 py-1 rounded-md cursor-pointer whitespace-nowrap ${
+                              exportFormat === 'pgn' ? 'xq-btn-option-active' : 'xq-btn-option'
+                            }`}
+                          >
+                            标准 PGN
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setExportFormat('wechat')}
+                            className={`px-2.5 py-1 rounded-md cursor-pointer whitespace-nowrap ${
+                              exportFormat === 'wechat' ? 'xq-btn-option-active' : 'xq-btn-option'
+                            }`}
+                          >
+                            微信纯中文
+                          </button>
+                        </div>
+
+                        <label className="flex items-center gap-1.5 cursor-pointer xq-text-secondary select-none text-xs">
+                          <input
+                            type="checkbox"
+                            checked={exportIncludeNotes}
+                            onChange={(e) => setExportIncludeNotes(e.target.checked)}
+                            className="w-3.5 h-3.5 accent-[var(--xq-accent-primary)] cursor-pointer"
+                          />
+                          <span>附带引擎评分（手写批注默认保留）</span>
+                        </label>
+                      </div>
+
+                      <textarea
+                        rows={5}
+                        readOnly
+                        value={exportPreviewText}
+                        onFocus={(e) => e.currentTarget.select()}
+                        className="w-full p-2.5 rounded-md border xq-border bg-[var(--xq-bg-canvas)] font-mono-tabular text-xs leading-relaxed"
+                      />
+
+                      <div className="text-xs xq-text-muted font-mono-tabular">
+                        {exportMoves.length > 0
+                          ? `已包含起始基准 [FEN] 与全盘 ${exportMoves.length} 手着法 · 可无损重导`
+                          : '当前尚无实走着法，导出仅含对局信息与起始 [FEN]'}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -1047,7 +1264,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
                       onClick={() => {
                         navigator.clipboard?.writeText(exportPreviewText).catch(() => {});
                         setCopiedExportText(true);
-                        setTimeout(() => setCopiedExportText(false), 1600);
+                        scheduleFeedbackReset(() => setCopiedExportText(false), 1600);
                       }}
                       className="px-3.5 py-1.5 rounded-md xq-btn-secondary flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
                     >
@@ -1078,10 +1295,10 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
                         );
                         downloadTextFile(`${fileName}.pgn`, pgnContent);
                       }}
-                      className="px-4 py-1.5 rounded-md xq-btn-primary flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                      className="px-4 py-1.5 rounded-md xq-btn-secondary flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
                     >
                       <ArrowUpFromLine className="w-3.5 h-3.5" />
-                      <span>下载 .pgn 文件</span>
+                      <span>下载 .pgn</span>
                     </button>
                   </div>
                 </div>
@@ -1131,6 +1348,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
                             type="button"
                             onClick={() => {
                               setFenInput(INITIAL_FEN);
+                              setPgnDirty(false);
                               setFenError(null);
                             }}
                             className="hover:underline cursor-pointer"
@@ -1144,6 +1362,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
                               setFenInput(
                                 '5k3/4a4/4b4/7R1/3r4R/1p7/9/4p4/4pp3/4K3C w - - 0 1'
                               );
+                              setPgnDirty(false);
                               setFenError(null);
                             }}
                             className="hover:underline cursor-pointer text-[var(--xq-accent-gold)] font-medium"
@@ -1155,6 +1374,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
                             type="button"
                             onClick={() => {
                               setFenInput(currentFen);
+                              setPgnDirty(false);
                               setFenError(null);
                             }}
                             className="hover:underline cursor-pointer"
@@ -1169,6 +1389,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
                           value={fenInput}
                           onChange={(e) => {
                             setFenInput(e.target.value);
+                            setPgnDirty(false);
                             setFenError(null);
                           }}
                           placeholder="粘贴 FEN 编码串（例如 rnbakabnr/9/... w - - 0 1）"
@@ -1957,7 +2178,7 @@ export const DialogsModalSuite: React.FC<DialogsModalSuiteProps> = React.memo(({
                   type="button"
                   onClick={() => {
                     setUpdateCheckStatus('checking');
-                    setTimeout(() => setUpdateCheckStatus('latest'), 500);
+                    scheduleFeedbackReset(() => setUpdateCheckStatus('latest'), 500);
                   }}
                   className="text-[var(--xq-accent-gold)] font-medium hover:underline flex items-center gap-1 cursor-pointer"
                 >

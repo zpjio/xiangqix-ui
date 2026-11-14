@@ -1,8 +1,10 @@
 import React from 'react';
-import { Camp, DrawRuleStatus, GameTerminalState, WorkspaceMode } from '../types/xiangqi';
+import { Camp, DrawRuleStatus, GameTerminalState, PlayOpponentMode, WorkspaceMode } from '../types/xiangqi';
 
 interface StatusBarProps {
   workspace: WorkspaceMode;
+  playOpponentMode?: PlayOpponentMode;
+  playHumanCamp?: Camp;
   isAnalyzing: boolean;
   compareMode?: boolean;
   primaryEngineName?: string;
@@ -46,6 +48,8 @@ function formatTerminalLabel(outcome: GameTerminalState): string {
 
 export const StatusBar: React.FC<StatusBarProps> = React.memo(({
   workspace,
+  playOpponentMode = 'ai',
+  playHumanCamp = 'red',
   isAnalyzing,
   compareMode = false,
   primaryEngineName = '皮卡鱼',
@@ -73,7 +77,10 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({
       return '残局题库 · 执红先行破局（可随时转入复盘分析）';
     }
     if (workspace === 'play') {
-      return '人机对弈 · 支持拖拽落子、棋钟加秒与认输提和';
+      if (playOpponentMode === 'local-pvp') {
+        return '本地双人对弈 · 支持面对面轮流落子、棋钟加秒与悔棋';
+      }
+      return `人机对弈（我方${playHumanCamp === 'red' ? '执红先手' : '执黑后手'}）· 支持开局变例、低时提醒与认输提和`;
     }
     if (workspace === 'setup') {
       return '摆子编辑 · 点选右侧子力库布子，点击盘面已有棋子可移除';

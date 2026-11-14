@@ -95,6 +95,7 @@ export type WorkspaceMode =
   | 'setup';     // 摆子编辑（自由摆子与 FEN 工坊）
 
 export type HandicapType = 'even' | 'move-first' | 'left-horse' | 'two-horses';
+export type PlayOpponentMode = 'ai' | 'local-pvp';
 export type EngineSkillTier = 'scholar' | 'strategist' | 'grandmaster' | 'deity';
 export type EngineInstallStatus = 'missing' | 'installing' | 'ready';
 export type EngineProtocol = 'UCI' | 'UCCI';
@@ -317,6 +318,11 @@ export interface BoardUserCircle {
   id: string;
   pos: Position;
   color: BoardAnnotationColor;
+}
+
+export interface BoardAnnotationSnapshot {
+  arrows: BoardUserArrow[];
+  circles: BoardUserCircle[];
 }
 
 export type ChessClockPresetId = 'none' | 'blitz-5-3' | 'rapid-10-5' | 'classical-20-10';

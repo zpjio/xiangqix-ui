@@ -196,3 +196,44 @@ export function playCheckmateGongSound(soundEnabled = true): void {
     // Ignore audio context errors
   }
 }
+
+// 棋钟最后 10 秒逐秒低时提醒叩击音（最后 3 秒音高略微上扬提示读秒）
+export function playClockWarningTickSound(
+  remainingSeconds: number,
+  soundEnabled = true
+): void {
+  if (!soundEnabled) return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  try {
+    const now = ctx.currentTime;
+    const isUrgent = remainingSeconds <= 3;
+    const baseHz = isUrgent ? 1040 : 780;
+
+    const triggerPulse = (t: number, freq: number, peakGain: number) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t);
+      osc.frequency.exponentialRampToValueAtTime(freq * 0.62, t + 0.042);
+
+      gain.gain.setValueAtTime(0.0008, t);
+      gain.gain.linearRampToValueAtTime(peakGain, t + 0.003);
+      gain.gain.exponentialRampToValueAtTime(0.0005, t + 0.048);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.055);
+    };
+
+    triggerPulse(now, baseHz, isUrgent ? 0.14 : 0.1);
+    if (isUrgent) {
+      triggerPulse(now + 0.055, baseHz * 1.18, 0.08);
+    }
+  } catch {
+    // Ignore audio context errors
+  }
+}
+

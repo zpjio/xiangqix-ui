@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, ArrowRightCircle, RotateCcw, Scale, X } from 'lucide-react';
+import { AlertTriangle, ArrowRightCircle, RotateCcw, Scale, Share2, X } from 'lucide-react';
 import {
   AppTheme,
   BoardAnnotationColor,
+  BoardAnnotationSnapshot,
   BoardTheme,
   BoardUserArrow,
   BoardUserCircle,
@@ -54,6 +55,7 @@ interface BoardProps {
   terminalPrimaryLabel?: string;
   onTerminalRestartAction?: () => void;
   terminalRestartLabel?: string;
+  onTerminalShareAction?: () => void;
   drawClaimPrompt?: {
     kind: '60moves' | 'repetition' | 'insufficient' | 'perpetual-check';
     label: string;
@@ -77,6 +79,7 @@ interface BoardProps {
   annotationResetKey?: string | number;
   clearAnnotationsNonce?: number;
   onUserAnnotationsChange?: (hasAnnotations: boolean) => void;
+  onAnnotationsSnapshotChange?: (snapshot: BoardAnnotationSnapshot) => void;
   onSelectIntersection: (row: number, col: number) => void;
   onEnsureSelectedPiece?: (pieceId: string) => void;
   onDropMove?: (from: Position, to: Position) => void;
@@ -1203,6 +1206,7 @@ export const Board: React.FC<BoardProps> = React.memo(
     terminalPrimaryLabel = '复盘分析',
     onTerminalRestartAction,
     terminalRestartLabel = '重开一局',
+    onTerminalShareAction,
     drawClaimPrompt = null,
     onAcceptDrawClaim,
     onDismissDrawClaim,
@@ -1221,6 +1225,7 @@ export const Board: React.FC<BoardProps> = React.memo(
     annotationResetKey,
     clearAnnotationsNonce = 0,
     onUserAnnotationsChange,
+    onAnnotationsSnapshotChange,
     onSelectIntersection,
     onEnsureSelectedPiece,
     onDropMove,
@@ -1642,10 +1647,21 @@ export const Board: React.FC<BoardProps> = React.memo(
     const verticalReserve = workspace === 'setup' ? '4.75rem' : '8.5rem';
     const horizontalReserve = workspace === 'study' ? '5.75rem' : '2.25rem';
     const hasUserAnnotations = userArrows.length > 0 || userCircles.length > 0;
+    const prevHadAnnotationsRef = useRef(false);
 
     useEffect(() => {
       onUserAnnotationsChange?.(hasUserAnnotations);
-    }, [hasUserAnnotations, onUserAnnotationsChange]);
+      if (hasUserAnnotations || prevHadAnnotationsRef.current) {
+        onAnnotationsSnapshotChange?.({ arrows: userArrows, circles: userCircles });
+      }
+      prevHadAnnotationsRef.current = hasUserAnnotations;
+    }, [
+      hasUserAnnotations,
+      userArrows,
+      userCircles,
+      onUserAnnotationsChange,
+      onAnnotationsSnapshotChange,
+    ]);
 
     return (
       <div className="relative flex items-center justify-center gap-3 select-none">
@@ -1861,6 +1877,16 @@ export const Board: React.FC<BoardProps> = React.memo(
                         >
                           <RotateCcw className="w-3.5 h-3.5 opacity-80" />
                           <span>{terminalRestartLabel}</span>
+                        </button>
+                      )}
+                      {onTerminalShareAction && (
+                        <button
+                          type="button"
+                          onClick={onTerminalShareAction}
+                          className="px-3 py-1.5 rounded-md xq-btn-secondary text-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                        >
+                          <Share2 className="w-3.5 h-3.5 text-[var(--xq-accent-gold)]" />
+                          <span>分享战报</span>
                         </button>
                       )}
                     </div>

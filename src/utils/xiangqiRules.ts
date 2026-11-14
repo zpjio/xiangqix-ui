@@ -39,7 +39,10 @@ export {
   RED_ROAD_NUMERALS,
 };
 
-export function createInitialPieces(handicap: HandicapType = 'even'): Piece[] {
+export function createInitialPieces(
+  handicap: HandicapType = 'even',
+  concededBy: Camp = 'black'
+): Piece[] {
   const full: Piece[] = [
     // Black camp (top, rows 0-4)
     { id: 'b-chariot-1', type: 'chariot', camp: 'black', row: 0, col: 0 },
@@ -77,11 +80,12 @@ export function createInitialPieces(handicap: HandicapType = 'even'): Piece[] {
     { id: 'r-chariot-2', type: 'chariot', camp: 'red', row: 9, col: 8 },
   ];
 
+  const prefix = concededBy === 'red' ? 'r' : 'b';
   if (handicap === 'left-horse') {
-    return full.filter((p) => p.id !== 'b-horse-1');
+    return full.filter((p) => p.id !== `${prefix}-horse-1`);
   }
   if (handicap === 'two-horses') {
-    return full.filter((p) => p.id !== 'b-horse-1' && p.id !== 'b-horse-2');
+    return full.filter((p) => p.id !== `${prefix}-horse-1` && p.id !== `${prefix}-horse-2`);
   }
   return full;
 }

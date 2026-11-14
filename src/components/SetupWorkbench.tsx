@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
   ArrowRightCircle,
@@ -41,6 +41,15 @@ export const SetupWorkbench: React.FC<SetupWorkbenchProps> = React.memo(({
   onFinishSetup,
 }) => {
   const [copiedFen, setCopiedFen] = useState(false);
+  const copiedTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copiedTimerRef.current !== null) {
+        window.clearTimeout(copiedTimerRef.current);
+      }
+    };
+  }, []);
 
   const getRemainingCount = (camp: Camp, type: PieceType, max: number) => {
     const onBoard = pieces.filter((p) => p.camp === camp && p.type === type).length;
@@ -51,9 +60,15 @@ export const SetupWorkbench: React.FC<SetupWorkbenchProps> = React.memo(({
   const currentFen = piecesToFen(pieces, setupTurn);
 
   const handleCopyFen = () => {
-    navigator.clipboard?.writeText(currentFen);
+    navigator.clipboard?.writeText(currentFen).catch(() => {});
     setCopiedFen(true);
-    setTimeout(() => setCopiedFen(false), 1500);
+    if (copiedTimerRef.current !== null) {
+      window.clearTimeout(copiedTimerRef.current);
+    }
+    copiedTimerRef.current = window.setTimeout(() => {
+      copiedTimerRef.current = null;
+      setCopiedFen(false);
+    }, 1500);
   };
 
   return (

@@ -10,6 +10,7 @@ import {
   MessageSquare,
   Pencil,
   RefreshCw,
+  Share2,
   Sparkles,
   Star,
   Unplug,
@@ -229,6 +230,15 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
   const [editingNote, setEditingNote] = useState(false);
   const [draftNag, setDraftNag] = useState<MoveNag | undefined>(undefined);
   const [draftComment, setDraftComment] = useState('');
+  const savedNoticeTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (savedNoticeTimerRef.current !== null) {
+        window.clearTimeout(savedNoticeTimerRef.current);
+      }
+    };
+  }, []);
 
   // 将单列手数配对为「红黑双栏回合行」(Round 1: ply 1 Red + ply 2 Black)
   const rounds = useMemo(() => {
@@ -311,7 +321,13 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
               onClick={() => {
                 onSaveToLibrary();
                 setSavedNotice(true);
-                window.setTimeout(() => setSavedNotice(false), 1600);
+                if (savedNoticeTimerRef.current !== null) {
+                  window.clearTimeout(savedNoticeTimerRef.current);
+                }
+                savedNoticeTimerRef.current = window.setTimeout(() => {
+                  savedNoticeTimerRef.current = null;
+                  setSavedNotice(false);
+                }, 1600);
               }}
               title={
                 !canSaveToLibrary
@@ -368,11 +384,12 @@ export const MoveList: React.FC<MoveListProps> = React.memo(({
             <button
               type="button"
               onClick={onOpenExportModal}
-              aria-label="导出当前对局"
-              title="导出当前对局（.pgn / .fen / 微信文本棋谱）"
-              className="px-1.5 py-0.5 rounded-md xq-btn-secondary cursor-pointer flex items-center gap-1 text-xs shrink-0 whitespace-nowrap"
+              aria-label="分享战报或导出棋谱"
+              title="生成高清战报图 (.png)、复制分享直链或导出 PGN / FEN"
+              className="px-2 py-0.5 rounded-md xq-btn-secondary cursor-pointer flex items-center gap-1 text-xs shrink-0 whitespace-nowrap"
             >
-              <ArrowUpFromLine className="w-3.5 h-3.5 opacity-85" />
+              <Share2 className="w-3 h-3 text-[var(--xq-accent-gold)]" />
+              <span>分享</span>
             </button>
           )}
         </div>
